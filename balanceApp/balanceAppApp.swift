@@ -6,10 +6,17 @@
 //
 
 import SwiftUI
+import Firebase
 import SwiftData
 
 @main
 struct balanceAppApp: App {
+    
+    // Инициализация Firebase в конструкторе
+    init() {
+        FirebaseApp.configure()
+    }
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,

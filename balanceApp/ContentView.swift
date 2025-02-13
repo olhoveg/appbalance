@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         TabView {
-            HomeView()
+            HomeView()  // Теперь тут загрузка из Firestore
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Главная")
@@ -36,14 +36,7 @@ struct ContentView: View {
     }
 }
 
-// Главная
-struct HomeView: View {
-    var body: some View {
-        Text("Главная страница")
-            .font(.title)
-            .padding()
-    }
-}
+
 
 // Карты (внутри переключение между сертификатами и абонементами)
 struct CardsTabView: View {
@@ -103,14 +96,7 @@ struct ChatView: View {
     }
 }
 
-// Профиль
-struct ProfileView: View {
-    var body: some View {
-        Text("Профиль")
-            .font(.title)
-            .padding()
-    }
-}
+
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
