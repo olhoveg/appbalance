@@ -9,22 +9,28 @@ struct ContentView: View {
                     Text("Главная")
                 }
             
-            ProfileView()
+            CardsTabView()
                 .tabItem {
-                    Image(systemName: "person.fill")
-                    Text("Профиль")
+                    Image(systemName: "creditcard.fill")
+                    Text("Карты")
                 }
             
-            MapView()
+            FeedView()
                 .tabItem {
-                    Image(systemName: "map.fill")
-                    Text("Карта")
+                    Image(systemName: "newspaper.fill")
+                    Text("Лента")
                 }
             
             ChatView()
                 .tabItem {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                     Text("Чат")
+                }
+            
+            ProfileView()
+                .tabItem {
+                    Image(systemName: "person.fill")
+                    Text("Профиль")
                 }
         }
     }
@@ -39,19 +45,50 @@ struct HomeView: View {
     }
 }
 
-// Профиль
-struct ProfileView: View {
+// Карты (внутри переключение между сертификатами и абонементами)
+struct CardsTabView: View {
+    @State private var selectedTab = 0
+    
     var body: some View {
-        Text("Профиль")
+        VStack {
+            Picker(selection: $selectedTab, label: Text("Выбор")) {
+                Text("Сертификаты").tag(0)
+                Text("Абонементы").tag(1)
+            }
+            .pickerStyle(SegmentedPickerStyle())
+            .padding()
+            
+            if selectedTab == 0 {
+                CertificatesView()
+            } else {
+                SubscriptionsView()
+            }
+        }
+    }
+}
+
+// Сертификаты
+struct CertificatesView: View {
+    var body: some View {
+        Text("Сертификаты")
             .font(.title)
             .padding()
     }
 }
 
-// Карта
-struct MapView: View {
+// Абонементы
+struct SubscriptionsView: View {
     var body: some View {
-        Text("Карта")
+        Text("Абонементы")
+            .font(.title)
+            .padding()
+    }
+}
+
+// Лента
+struct FeedView: View {
+    var body: some View {
+        Text("Лента")
             .font(.title)
             .padding()
     }
@@ -61,6 +98,15 @@ struct MapView: View {
 struct ChatView: View {
     var body: some View {
         Text("Чат")
+            .font(.title)
+            .padding()
+    }
+}
+
+// Профиль
+struct ProfileView: View {
+    var body: some View {
+        Text("Профиль")
             .font(.title)
             .padding()
     }
