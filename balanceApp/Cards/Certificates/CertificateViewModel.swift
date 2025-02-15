@@ -2,6 +2,17 @@ import SwiftUI
 import Firebase
 import FirebaseDatabase
 
+import Foundation
+
+extension String {
+    func toDate() -> Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ" // Формат даты из Firebase
+        return formatter.date(from: self)
+    }
+}
+
+
 class CertificateViewModel: ObservableObject {
     @Published var ownedCertificates: [Certificate] = []     // Купленные сертификаты
     @Published var availableCertificates: [Certificate] = [] // Доступные для покупки
@@ -78,10 +89,10 @@ class CertificateViewModel: ObservableObject {
                             typeID: nil,
                             statusID: nil,
                             createdDate: nil,
-                            expirationDate: nil,
+                            expirationDate: (value["expirationDate"] as? String)?.toDate(), // Преобразуем строку в Date
                             imageUrl: value["image_url"] as? String,
                             buyUrl: value["buyUrl"] as? String,
-                            expirationText: value["expirationText"] as? String,
+                            expirationText: value["expirationText"] as? String, // Текстовое описание срока действия
                             type: CertificateType(title: key),
                             status: nil
                         )
@@ -106,6 +117,9 @@ class CertificateViewModel: ObservableObject {
                         self.ownedCertificates[index].buyUrl = data["buyUrl"] as? String
                         if let expText = data["expirationText"] as? String {
                             self.ownedCertificates[index].expirationText = expText
+                        }
+                        if let expDateString = data["expirationDate"] as? String {
+                            self.ownedCertificates[index].expirationDate = expDateString.toDate()
                         }
                     }
                 }
