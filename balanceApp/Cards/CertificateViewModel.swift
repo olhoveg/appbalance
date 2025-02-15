@@ -3,7 +3,8 @@ import Firebase
 import FirebaseDatabase
 
 class CertificateViewModel: ObservableObject {
-    @Published var certificates: [Certificate] = []
+    @Published var ownedCertificates: [Certificate] = [] // Сертификаты клиента
+    @Published var availableCertificates: [Certificate] = [] // Доступные сертификаты
     @Published var isLoading: Bool = false
 
     private let API_URL = "https://api.yclients.com/api/v1"
@@ -18,6 +19,12 @@ class CertificateViewModel: ObservableObject {
             return
         }
 
+        fetchOwnedCertificates(for: phoneNumber)
+        fetchAvailableCertificates()
+    }
+
+    // 🚀 **Загрузка сертификатов клиента**
+    private func fetchOwnedCertificates(for phoneNumber: String) {
         guard let url = URL(string: "\(API_URL)/loyalty/certificates/?company_id=433675&phone=\(phoneNumber)") else {
             print("Ошибка: Неверный URL")
             return
@@ -34,25 +41,25 @@ class CertificateViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.isLoading = false
             }
-            
+
             if let error = error {
                 print("Ошибка загрузки сертификатов: \(error.localizedDescription)")
                 return
             }
-            
+
             guard let data = data else {
                 print("Ошибка: пустой ответ от сервера")
                 return
             }
-            
+
             do {
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
                 let decodedResponse: APIResponse = try decoder.decode(APIResponse.self, from: data)
-                
+
                 DispatchQueue.main.async {
-                    self.certificates = decodedResponse.data
-                    self.fetchCertificateImages()
+                    self.ownedCertificates = decodedResponse.data
+                    self.fetchCertificateDetails(for: self.ownedCertificates) // ✅ Загружаем фото для купленных сертификатов
                 }
             } catch {
                 print("Ошибка декодирования JSON: \(error.localizedDescription)")
@@ -60,12 +67,36 @@ class CertificateViewModel: ObservableObject {
         }.resume()
     }
 
-    // 🚀 Получаем номер телефона из профиля (UserDefaults)
-    private func getUserPhoneNumber() -> String? {
-        return UserDefaults.standard.string(forKey: "userPhone")
+    // 🚀 **Загрузка доступных сертификатов из Firebase**
+    private func fetchAvailableCertificates() {
+        databaseRef.child("certificate_images").observeSingleEvent(of: .value) { snapshot in
+            if let data = snapshot.value as? [String: [String: Any]] {
+                DispatchQueue.main.async {
+                    self.availableCertificates = data.map { (key, value) in
+                        Certificate(
+                            id: Int.random(in: 1000...9999),
+                            number: key,
+                            balance: value["price"] as? Int ?? 0,
+                            defaultBalance: nil,
+                            typeID: nil,
+                            statusID: nil,
+                            createdDate: nil,
+                            expirationDate: nil,
+                            imageUrl: value["image_url"] as? String,
+                            buyUrl: value["buyUrl"] as? String,
+                            type: CertificateType(title: key),
+                            status: nil
+                        )
+                    }.sorted { $0.balance < $1.balance }
+                }
+            } else {
+                print("⚠️ Доступные сертификаты не найдены в Firebase")
+            }
+        }
     }
 
-    private func fetchCertificateImages() {
+    // 🚀 **Загрузка изображений и ссылок на покупку**
+    private func fetchCertificateDetails(for certificates: [Certificate]) {
         for index in certificates.indices {
             let certTitle = certificates[index].type?.title ?? ""
 
@@ -77,15 +108,22 @@ class CertificateViewModel: ObservableObject {
             let certRef = databaseRef.child("certificate_images").child(certTitle)
             
             certRef.observeSingleEvent(of: .value) { snapshot in
-                if let data = snapshot.value as? [String: Any], let imageUrl = data["image_url"] as? String {
+                if let data = snapshot.value as? [String: Any] {
                     DispatchQueue.main.async {
-                        self.certificates[index].imageUrl = imageUrl
-                        print("✅ Изображение загружено для \(certTitle): \(imageUrl)")
+                        self.ownedCertificates[index].imageUrl = data["image_url"] as? String
+                        self.ownedCertificates[index].buyUrl = data["buyUrl"] as? String
+                        print("✅ Фото загружено для \(certTitle)")
                     }
                 } else {
-                    print("⚠️ Изображение не найдено в Realtime Database для \(certTitle)")
+                    print("⚠️ Фото не найдено в Firebase для \(certTitle)")
                 }
             }
         }
+    }
+
+
+
+    private func getUserPhoneNumber() -> String? {
+        return UserDefaults.standard.string(forKey: "userPhone")
     }
 }

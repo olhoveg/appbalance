@@ -4,22 +4,41 @@ struct CertificatesView: View {
     @StateObject private var viewModel = CertificateViewModel()
 
     var body: some View {
-        VStack {
-            if viewModel.isLoading {
-                ProgressView()
-                    .padding()
-            } else if viewModel.certificates.isEmpty {
-                Text("У вас пока нет сертификатов")
-                    .foregroundColor(.gray)
-            } else {
-                TabView {
-                    ForEach(viewModel.certificates) { cert in
-                        CertificateCardView(certificate: cert)
-                            .padding(.horizontal)
+        ScrollView {
+            VStack(spacing: 20) {
+                // ✅ Купленные сертификаты (без кнопки "Купить")
+                if !viewModel.ownedCertificates.isEmpty {
+                    Text("Ваши сертификаты")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .padding(.top, 10)
+
+                    TabView {
+                        ForEach(viewModel.ownedCertificates) { cert in
+                            CertificateCardView(certificate: cert, isOwned: true) // ✅ Передаём isOwned: true
+                                .padding(.horizontal)
+                        }
+                    }
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+                    .frame(height: 350)
+                }
+
+                // ✅ Доступные для покупки сертификаты (с кнопкой "Купить")
+                if !viewModel.availableCertificates.isEmpty {
+                    Text("Доступные сертификаты")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .padding(.top, 20)
+
+                    VStack(spacing: 15) {
+                        ForEach(viewModel.availableCertificates) { cert in
+                            CertificateCardView(certificate: cert, isOwned: false) // ✅ Передаём isOwned: false
+                                .padding(.horizontal)
+                        }
                     }
                 }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
             }
+            .padding()
         }
         .onAppear {
             viewModel.fetchCertificates()
