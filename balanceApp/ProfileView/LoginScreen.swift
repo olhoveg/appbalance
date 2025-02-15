@@ -1,39 +1,19 @@
-//
-//  LoginScreen.swift
-//  balanceApp
-//
-//  Created by YourName on 13.02.2025.
-//
-
 import SwiftUI
 
 struct LoginScreen: View {
-    // Поля для телефона и кода
     @State private var username: String = ""
     @State private var formattedPhone: String = ""
     @State private var smsCode: String = ""
-    
-    // Состояния для работы с таймером и запросами
     @State private var codeRequested: Bool = false
     @State private var remainingTime: Int = 0
     @State private var showRequestAgainButton: Bool = false
-    
-    // Для Alert
     @State private var alertMessage: String = ""
     @State private var showingAlert: Bool = false
-    
-    // Флаг для навигации на HomeView
     @State private var shouldNavigate: Bool = false
 
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                
-                // Скрытый NavigationLink для перехода на HomeView
-                NavigationLink(destination: HomeView(), isActive: $shouldNavigate) {
-                    EmptyView()
-                }
-                
                 // Поле ввода телефона
                 TextField("+7 (___) ___ __ __", text: $formattedPhone)
                     .keyboardType(.numberPad)
@@ -42,7 +22,6 @@ struct LoginScreen: View {
                     .cornerRadius(8)
                     .onChange(of: formattedPhone) { newValue in
                         handleFormattedPhoneChange(newValue)
-                        print("Новый форматированный номер: \(formattedPhone)")
                     }
                 
                 // Поле ввода SMS-кода
@@ -107,19 +86,30 @@ struct LoginScreen: View {
             .alert(isPresented: $showingAlert) {
                 Alert(title: Text("Сообщение"),
                       message: Text(alertMessage),
-                      dismissButton: .default(Text("OK")))
+                      dismissButton: .default(Text("OK"), action: {
+                          if alertMessage == "Вход выполнен!" {
+                              shouldNavigate = true
+                          }
+                      }))
             }
             .onAppear {
                 checkAuthStatus()
             }
         }
+        // После успешной авторизации переходим на ContentView (главное меню с TabView)
+        .fullScreenCover(isPresented: $shouldNavigate) {
+            ContentView()
+        }
     }
-}
-
-// MARK: - Логика работы
-
-extension LoginScreen {
     
+    // Проверка авторизации (например, через UserDefaults)
+    private func checkAuthStatus() {
+        if UserDefaults.standard.bool(forKey: "isLoggedIn") {
+            shouldNavigate = true
+        }
+    }
+    
+    // Обработка ввода телефона
     private func handleFormattedPhoneChange(_ input: String) {
         let digits = input.filter { "0123456789".contains($0) }
         if digits.isEmpty {
@@ -137,6 +127,7 @@ extension LoginScreen {
         formattedPhone = formatPhoneNumber(normalized)
     }
     
+    // Форматирование номера телефона
     private func formatPhoneNumber(_ digits: String) -> String {
         let prefix = "+7 "
         var formatted = prefix
@@ -162,14 +153,15 @@ extension LoginScreen {
         return formatted.trimmingCharacters(in: .whitespaces)
     }
     
+    // Запрос SMS-кода
     private func handleRequestCode() {
         codeRequested = true
         remainingTime = 60
-        // Если хотите, чтобы поле с SMS-кодом активировалось, можно добавить флаг, но здесь оставляем как есть
         requestSmsCode()
         startTimer()
     }
     
+    // Таймер для повторного запроса кода
     private func startTimer() {
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             if self.remainingTime > 0 {
@@ -182,6 +174,7 @@ extension LoginScreen {
         }
     }
     
+    // Отправка запроса на получение SMS-кода
     private func requestSmsCode() {
         guard let url = URL(string: "https://api.yclients.com/api/v1/book_code/672239") else { return }
         let dataDict: [String: Any] = ["phone": username]
@@ -194,31 +187,19 @@ extension LoginScreen {
         request.setValue("Bearer 88fnh8jbmt44er5y28nj", forHTTPHeaderField: "Authorization")
         request.httpBody = jsonData
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
+        URLSession.shared.dataTask(with: request) { _, _, error in
+            DispatchQueue.main.async {
+                if let error = error {
                     alertMessage = "Ошибка отправки кода: \(error.localizedDescription)"
-                    showingAlert = true
-                }
-                return
-            }
-            guard let httpResponse = response as? HTTPURLResponse else { return }
-            
-            if (200...299).contains(httpResponse.statusCode) {
-                DispatchQueue.main.async {
+                } else {
                     alertMessage = "Код отправлен на \(username)"
-                    showingAlert = true
                 }
-            } else {
-                let responseData = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-                DispatchQueue.main.async {
-                    alertMessage = "Ошибка отправки кода: \(responseData)"
-                    showingAlert = true
-                }
+                showingAlert = true
             }
         }.resume()
     }
     
+    // Отправка SMS-кода для авторизации и получение данных пользователя (name, email)
     private func handleSmsCodeSubmit() {
         guard let url = URL(string: "https://api.yclients.com/api/v1/user/auth") else { return }
         let dataDict: [String: Any] = ["phone": username, "code": smsCode]
@@ -232,42 +213,33 @@ extension LoginScreen {
         request.httpBody = jsonData
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
+            DispatchQueue.main.async {
+                if let error = error {
                     alertMessage = "Ошибка при входе: \(error.localizedDescription)"
                     showingAlert = true
-                }
-                return
-            }
-            guard let httpResponse = response as? HTTPURLResponse else { return }
-            
-            if (200...299).contains(httpResponse.statusCode) {
-                DispatchQueue.main.async {
+                } else if let data = data {
+                    // Разбираем JSON-ответ
+                    if let jsonResponse = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                       let dataObject = jsonResponse["data"] as? [String: Any] {
+                        let name = dataObject["name"] as? String ?? "Имя пользователя"
+                        let email = dataObject["email"] as? String ?? "email@example.com"
+                        // Сохраняем данные пользователя
+                        UserDefaults.standard.set(name, forKey: "userName")
+                        UserDefaults.standard.set(email, forKey: "userEmail")
+                    }
                     alertMessage = "Вход выполнен!"
-                    showingAlert = true
                     UserDefaults.standard.set(true, forKey: "isLoggedIn")
-                    UserDefaults.standard.set(self.username, forKey: "phone")
-                    
-                    // Переход на HomeView
-                    shouldNavigate = true
-                }
-            } else {
-                let responseData = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-                DispatchQueue.main.async {
-                    alertMessage = "Ошибка входа: \(responseData)"
+                    UserDefaults.standard.set(username, forKey: "userPhone")
                     showingAlert = true
+                    shouldNavigate = true
                 }
             }
         }.resume()
     }
-    
-    private func checkAuthStatus() {
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "isLoggedIn")
-        if isLoggedIn {
-            print("Пользователь уже авторизован")
-            shouldNavigate = true
-        } else {
-            print("Пользователь не авторизован")
-        }
+}
+
+struct LoginScreen_Previews: PreviewProvider {
+    static var previews: some View {
+        LoginScreen()
     }
 }

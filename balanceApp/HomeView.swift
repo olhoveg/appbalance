@@ -1,12 +1,6 @@
-//
-//  HomeView.swift
-//  balanceApp
-//
-//  Created by Evgeniy Olkhov on 13.02.2025.
-//
-
 import SwiftUI
 import Firebase
+import FirebaseFirestore
 
 struct HomeView: View {
     @State private var messages: [String] = [] // Список для данных из Firestore
@@ -25,6 +19,8 @@ struct HomeView: View {
         .onAppear {
             fetchDataFromFirestore()
         }
+        // Скрываем навигационную панель, чтобы не было кнопок "назад" и прочего
+        .navigationBarHidden(true)
     }
     
     // Функция добавления тестовых данных
@@ -58,5 +54,11 @@ struct HomeView: View {
                 }
             }
         }
+    }
+}
+
+struct HomeView_Previews: PreviewProvider {
+    static var previews: some View {
+        HomeView()
     }
 }
