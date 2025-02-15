@@ -60,14 +60,7 @@ struct CardsTabView: View {
     }
 }
 
-// Сертификаты
-struct CertificatesView: View {
-    var body: some View {
-        Text("Сертификаты")
-            .font(.title)
-            .padding()
-    }
-}
+
 
 // Абонементы
 struct SubscriptionsView: View {
