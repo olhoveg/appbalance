@@ -6,7 +6,7 @@ struct CertificatesView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // ✅ Купленные сертификаты (без кнопки "Купить")
+                // ✅ Купленные сертификаты
                 if !viewModel.ownedCertificates.isEmpty {
                     Text("Ваши сертификаты")
                         .font(.title)
@@ -15,7 +15,7 @@ struct CertificatesView: View {
 
                     TabView {
                         ForEach(viewModel.ownedCertificates) { cert in
-                            CertificateCardView(certificate: cert, isOwned: true) // ✅ Передаём isOwned: true
+                            CertificateCardView(certificate: cert, isOwned: true)
                                 .padding(.horizontal)
                         }
                     }
@@ -23,17 +23,18 @@ struct CertificatesView: View {
                     .frame(height: 350)
                 }
 
-                // ✅ Доступные для покупки сертификаты (с кнопкой "Купить")
+                // ✅ Доступные для покупки сертификаты (исправлено наложение)
                 if !viewModel.availableCertificates.isEmpty {
                     Text("Доступные сертификаты")
                         .font(.title)
                         .fontWeight(.bold)
                         .padding(.top, 20)
 
-                    VStack(spacing: 15) {
+                    LazyVStack(spacing: 15) { // ✅ Исправлено наложение
                         ForEach(viewModel.availableCertificates) { cert in
-                            CertificateCardView(certificate: cert, isOwned: false) // ✅ Передаём isOwned: false
+                            CertificateCardView(certificate: cert, isOwned: false)
                                 .padding(.horizontal)
+                                .padding(.vertical, 10) // ✅ Добавил отступы сверху и снизу
                         }
                     }
                 }
