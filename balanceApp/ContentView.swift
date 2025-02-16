@@ -38,38 +38,11 @@ struct ContentView: View {
 
 
 
-// Карты (внутри переключение между сертификатами и абонементами)
-struct CardsTabView: View {
-    @State private var selectedTab = 0
-    
-    var body: some View {
-        VStack {
-            Picker(selection: $selectedTab, label: Text("Выбор")) {
-                Text("Сертификаты").tag(0)
-                Text("Абонементы").tag(1)
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .padding()
-            
-            if selectedTab == 0 {
-                CertificatesView()
-            } else {
-                SubscriptionsView()
-            }
-        }
-    }
-}
 
 
 
-// Абонементы
-struct SubscriptionsView: View {
-    var body: some View {
-        Text("Абонементы")
-            .font(.title)
-            .padding()
-    }
-}
+
+
 
 // Лента
 struct FeedView: View {
