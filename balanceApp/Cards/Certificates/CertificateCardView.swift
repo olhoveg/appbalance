@@ -31,6 +31,12 @@ struct CertificateCardView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
+                    // Отображение баланса
+                    Text("Баланс: \(certificate.balance) ₽")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .padding(.top, 8)
+
                     if let purchaseDate = certificate.createdDate {
                         Text("Дата покупки: \(formattedDate(purchaseDate))")
                             .font(.subheadline)
@@ -70,20 +76,27 @@ struct CertificateCardView: View {
                             .stroke(Color.gray.opacity(0.5), lineWidth: 2)
                     )
 
-                if let buyUrl = certificate.buyUrl, let url = URL(string: buyUrl) {
-                    Button(action: {
-                        UIApplication.shared.open(url)
-                    }) {
-                        Text("Купить")
-                            .font(.headline)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                VStack(alignment: .leading, spacing: 8) {
+                    // Отображение баланса
+                    Text("Баланс: \(certificate.balance) ₽")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    if let buyUrl = certificate.buyUrl, let url = URL(string: buyUrl) {
+                        Button(action: {
+                            UIApplication.shared.open(url)
+                        }) {
+                            Text("Купить")
+                                .font(.headline)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                        }
                     }
-                    .padding(.trailing, 12)
                 }
+                .padding(.trailing, 12)
             }
             .frame(maxWidth: .infinity) // Растягиваем на всю ширину
             .padding(.horizontal, 10) // Уменьшаем отступы для маленьких экранов
@@ -127,55 +140,5 @@ struct CertificateCardView: View {
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMMM yyyy"
         return formatter.string(from: date)
-    }
-}
-
-struct CertificateCardView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            // Пример купленного сертификата
-            CertificateCardView(
-                certificate: Certificate(
-                    id: 409726,
-                    number: "888",
-                    balance: 9000,
-                    defaultBalance: 9000,
-                    typeID: 27841,
-                    statusID: 2,
-                    createdDate: Date(),
-                    expirationDate: Calendar.current.date(byAdding: .month, value: 6, to: Date()),
-                    imageUrl: "https://24balance.hb.bizmrg.com/certificates/1000.png",
-                    buyUrl: nil,
-                    expirationText: "Бессрочный",
-                    type: CertificateType(title: "Массаж"),
-                    status: CertificateStatus(name: "Активен")
-                ),
-                isOwned: true
-            )
-            .previewLayout(.sizeThatFits)
-            .padding()
-
-            // Пример сертификата, доступного для покупки
-            CertificateCardView(
-                certificate: Certificate(
-                    id: 1234,
-                    number: "Test",
-                    balance: 1000,
-                    defaultBalance: nil,
-                    typeID: nil,
-                    statusID: nil,
-                    createdDate: nil,
-                    expirationDate: nil,
-                    imageUrl: "https://24balance.hb.bizmrg.com/certificates/1000.png",
-                    buyUrl: "https://o677.yclients.com/loyalty/certificate/163597",
-                    expirationText: nil,
-                    type: CertificateType(title: "Сертификат 1000"),
-                    status: nil
-                ),
-                isOwned: false
-            )
-            .previewLayout(.sizeThatFits)
-            .padding()
-        }
     }
 }

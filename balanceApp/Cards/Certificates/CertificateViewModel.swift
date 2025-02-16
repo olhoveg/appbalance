@@ -12,7 +12,6 @@ extension String {
     }
 }
 
-
 class CertificateViewModel: ObservableObject {
     @Published var ownedCertificates: [Certificate] = []     // Купленные сертификаты
     @Published var availableCertificates: [Certificate] = [] // Доступные для покупки
