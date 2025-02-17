@@ -40,7 +40,7 @@ struct AbonementCardView: View {
                 }
                 
                 Text("№ \(abonement.number)")
-                    .font(.headline)
+                    .font(.footnote).fontWeight(.bold)
                     .padding(8)
                     .background(Color.black.opacity(0.6))
                     .foregroundColor(.white)

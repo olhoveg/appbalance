@@ -11,22 +11,21 @@ struct BonusBlockCardView: View {
     private let defaultImageName = "defaultBonusImage"
     
     var body: some View {
-        VStack(spacing: 8) {
-            // Квадратное изображение бонусной карты с обводкой и скруглением
-            ZStack {
+        VStack(spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                // Изображение карты, занимающее всю ширину
                 if let imageUrl = imageUrl, !imageUrl.isEmpty {
                     if let image = loadedImage {
                         Image(uiImage: image)
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 150, height: 150)
+                            .scaledToFill()
+                            .frame(height: 200)
                             .clipped()
-                            .cornerRadius(12)
                     } else {
                         Color.gray.opacity(0.2)
-                            .frame(width: 150, height: 150)
-                            .cornerRadius(12)
+                            .frame(height: 200)
                             .overlay(ProgressView())
+                            .clipped()
                             .onAppear {
                                 imageCache.loadImage(from: imageUrl) { img in
                                     loadedImage = img
@@ -36,50 +35,40 @@ struct BonusBlockCardView: View {
                 } else {
                     Image(defaultImageName)
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 150, height: 150)
+                        .scaledToFill()
+                        .frame(height: 200)
                         .clipped()
-                        .cornerRadius(12)
                 }
+                
+                // Номер карты, отображается справа сверху
+                Text("№ \(bonusCard.number)")
+                    .font(.subheadline)
+                    .padding(8)
+                    .background(Color.black.opacity(0.6))
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+                    .padding([.top, .trailing], 12)
             }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.5), lineWidth: 1)
-            )
+            .frame(maxWidth: .infinity)
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 5)
             
-            // Номер бонусной карты
-            Text("№ \(bonusCard.number)")
-                .font(.subheadline)
-                .foregroundColor(.primary)
-            
-            // Баланс карты
-            Text("Баланс: \(String(format: "%.2f", bonusCard.balance)) ₽")
-                .font(.subheadline)
-                .foregroundColor(.blue)
-            
-            // Блок истории операций (если есть)
-            if let transactions = bonusCard.transactions, !transactions.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("История операций")
-                        .font(.footnote)
+            // Баланс карты, красиво оформленный под изображением
+            HStack {
+                Spacer()
+                VStack(spacing: 4) {
+                    Text("Баланс")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("\(String(format: "%.2f", bonusCard.balance)) ₽")
+                        .font(.title2)
                         .bold()
-                    ForEach(transactions) { transaction in
-                        HStack {
-                            Text(transaction.type == "Начисление" ? "Начислено:" : "Списано:")
-                                .font(.caption)
-                            Text("\(String(format: "%.2f", transaction.amount)) ₽")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(formattedDate(transaction.date))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
+                        .foregroundColor(.blue)
                 }
+                Spacer()
             }
         }
-        // Убираем общий фон и контейнер
+        .padding(.horizontal)
         .onAppear {
             fetchBonusCardImage()
         }
@@ -90,23 +79,19 @@ struct BonusBlockCardView: View {
         let ref = dbRef.child("bonuscard_image")
         
         ref.observeSingleEvent(of: .value) { snapshot in
-            print("Snapshot bonuscard_image: \(snapshot.value ?? "nil")")
             if let dict = snapshot.value as? [String: Any] {
                 // Сначала проверяем верхний уровень
                 if let title = dict["title"] as? String,
-                   let url = dict["image_url"] as? String {
-                    print("Найдено на верхнем уровне: \(title) - \(url)")
-                    if title.lowercased() == bonusCard.type.title.lowercased() {
-                        DispatchQueue.main.async {
-                            self.imageUrl = url
-                        }
-                        return
+                   let url = dict["image_url"] as? String,
+                   title.lowercased() == bonusCard.type.title.lowercased() {
+                    DispatchQueue.main.async {
+                        self.imageUrl = url
                     }
+                    return
                 }
                 // Ищем вложенный словарь с ключом, равным bonusCard.type.title
                 if let nested = dict[bonusCard.type.title] as? [String: Any],
                    let nestedUrl = nested["image_url"] as? String {
-                    print("Найдено во вложенном словаре: \(bonusCard.type.title) - \(nestedUrl)")
                     DispatchQueue.main.async {
                         self.imageUrl = nestedUrl
                     }
@@ -115,17 +100,8 @@ struct BonusBlockCardView: View {
                 DispatchQueue.main.async {
                     self.imageUrl = ""
                 }
-            } else {
-                print("Нет данных для bonuscard_image")
             }
         }
-    }
-    
-    private func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "d MMMM yyyy"
-        return formatter.string(from: date)
     }
 }
 
@@ -156,6 +132,5 @@ struct BonusBlockCardView_Previews: PreviewProvider {
             ]
         ))
         .previewLayout(.sizeThatFits)
-        .padding()
     }
 }

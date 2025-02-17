@@ -2,39 +2,39 @@ import SwiftUI
 
 struct CertificatesView: View {
     @StateObject private var viewModel = CertificateViewModel()
+    @State private var activeIndex = 0  // 🔹 Для отслеживания текущей страницы
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // ✅ Купленные сертификаты
+                // ✅ Купленные сертификаты с пагинатором
                 if !viewModel.ownedCertificates.isEmpty {
-                    Text("Ваши сертификаты")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .padding(.top, 10)
-
-                    TabView {
-                        ForEach(viewModel.ownedCertificates) { cert in
-                            CertificateCardView(certificate: cert, isOwned: true)
+                    TabView(selection: $activeIndex) {
+                        ForEach(viewModel.ownedCertificates.indices, id: \.self) { index in
+                            CertificateCardView(certificate: viewModel.ownedCertificates[index], isOwned: true)
                                 .padding(.horizontal)
+                                .tag(index) // 🔹 Устанавливаем теги для отслеживания
                         }
                     }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never)) // 🔹 Скрываем стандартные точки
                     .frame(height: 350)
+
+                    // ✅ Пагинатор под картой
+                    PaginationView(dots: viewModel.ownedCertificates.count, activeIndex: activeIndex)
                 }
 
-                // ✅ Доступные для покупки сертификаты (исправлено наложение)
+                // ✅ Доступные для покупки сертификаты
                 if !viewModel.availableCertificates.isEmpty {
                     Text("Доступные сертификаты")
                         .font(.title)
                         .fontWeight(.bold)
                         .padding(.top, 20)
 
-                    LazyVStack(spacing: 15) { // ✅ Исправлено наложение
+                    LazyVStack(spacing: 15) {
                         ForEach(viewModel.availableCertificates) { cert in
                             CertificateCardView(certificate: cert, isOwned: false)
                                 .padding(.horizontal)
-                                .padding(.vertical, 10) // ✅ Добавил отступы сверху и снизу
+                                .padding(.vertical, 10)
                         }
                     }
                 }
@@ -49,3 +49,5 @@ struct CertificatesView: View {
         }
     }
 }
+
+

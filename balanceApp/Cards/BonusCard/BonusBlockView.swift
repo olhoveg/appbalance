@@ -1,7 +1,7 @@
 import SwiftUI
 import FirebaseDatabase
 
-private let API_KEY = "88fnh8jbmt44er5y28nj" // Ваш API ключ
+private let API_KEY = "88fnh8jbmt44er5y28nj"
 
 struct BonusBlockView: View {
     @State private var bonusCards: [BonusCard] = []
@@ -9,39 +9,38 @@ struct BonusBlockView: View {
     @State private var isLoading = false
     @State private var phoneNumber: String = ""
     
-    let screenWidth = UIScreen.main.bounds.width
-    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
                     if isLoading {
                         ProgressView()
+                            .padding(.top, 50)
                     } else if bonusCards.isEmpty {
                         Text("Нет бонусных карт")
+                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .padding(.top, 50)
                     } else {
                         TabView(selection: $activeIndex) {
                             ForEach(bonusCards) { card in
                                 BonusBlockCardView(bonusCard: card)
-                                    .padding(.horizontal, 10)
+                                    .padding(.horizontal, 20)
                                     .tag(card.id)
                             }
                         }
                         .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                        .frame(height: 250)
+                        .frame(height: 300)
+                        .animation(.easeInOut, value: activeIndex)
                         
-                        PaginationView(dots: bonusCards.count, activeIndex: activeIndex)
                     }
                 }
-                .padding()
+                .padding(.vertical, 20)
             }
-            .navigationTitle("Бонусная карта")
             .onAppear {
                 if let phone = UserDefaults.standard.string(forKey: "userPhone") {
                     phoneNumber = phone
                     fetchBonusCards()
-                } else {
-                    print("Номер телефона не найден")
                 }
             }
             .refreshable {
@@ -51,17 +50,13 @@ struct BonusBlockView: View {
     }
     
     private func fetchBonusCards() {
-        guard !phoneNumber.isEmpty else {
-            print("Номер телефона пуст")
-            return
-        }
+        guard !phoneNumber.isEmpty else { return }
         isLoading = true
         
         let groupId = "415038"
         let companyId = "433675"
         let urlString = "https://api.yclients.com/api/v1/loyalty/cards/\(phoneNumber)/\(groupId)/\(companyId)"
         guard let url = URL(string: urlString) else {
-            print("Неверный URL")
             isLoading = false
             return
         }
@@ -83,7 +78,6 @@ struct BonusBlockView: View {
             guard let data = data else { return }
             do {
                 let decoder = JSONDecoder()
-                // Если API не возвращает даты, можно не настраивать dateDecodingStrategy
                 let response = try decoder.decode(BonusAPIResponse.self, from: data)
                 DispatchQueue.main.async {
                     bonusCards = response.data
@@ -100,19 +94,14 @@ struct PaginationView: View {
     let activeIndex: Int
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             ForEach(0..<dots, id: \.self) { index in
                 Circle()
-                    .fill(index == activeIndex ? Color.black : Color.gray.opacity(0.5))
+                    .fill(index == activeIndex ? Color.blue : Color.gray.opacity(0.3))
                     .frame(width: 8, height: 8)
+                    .animation(.easeInOut, value: activeIndex)
             }
         }
-        .padding(.top, 8)
-    }
-}
-
-struct BonusBlockView_Previews: PreviewProvider {
-    static var previews: some View {
-        BonusBlockView()
+        .padding(.top, 10)
     }
 }
