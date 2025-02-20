@@ -27,6 +27,10 @@ struct AbonementBlockView: View {
                         ProgressView()
                     } else {
                         Text("Нет абонементов")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.gray)
+                            .padding(.top, 16)
                     }
 
                     // ✅ Блок покупки абонементов

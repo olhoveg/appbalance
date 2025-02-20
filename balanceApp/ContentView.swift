@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         TabView {
-            HomeView()  // Теперь тут загрузка из Firestore
+            MainView()  // Теперь тут загрузка из Firestore
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Главная")

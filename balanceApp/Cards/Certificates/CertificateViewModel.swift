@@ -1,9 +1,9 @@
 import SwiftUI
 import Firebase
 import FirebaseDatabase
-
 import Foundation
 
+// Расширение для преобразования строки в дату
 extension String {
     func toDate() -> Date? {
         let formatter = DateFormatter()
@@ -13,9 +13,10 @@ extension String {
 }
 
 class CertificateViewModel: ObservableObject {
-    @Published var ownedCertificates: [Certificate] = []     // Купленные сертификаты
-    @Published var availableCertificates: [Certificate] = [] // Доступные для покупки
+    @Published var ownedCertificates: [Certificate] = []      // Купленные сертификаты
+    @Published var availableCertificates: [Certificate] = []  // Доступные для покупки
     @Published var isLoading: Bool = false
+    @Published var isAuthorized: Bool = false  // Флаг авторизации пользователя
 
     private let API_URL = "https://api.yclients.com/api/v1"
     private let API_KEY = "88fnh8jbmt44er5y28nj"
@@ -24,12 +25,18 @@ class CertificateViewModel: ObservableObject {
     private let databaseRef = Database.database().reference()
 
     func fetchCertificates() {
+        // Всегда загружаем доступные сертификаты
+        fetchAvailableCertificates()
+        
+        // Пытаемся получить номер телефона для купленных сертификатов
         guard let phoneNumber = getUserPhoneNumber() else {
             print("❌ Ошибка: Номер телефона не найден в профиле")
+            self.isAuthorized = false
             return
         }
+        
+        self.isAuthorized = true
         fetchOwnedCertificates(for: phoneNumber)
-        fetchAvailableCertificates()
     }
 
     private func fetchOwnedCertificates(for phoneNumber: String) {
@@ -77,28 +84,38 @@ class CertificateViewModel: ObservableObject {
 
     private func fetchAvailableCertificates() {
         databaseRef.child("certificate_images").observeSingleEvent(of: .value, with: { snapshot in
-            if let data = snapshot.value as? [String: [String: Any]] {
-                DispatchQueue.main.async {
-                    self.availableCertificates = data.map { (key, value) in
-                        Certificate(
-                            id: Int.random(in: 1000...9999),
-                            number: key,
-                            balance: value["price"] as? Int ?? 0,
-                            defaultBalance: nil,
-                            typeID: nil,
-                            statusID: nil,
-                            createdDate: nil,
-                            expirationDate: (value["expirationDate"] as? String)?.toDate(), // Преобразуем строку в Date
-                            imageUrl: value["image_url"] as? String,
-                            buyUrl: value["buyUrl"] as? String,
-                            expirationText: value["expirationText"] as? String, // Текстовое описание срока действия
-                            type: CertificateType(title: key),
-                            status: nil
-                        )
-                    }.sorted { $0.balance < $1.balance }
-                }
-            } else {
+            print("Получен snapshot для availableCertificates: \(snapshot.value ?? "nil")")
+            
+            // Приводим snapshot.value к типу [String: Any]
+            guard let data = snapshot.value as? [String: Any] else {
                 print("⚠️ Доступные сертификаты не найдены в Firebase")
+                return
+            }
+            
+            var certs = [Certificate]()
+            for (key, value) in data {
+                if let dict = value as? [String: Any] {
+                    let certificate = Certificate(
+                        id: Int.random(in: 1000...9999),
+                        number: key,
+                        balance: dict["price"] as? Int ?? 0,
+                        defaultBalance: nil,
+                        typeID: nil,
+                        statusID: nil,
+                        createdDate: nil,
+                        expirationDate: (dict["expirationDate"] as? String)?.toDate(),
+                        imageUrl: dict["image_url"] as? String,
+                        buyUrl: dict["buyUrl"] as? String,
+                        expirationText: dict["expirationText"] as? String,
+                        type: CertificateType(title: key),
+                        status: nil
+                    )
+                    certs.append(certificate)
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.availableCertificates = certs.sorted { $0.balance < $1.balance }
             }
         })
     }
@@ -127,6 +144,7 @@ class CertificateViewModel: ObservableObject {
     }
 
     private func getUserPhoneNumber() -> String? {
+        // Здесь предполагается, что номер телефона сохраняется в UserDefaults
         UserDefaults.standard.string(forKey: "userPhone")
     }
 }

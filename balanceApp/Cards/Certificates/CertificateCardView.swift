@@ -8,18 +8,18 @@ struct CertificateCardView: View {
 
     var body: some View {
         if isOwned {
-            // ✅ Купленные сертификаты (фиксированная высота ~320)
+            // Купленные сертификаты (фиксированная высота ~320)
             VStack(alignment: .leading, spacing: 8) {
                 ZStack(alignment: .topTrailing) {
                     certificateImageView()
-                        .frame(height: 200) // Высота изображения
+                        .frame(height: 200)
                         .cornerRadius(15)
                         .clipped()
                         .overlay(
                             RoundedRectangle(cornerRadius: 15)
                                 .stroke(Color.gray.opacity(0.5), lineWidth: 2)
                         )
-
+                    
                     Text("№ \(certificate.number)")
                         .font(.footnote)
                         .fontWeight(.bold)
@@ -29,14 +29,13 @@ struct CertificateCardView: View {
                         .cornerRadius(8)
                         .padding(6)
                 }
-
+                
                 VStack(alignment: .leading, spacing: 4) {
-                    // Отображение баланса
                     Text("Баланс: \(certificate.balance) ₽")
                         .font(.headline)
                         .foregroundColor(.primary)
                         .padding(.top, 8)
-
+                    
                     if let purchaseDate = certificate.createdDate {
                         Text("Дата покупки: \(formattedDate(purchaseDate))")
                             .font(.subheadline)
@@ -58,14 +57,14 @@ struct CertificateCardView: View {
                 }
                 .padding([.leading, .trailing, .bottom])
             }
-            .frame(maxWidth: .infinity) // Растягиваем на всю ширину
-            .padding(.horizontal, 10) // Уменьшаем отступы для маленьких экранов
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
             .padding(.top, 10)
             .background(Color.white)
             .cornerRadius(15)
             .shadow(radius: 5)
         } else {
-            // ✅ Сертификаты, доступные к покупке (фиксированная высота 170)
+            // Сертификаты, доступные к покупке - без внешнего контейнера и без баланса
             HStack {
                 certificateImageView()
                     .frame(height: 140)
@@ -75,38 +74,25 @@ struct CertificateCardView: View {
                         RoundedRectangle(cornerRadius: 15)
                             .stroke(Color.gray.opacity(0.5), lineWidth: 2)
                     )
-
-                VStack(alignment: .leading, spacing: 8) {
-                    // Отображение баланса
-                    Text("Баланс: \(certificate.balance) ₽")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-
-                    if let buyUrl = certificate.buyUrl, let url = URL(string: buyUrl) {
-                        Button(action: {
-                            UIApplication.shared.open(url)
-                        }) {
-                            Text("Купить")
-                                .font(.headline)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
-                        }
+                
+                if let buyUrl = certificate.buyUrl, let url = URL(string: buyUrl) {
+                    Button(action: {
+                        UIApplication.shared.open(url)
+                    }) {
+                        Text("Купить")
+                            .font(.headline)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
                     }
                 }
-                .padding(.trailing, 12)
             }
-            .frame(maxWidth: .infinity) // Растягиваем на всю ширину
-            .padding(.horizontal, 10) // Уменьшаем отступы для маленьких экранов
-            .padding(.vertical, 10)
-            .background(Color.white)
-            .cornerRadius(15)
-            .shadow(radius: 5)
+            // Без дополнительного контейнера (padding, background, cornerRadius и shadow)
         }
     }
-
+    
     // Функция для отображения изображения с кэшированием
     @ViewBuilder
     private func certificateImageView() -> some View {
@@ -133,7 +119,7 @@ struct CertificateCardView: View {
             }
         }
     }
-
+    
     // Форматирование даты на русский язык
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
