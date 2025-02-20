@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import OneSignalFramework
 
 struct MainView: View {
     var body: some View {
@@ -17,27 +18,60 @@ struct MainView: View {
                 // Основной контент ниже
                 ScrollView {
                     VStack(spacing: 20) {
-                        StoriesView() // Вставляем готовый блок сторис
+                        StoriesView()
+                        ClientRecordsView()
                         
                         Divider()
                         
-                        RecommendationsView() // Блок с рекомендациями
+                        RecommendationsView()
                         
                         Divider()
                         
-                        ArticlesView() // Блок со статьями
+                        ArticlesView()
                     }
                     .padding()
                 }
             }
-            .navigationBarHidden(true) // Скрываем стандартный navigation bar
+            .navigationBarHidden(true)
+        }
+        .onAppear {
+            // Инициализируем OneSignal один раз
+            OneSignalManager.shared.initializeOneSignal()
         }
     }
 }
 
-// MARK: - Остальные вьюшки (примерные реализации)
+// MARK: - OneSignalManager (синглтон)
+class OneSignalManager {
+    static let shared = OneSignalManager()
+    private var isInitialized = false
+    private init() {}
+    
+    func initializeOneSignal() {
+        guard !isInitialized else {
+            print("OneSignal уже инициализирован")
+            return
+        }
+        isInitialized = true
+        
+        // Устанавливаем уровень логирования OneSignal
+        OneSignal.Debug.setLogLevel(.LL_VERBOSE)
+        
+        // Инициализируем OneSignal с вашим App ID
+        OneSignal.initialize("61e511f4-5929-448d-85f4-e5bf171f0764", withLaunchOptions: nil)
+        
+        // Запрос разрешения на уведомления
+        OneSignal.Notifications.requestPermission({ accepted in
+            print("User accepted notifications: \(accepted)")
+        }, fallbackToSettings: true)
+        
+     
+        
+        print("OneSignal успешно инициализирован")
+    }
+}
 
-// Кастомный NavigationBar (с увеличенной областью касания для кнопки профиля)
+// MARK: - Кастомный NavigationBar
 struct CustomNavigationBar: View {
     var body: some View {
         HStack {
@@ -61,7 +95,11 @@ struct CustomNavigationBar: View {
             Spacer()
             
             HStack(spacing: 15) {
-                Button(action: openWhatsApp) {
+                Button(action: {
+                    if let url = URL(string: "https://wa.me/79615805108") {
+                        UIApplication.shared.open(url)
+                    }
+                }) {
                     Image(systemName: "message.fill")
                         .resizable()
                         .frame(width: 24, height: 24)
@@ -69,7 +107,11 @@ struct CustomNavigationBar: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                Button(action: makeCall) {
+                Button(action: {
+                    if let url = URL(string: "tel://+79615805108") {
+                        UIApplication.shared.open(url)
+                    }
+                }) {
                     Image(systemName: "phone.fill")
                         .resizable()
                         .frame(width: 24, height: 24)
@@ -83,29 +125,17 @@ struct CustomNavigationBar: View {
         .background(Color.white)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
-    
-    func openWhatsApp() {
-        if let url = URL(string: "https://wa.me/79615805108") {
-            UIApplication.shared.open(url)
-        }
-    }
-    
-    func makeCall() {
-        if let url = URL(string: "tel://+79615805108") {
-            UIApplication.shared.open(url)
-        }
-    }
 }
 
 
-// Блок рекомендаций
+
+// MARK: - Пример блока рекомендаций
 struct RecommendationsView: View {
     var body: some View {
         VStack(alignment: .leading) {
             Text("Рекомендации")
                 .font(.headline)
                 .padding(.leading)
-            
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack {
                     ForEach(0..<5, id: \.self) { index in
@@ -113,10 +143,7 @@ struct RecommendationsView: View {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.green)
                                 .frame(width: 150, height: 100)
-                                .overlay(
-                                    Text("Рекомендация \(index + 1)")
-                                        .foregroundColor(.white)
-                                )
+                                .overlay(Text("Рекомендация \(index + 1)").foregroundColor(.white))
                         }
                     }
                 }
@@ -126,14 +153,13 @@ struct RecommendationsView: View {
     }
 }
 
-// Блок статей
+// MARK: - Пример блока статей
 struct ArticlesView: View {
     var body: some View {
         VStack(alignment: .leading) {
             Text("Статьи")
                 .font(.headline)
                 .padding(.leading)
-            
             List(0..<5, id: \.self) { index in
                 NavigationLink(destination: ArticleDetailView(id: index)) {
                     Text("Статья \(index + 1)")
@@ -144,17 +170,9 @@ struct ArticlesView: View {
     }
 }
 
-// Детальные страницы
-struct FullStoriesView: View {
-    var body: some View {
-        Text("Полный экран сторис")
-            .font(.largeTitle)
-    }
-}
-
+// MARK: - Детальные страницы
 struct RecommendationDetailView: View {
     var id: Int
-    
     var body: some View {
         Text("Детальная страница рекомендации \(id + 1)")
             .font(.largeTitle)
@@ -163,14 +181,12 @@ struct RecommendationDetailView: View {
 
 struct ArticleDetailView: View {
     var id: Int
-    
     var body: some View {
         Text("Детальная страница статьи \(id + 1)")
             .font(.largeTitle)
     }
 }
 
-// Превью для MainView
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {

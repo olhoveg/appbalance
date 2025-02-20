@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A6FA6512D6755AE009EB62D /* OneSignalExtension in Frameworks */ = {isa = PBXBuildFile; productRef = 0A6FA6502D6755AE009EB62D /* OneSignalExtension */; };
+		0A6FA6532D6755AE009EB62D /* OneSignalFramework in Frameworks */ = {isa = PBXBuildFile; productRef = 0A6FA6522D6755AE009EB62D /* OneSignalFramework */; };
+		0A6FA6552D6755AE009EB62D /* OneSignalInAppMessages in Frameworks */ = {isa = PBXBuildFile; productRef = 0A6FA6542D6755AE009EB62D /* OneSignalInAppMessages */; };
+		0A6FA6572D6755AE009EB62D /* OneSignalLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 0A6FA6562D6755AE009EB62D /* OneSignalLocation */; };
+		0A6FA6632D676360009EB62D /* org.reactjs.native.example.balance24App.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0A6FA65C2D676360009EB62D /* org.reactjs.native.example.balance24App.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0AD443332D5DED6B0063ECEF /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 0AD443322D5DED6B0063ECEF /* FirebaseAuth */; };
 		0AD443352D5DED6B0063ECEF /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 0AD443342D5DED6B0063ECEF /* FirebaseDatabase */; };
 		0AD443372D5DED6B0063ECEF /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 0AD443362D5DED6B0063ECEF /* FirebaseFirestore */; };
@@ -30,13 +35,45 @@
 			remoteGlobalIDString = 0A5684412D5CDBE200F299AA;
 			remoteInfo = balanceApp;
 		};
+		0A6FA6612D676360009EB62D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0A56843A2D5CDBE200F299AA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0A6FA65B2D676360009EB62D;
+			remoteInfo = org.reactjs.native.example.balance24App;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		0A6FA6682D676360009EB62D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0A6FA6632D676360009EB62D /* org.reactjs.native.example.balance24App.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0A5684422D5CDBE200F299AA /* balanceApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = balanceApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A5684552D5CDBE400F299AA /* balanceAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = balanceAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A56845F2D5CDBE400F299AA /* balanceAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = balanceAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A6FA65C2D676360009EB62D /* org.reactjs.native.example.balance24App.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = org.reactjs.native.example.balance24App.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0A6FA6642D676360009EB62D /* Exceptions for "org.reactjs.native.example.balance24App" folder in "org.reactjs.native.example.balance24App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0A6FA65B2D676360009EB62D /* org.reactjs.native.example.balance24App */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0A5684442D5CDBE200F299AA /* balanceApp */ = {
@@ -54,6 +91,14 @@
 			path = balanceAppUITests;
 			sourceTree = "<group>";
 		};
+		0A6FA65D2D676360009EB62D /* org.reactjs.native.example.balance24App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0A6FA6642D676360009EB62D /* Exceptions for "org.reactjs.native.example.balance24App" folder in "org.reactjs.native.example.balance24App" target */,
+			);
+			path = org.reactjs.native.example.balance24App;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,9 +106,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0A6FA6532D6755AE009EB62D /* OneSignalFramework in Frameworks */,
+				0A6FA6512D6755AE009EB62D /* OneSignalExtension in Frameworks */,
 				0AD443352D5DED6B0063ECEF /* FirebaseDatabase in Frameworks */,
+				0A6FA6552D6755AE009EB62D /* OneSignalInAppMessages in Frameworks */,
 				0AD443392D5DED6B0063ECEF /* FirebaseFirestoreCombine-Community in Frameworks */,
 				0AD443332D5DED6B0063ECEF /* FirebaseAuth in Frameworks */,
+				0A6FA6572D6755AE009EB62D /* OneSignalLocation in Frameworks */,
 				0AD4433B2D5DED6B0063ECEF /* FirebaseStorage in Frameworks */,
 				0AD4433D2D5DED6B0063ECEF /* FirebaseStorageCombine-Community in Frameworks */,
 				0AD443372D5DED6B0063ECEF /* FirebaseFirestore in Frameworks */,
@@ -84,6 +133,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A6FA6592D676360009EB62D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -93,6 +149,7 @@
 				0A5684442D5CDBE200F299AA /* balanceApp */,
 				0A5684582D5CDBE400F299AA /* balanceAppTests */,
 				0A5684622D5CDBE400F299AA /* balanceAppUITests */,
+				0A6FA65D2D676360009EB62D /* org.reactjs.native.example.balance24App */,
 				0A5684432D5CDBE200F299AA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +160,7 @@
 				0A5684422D5CDBE200F299AA /* balanceApp.app */,
 				0A5684552D5CDBE400F299AA /* balanceAppTests.xctest */,
 				0A56845F2D5CDBE400F299AA /* balanceAppUITests.xctest */,
+				0A6FA65C2D676360009EB62D /* org.reactjs.native.example.balance24App.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -117,10 +175,12 @@
 				0A56843E2D5CDBE200F299AA /* Sources */,
 				0A56843F2D5CDBE200F299AA /* Frameworks */,
 				0A5684402D5CDBE200F299AA /* Resources */,
+				0A6FA6682D676360009EB62D /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				0A6FA6622D676360009EB62D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				0A5684442D5CDBE200F299AA /* balanceApp */,
@@ -133,6 +193,10 @@
 				0AD443382D5DED6B0063ECEF /* FirebaseFirestoreCombine-Community */,
 				0AD4433A2D5DED6B0063ECEF /* FirebaseStorage */,
 				0AD4433C2D5DED6B0063ECEF /* FirebaseStorageCombine-Community */,
+				0A6FA6502D6755AE009EB62D /* OneSignalExtension */,
+				0A6FA6522D6755AE009EB62D /* OneSignalFramework */,
+				0A6FA6542D6755AE009EB62D /* OneSignalInAppMessages */,
+				0A6FA6562D6755AE009EB62D /* OneSignalLocation */,
 			);
 			productName = balanceApp;
 			productReference = 0A5684422D5CDBE200F299AA /* balanceApp.app */;
@@ -184,6 +248,28 @@
 			productReference = 0A56845F2D5CDBE400F299AA /* balanceAppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		0A6FA65B2D676360009EB62D /* org.reactjs.native.example.balance24App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A6FA6652D676360009EB62D /* Build configuration list for PBXNativeTarget "org.reactjs.native.example.balance24App" */;
+			buildPhases = (
+				0A6FA6582D676360009EB62D /* Sources */,
+				0A6FA6592D676360009EB62D /* Frameworks */,
+				0A6FA65A2D676360009EB62D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0A6FA65D2D676360009EB62D /* org.reactjs.native.example.balance24App */,
+			);
+			name = org.reactjs.native.example.balance24App;
+			packageProductDependencies = (
+			);
+			productName = org.reactjs.native.example.balance24App;
+			productReference = 0A6FA65C2D676360009EB62D /* org.reactjs.native.example.balance24App.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -205,6 +291,9 @@
 						CreatedOnToolsVersion = 16.2;
 						TestTargetID = 0A5684412D5CDBE200F299AA;
 					};
+					0A6FA65B2D676360009EB62D = {
+						CreatedOnToolsVersion = 16.2;
+					};
 				};
 			};
 			buildConfigurationList = 0A56843D2D5CDBE200F299AA /* Build configuration list for PBXProject "balanceApp" */;
@@ -218,6 +307,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				0AD443312D5DED6B0063ECEF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				0A6FA64F2D6755AE009EB62D /* XCRemoteSwiftPackageReference "OneSignal-iOS-SDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0A5684432D5CDBE200F299AA /* Products */;
@@ -227,6 +317,7 @@
 				0A5684412D5CDBE200F299AA /* balanceApp */,
 				0A5684542D5CDBE400F299AA /* balanceAppTests */,
 				0A56845E2D5CDBE400F299AA /* balanceAppUITests */,
+				0A6FA65B2D676360009EB62D /* org.reactjs.native.example.balance24App */,
 			);
 		};
 /* End PBXProject section */
@@ -247,6 +338,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0A56845D2D5CDBE400F299AA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A6FA65A2D676360009EB62D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -277,6 +375,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A6FA6582D676360009EB62D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -289,6 +394,11 @@
 			isa = PBXTargetDependency;
 			target = 0A5684412D5CDBE200F299AA /* balanceApp */;
 			targetProxy = 0A5684602D5CDBE400F299AA /* PBXContainerItemProxy */;
+		};
+		0A6FA6622D676360009EB62D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0A6FA65B2D676360009EB62D /* org.reactjs.native.example.balance24App */;
+			targetProxy = 0A6FA6612D676360009EB62D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -416,8 +526,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"balanceApp/Preview Content\"";
+				DEVELOPMENT_TEAM = B9K44XR228;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = 24balance;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -426,20 +538,21 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = balance.balanceApp;
+				MARKETING_VERSION = 1.15;
+				PRODUCT_BUNDLE_IDENTIFIER = org.reactjs.native.example.balance24App;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				XROS_DEPLOYMENT_TARGET = 2.2;
 			};
 			name = Debug;
@@ -449,12 +562,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = balanceApp/balanceApp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = balanceApp/balanceAppRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"balanceApp/Preview Content\"";
+				DEVELOPMENT_TEAM = B9K44XR228;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = 24balance;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -463,20 +578,21 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = balance.balanceApp;
+				MARKETING_VERSION = 1.15;
+				PRODUCT_BUNDLE_IDENTIFIER = org.reactjs.native.example.balance24App;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				XROS_DEPLOYMENT_TARGET = 2.2;
 			};
 			name = Release;
@@ -567,6 +683,62 @@
 			};
 			name = Release;
 		};
+		0A6FA6662D676360009EB62D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B9K44XR228;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = org.reactjs.native.example.balance24App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = org.reactjs.native.example.balance24App;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.balance24App.org-reactjs-native-example-balance24App";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		0A6FA6672D676360009EB62D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = org.reactjs.native.example.balance24App/org.reactjs.native.example.balance24AppRelease.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B9K44XR228;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = org.reactjs.native.example.balance24App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = org.reactjs.native.example.balance24App;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.balance24App.org-reactjs-native-example-balance24App";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -606,9 +778,26 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		0A6FA6652D676360009EB62D /* Build configuration list for PBXNativeTarget "org.reactjs.native.example.balance24App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A6FA6662D676360009EB62D /* Debug */,
+				0A6FA6672D676360009EB62D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0A6FA64F2D6755AE009EB62D /* XCRemoteSwiftPackageReference "OneSignal-iOS-SDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/OneSignal/OneSignal-iOS-SDK.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.2.10;
+			};
+		};
 		0AD443312D5DED6B0063ECEF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -620,6 +809,26 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		0A6FA6502D6755AE009EB62D /* OneSignalExtension */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A6FA64F2D6755AE009EB62D /* XCRemoteSwiftPackageReference "OneSignal-iOS-SDK" */;
+			productName = OneSignalExtension;
+		};
+		0A6FA6522D6755AE009EB62D /* OneSignalFramework */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A6FA64F2D6755AE009EB62D /* XCRemoteSwiftPackageReference "OneSignal-iOS-SDK" */;
+			productName = OneSignalFramework;
+		};
+		0A6FA6542D6755AE009EB62D /* OneSignalInAppMessages */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A6FA64F2D6755AE009EB62D /* XCRemoteSwiftPackageReference "OneSignal-iOS-SDK" */;
+			productName = OneSignalInAppMessages;
+		};
+		0A6FA6562D6755AE009EB62D /* OneSignalLocation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A6FA64F2D6755AE009EB62D /* XCRemoteSwiftPackageReference "OneSignal-iOS-SDK" */;
+			productName = OneSignalLocation;
+		};
 		0AD443322D5DED6B0063ECEF /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0AD443312D5DED6B0063ECEF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
