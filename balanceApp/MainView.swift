@@ -19,7 +19,7 @@ struct MainView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         StoriesView()
-                        ClientRecordsView()
+                        RecordView()
                         
                         Divider()
                         
