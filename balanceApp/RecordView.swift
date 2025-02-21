@@ -1,5 +1,30 @@
 import SwiftUI
 import Combine
+import FirebaseDatabase
+
+
+extension Record {
+    var visit_id: Int? { return nil }
+    var services: [Service]? { return [] }
+    var staff: Staff? { return nil }
+    
+    var asRecordModal: RecordModal {
+        return RecordModal(
+            company_id: self.company_id,
+            date: self.date,
+            id: self.id,
+            last_change_date: self.last_change_date,
+            custom_color: self.custom_color,
+            attendance: self.attendance,
+            visit_attendance: self.visit_attendance,
+            visit_id: self.visit_id,
+            length: self.length, // Используем значение, которое пришло из JSON
+            services: self.services,
+            staff: self.staff
+        )
+    }
+}
+
 
 // MARK: - Модели данных
 
@@ -12,9 +37,10 @@ struct Record: Identifiable, Codable {
     let attendance: Int?
     let visit_attendance: Int?
     let confirmed: Int?  // Например, для проверки (1 – подтверждённая запись)
-    
+    let length: Int      // длительность записи в секундах
+
     private enum CodingKeys: String, CodingKey {
-        case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed
+        case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed, length
     }
 }
 
@@ -329,173 +355,284 @@ struct RecordView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        // Отображение записей по филиалам
-                        ForEach(viewModel.recordsByCompany.keys.sorted(), id: \.self) { companyIdKey in
-                            if let records = viewModel.recordsByCompany[companyIdKey] {
-                                let address = viewModel.companyIdToAddress[companyIdKey] ?? ""
-                                if let closestRecord = viewModel.closestUpcomingRecord(records: records) {
-                                    let display = viewModel.displayRecord(record: closestRecord)
-                                    RecordRow(address: display.address, date: display.dateString)
-                                        .onTapGesture {
-                                            viewModel.selectedRecord = closestRecord
-                                            viewModel.showModal = true
-                                            viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
-                                        }
-                                } else {
-                                    NoRecordRow(address: address)
-                                }
+            VStack(spacing: 16) {
+                // Верхняя строка: два блока для "Коммунаров 26" и "Свердлова 126"
+                HStack(spacing: 10) {
+                    let companyIds = ["433675", "672239"]
+                    
+                    ForEach(companyIds, id: \.self) { companyIdKey in
+                        let address = viewModel.companyIdToAddress[companyIdKey] ?? ""
+                        let records = viewModel.recordsByCompany[companyIdKey] ?? []
+                        let futureRecords = records.filter {
+                            if let d = viewModel.recordDate(from: $0.date) {
+                                return d > Date()
+                            }
+                            return false
+                        }
+                        
+                        if futureRecords.isEmpty {
+                            NoRecordRow(address: address)
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            if let closestRecord = viewModel.closestUpcomingRecord(records: futureRecords) {
+                                let display = viewModel.displayRecord(record: closestRecord)
+                                // Используем RecordRow, который теперь получает customColor, visit_attendance и attendance
+                                RecordRow(address: display.address,
+                                          date: display.dateString,
+                                          customColor: closestRecord.custom_color,
+                                          visit_attendance: closestRecord.visit_attendance,
+                                          attendance: closestRecord.attendance)
+                                    .onTapGesture {
+                                        viewModel.selectedRecord = closestRecord
+                                        viewModel.showModal = true
+                                        _ = viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                NoRecordRow(address: address)
+                                    .frame(maxWidth: .infinity)
                             }
                         }
-                        // Горизонтальная лента с 10 предстоящими записями
-                        UpcomingTenRecordsView(records: viewModel.upcomingTenRecords(), viewModel: viewModel)
                     }
-                    .padding()
                 }
-                .navigationTitle("Записи")
-                .toolbar {
-                    Button(action: {
-                        viewModel.refreshData()
-                    }) {
-                        if viewModel.isLoading {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "arrow.clockwise")
+                .padding(.horizontal)
+                
+                // Горизонтальная лента с 10 ближайшими записями
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(viewModel.upcomingTenRecords()) { record in
+                            if let date = viewModel.recordDate(from: record.date) {
+                                let address = viewModel.companyIdToAddress[String(record.company_id)] ?? ""
+                                UpcomingRecordBlock(date: date, address: address)
+                                    .onTapGesture {
+                                        viewModel.selectedRecord = record
+                                        viewModel.showModal = true
+                                    }
+                            }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .refreshable {
+                
+                Spacer()
+            }
+            .navigationTitle("Записи")
+            .toolbar {
+                Button(action: {
                     viewModel.refreshData()
+                }) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
                 }
-                
-                
+            }
+            .refreshable {
+                viewModel.refreshData()
             }
             .onAppear {
-                viewModel.getPhoneNumber() // Получаем номер телефона
+                viewModel.getPhoneNumber()
                 viewModel.refreshData()
-                viewModel.log("RecordView появился")
-                // Если нужно, можно добавить получение playerId через OneSignal
             }
             .sheet(isPresented: $viewModel.showModal) {
                 if let record = viewModel.selectedRecord {
-                    RecordModalView(record: record, viewModel: viewModel)
+                    RecordModalView(record: record.asRecordModal, viewModel: viewModel)
                 }
             }
         }
     }
 }
 
-// MARK: - Дополнительные SwiftUI View
+// MARK: - Запись с автоматическим подставлением специалиста
 
 struct RecordRow: View {
     let address: String
     let date: String
+    let customColor: String?
+    let visit_attendance: Int?
+    let attendance: Int?
+    
+    @State private var specialistName: String = ""
+    @State private var checkmarkUrl: String? = nil
+    
+    // Проверка на подтверждённость записи (visit_attendance или attendance равны 2)
+    var isConfirmed: Bool {
+        (visit_attendance == 2 || attendance == 2)
+    }
+    
+    var backgroundColor: Color {
+        if address == "Коммунаров 26" {
+            return Color(red: 66/255, green: 141/255, blue: 58/255)
+        } else if address == "Свердлова 126" {
+            return Color(red: 60/255, green: 103/255, blue: 218/255)
+        } else {
+            return Color(red: 66/255, green: 141/255, blue: 58/255)
+        }
+    }
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(address)
-                    .font(.headline)
-                Text(date)
+        VStack(spacing: 8) {
+            Text("Вас ждет на")
+                .font(.subheadline)
+                .foregroundColor(.white)
+            Text(address)
+                .font(.headline)
+                .foregroundColor(.white)
+            Text(date)
+                .font(.subheadline)
+                .foregroundColor(.white)
+            if !specialistName.isEmpty {
+                Text(specialistName)
                     .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
             }
-            Spacer()
         }
         .padding()
-        .background(Color.blue.opacity(0.2))
-        .cornerRadius(8)
-    }
-}
-
-struct NoRecordRow: View {
-    let address: String
-    var body: some View {
-        HStack {
-            Text("Нет записи для \(address)")
-                .foregroundColor(.gray)
+        .background(backgroundColor)
+        .cornerRadius(12)
+        .overlay(
+            Group {
+                if isConfirmed, let checkmarkUrl = checkmarkUrl, let url = URL(string: checkmarkUrl) {
+                    AsyncImage(url: url) { image in
+                        image.resizable()
+                             .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        ProgressView()
+                    }
+                    .frame(width: 25, height: 25)
+                    .padding(5)
+                    .background(Color.white.opacity(0.7))
+                    .cornerRadius(15)
+                    .padding([.top, .trailing], 5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+            }
+        )
+        .onAppear {
+            loadCheckmarkUrl()
+            loadSpecialistName()
         }
-        .padding()
     }
-}
-
-struct UpcomingTenRecordsView: View {
-    let records: [Record]
-    let viewModel: RecordViewModel
     
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(records) { record in
-                    if let date = viewModel.recordDate(from: record.date) {
-                        let address = viewModel.companyIdToAddress[String(record.company_id)] ?? ""
-                        UpcomingRecordBlock(date: date, address: address, viewModel: viewModel)
+    /// Загружает URL иконки галочки из Firebase
+    func loadCheckmarkUrl() {
+        let ref = Database.database().reference(withPath: "specialists/checkmarkUrl")
+        ref.observeSingleEvent(of: .value) { snapshot in
+            if let url = snapshot.value as? String {
+                self.checkmarkUrl = url
+            }
+        }
+    }
+    
+    /// Загружает имя специалиста из Firebase, подбирая по значению customColor
+    func loadSpecialistName() {
+        guard let customColor = customColor else { return }
+        let ref = Database.database().reference(withPath: "specialists")
+        ref.observeSingleEvent(of: .value) { snapshot in
+            if let specialistsDict = snapshot.value as? [String: Any] {
+                for (_, value) in specialistsDict {
+                    if let spec = value as? [String: Any],
+                       let color = spec["color"] as? String,
+                       let name = spec["name"] as? String,
+                       color == customColor {
+                        self.specialistName = name
+                        break
                     }
                 }
             }
-            .padding(.vertical)
         }
     }
 }
+
+// MARK: - Нет записей (серый блок)
+
+struct NoRecordRow: View {
+    let address: String
+    
+    var body: some View {
+        Text("Нет записей на \(address)")
+            .font(.headline)
+            .foregroundColor(.black)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color(white: 0.9))
+            .cornerRadius(12)
+    }
+}
+
+// MARK: - Горизонтальная лента с 10 ближайшими записями
 
 struct UpcomingRecordBlock: View {
     let date: Date
     let address: String
-    let viewModel: RecordViewModel
     
     var body: some View {
         let calendar = Calendar.current
         let day = calendar.component(.day, from: date)
-        let weekdayIndex = calendar.component(.weekday, from: date) - 1 // В Swift воскресенье = 1
+        let weekdayIndex = calendar.component(.weekday, from: date) - 1 // В Swift: воскресенье = 1
         let weekdays = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"]
         let dayOfWeek = weekdays[weekdayIndex]
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ru_RU")
-        formatter.dateFormat = "HH:mm"
-        let time = formatter.string(from: date)
-        let backgroundColor: Color = (address == "Коммунаров 26") ? Color(red: 66/255, green: 141/255, blue: 58/255) : Color(red: 60/255, green: 103/255, blue: 218/255)
         
-        return VStack {
-            Text(dayOfWeek)
-                .font(.caption)
-                .foregroundColor(.white)
-                .padding(.top, 4)
-            Text("\(day)")
-                .font(.title)
-                .foregroundColor(.white)
-            Text(time)
-                .font(.caption)
-                .foregroundColor(.white)
+        let monthIndex = calendar.component(.month, from: date) - 1
+        let genitiveMonths = ["января", "февраля", "марта",
+                              "апреля", "мая", "июня",
+                              "июля", "августа", "сентября",
+                              "октября", "ноября", "декабря"]
+        let monthString = genitiveMonths[monthIndex]
+        
+        let timeFormatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ru_RU")
+            formatter.dateFormat = "HH:mm"
+            return formatter
+        }()
+        let timeString = timeFormatter.string(from: date)
+        
+        let backgroundColor: Color = (address == "Коммунаров 26")
+            ? Color(red: 66/255, green: 141/255, blue: 58/255)
+            : Color(red: 60/255, green: 103/255, blue: 218/255)
+        
+        ZStack {
+            VStack {
+                Spacer()
+                Text("\(day)")
+                    .font(.system(size: 26))
+                    .foregroundColor(.white)
+                Text(monthString)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white)
+                Text(timeString)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white)
+                Spacer()
+            }
+            
+            VStack {
+                HStack {
+                    Spacer()
+                    Text(dayOfWeek)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.top, 4)
+                        .padding(.trailing, 4)
+                }
+                Spacer()
+            }
         }
-        .frame(width: 60, height: 60)
+        .frame(width: 70, height: 70)
         .background(backgroundColor)
         .cornerRadius(10)
     }
 }
 
-struct RecordModalView: View {
-    let record: Record
-    @ObservedObject var viewModel: RecordViewModel
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Детали записи")
-                .font(.title)
-                .padding()
-            Text("ID: \(record.id)")
-            Text("Дата: \(record.date)")
-            Text("Подтверждена: \((record.confirmed ?? 0) == 1 ? "Да" : "Нет")")
-            Button("Закрыть") {
-                viewModel.showModal = false
-                viewModel.log("Закрытие модального окна")
-            }
-        }
-        .padding()
-    }
-}
+// MARK: - Модальное окно для детального просмотра записи
 
-// Отладочное окно для вывода логов (при необходимости)
+
+
+// MARK: - Окно для отладки (при необходимости)
+
 struct DebugLogsView: View {
     let debugLogs: [String]
     
@@ -513,6 +650,8 @@ struct DebugLogsView: View {
         }
     }
 }
+
+// MARK: - Превью
 
 struct RecordView_Previews: PreviewProvider {
     static var previews: some View {
