@@ -204,7 +204,22 @@ struct RecordModalView: View {
                     .cornerRadius(10)
                     .shadow(radius: 2)
                     .padding(.bottom, 10)
+                    .onAppear {
+                         print("Record \(record.id) has \(services.count) services")
+                         for service in services {
+                             print("Service id: \(service.id), title: \(service.title), cost: \(service.cost)")
+                         }
+                    }
+                } else {
+                    // Если услуг нет, добавляем лог
+                    Text("Нет услуг для этой записи")
+                        .foregroundColor(.gray)
+                        .onAppear {
+                            print("Record \(record.id) has no services")
+                        }
                 }
+
+
                 
                 // Локация
                 VStack(alignment: .center, spacing: 8) {

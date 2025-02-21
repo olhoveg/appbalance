@@ -5,7 +5,11 @@ import FirebaseDatabase
 
 extension Record {
     var visit_id: Int? { return nil }
-    var services: [Service]? { return [] }
+    var lengthValue: Int {
+        return length ?? 600  // Если length отсутствует, можно использовать значение по умолчанию
+    }
+    // Удалите эту строку:
+    // var services: [Service]? { return [] }
     var staff: Staff? { return nil }
     
     var asRecordModal: RecordModal {
@@ -18,8 +22,8 @@ extension Record {
             attendance: self.attendance,
             visit_attendance: self.visit_attendance,
             visit_id: self.visit_id,
-            length: self.length, // Используем значение, которое пришло из JSON
-            services: self.services,
+            length: self.lengthValue,
+            services: self.services,  // Теперь будет использовать значение, полученное из JSON
             staff: self.staff
         )
     }
@@ -36,11 +40,12 @@ struct Record: Identifiable, Codable {
     let custom_color: String?
     let attendance: Int?
     let visit_attendance: Int?
-    let confirmed: Int?  // Например, для проверки (1 – подтверждённая запись)
-    let length: Int      // длительность записи в секундах
+    let confirmed: Int?
+    let length: Int?
+    let services: [Service]?  // Добавляем, чтобы декодировалось из JSON
 
     private enum CodingKeys: String, CodingKey {
-        case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed, length
+        case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed, length, services
     }
 }
 
