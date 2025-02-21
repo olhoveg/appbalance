@@ -114,33 +114,34 @@ struct RecordModalView: View {
                         let dateString = headerDateFormatter.string(from: startDate)
                         let startTimeString = headerTimeFormatter.string(from: startDate)
                         let endTimeString = headerTimeFormatter.string(from: endDate)
-                        
-                        HStack {
-                            Text("\(dateString), \(startTimeString)")
+
+                        HStack(spacing: 8) {
+                            // Текст с датой и временем
+                            Text("\(dateString), \(startTimeString) - \(endTimeString)")
                                 .font(.headline)
                                 .foregroundColor(record.attendance == 2 ? .white : .black)
-                            Text("- \(endTimeString)")
-                                .font(.headline)
-                                .foregroundColor(record.attendance == 2 ? .white : .black)
+                            
+                            // Галочка, если запись подтверждена
+                            if record.attendance == 2,
+                               let checkmarkUrl = checkmarkUrl,
+                               let url = URL(string: checkmarkUrl) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                                .frame(width: 25, height: 25)
+                            }
                         }
-                    }
-                    // Галочка, если запись подтверждена
-                    if record.attendance == 2,
-                       let checkmarkUrl = checkmarkUrl,
-                       let url = URL(string: checkmarkUrl) {
-                        AsyncImage(url: url) { image in
-                            image.resizable()
-                                .aspectRatio(contentMode: .fit)
-                        } placeholder: {
-                            ProgressView()
-                        }
-                        .frame(width: 25, height: 25)
                     }
                 }
                 .padding()
                 .background(record.attendance == 2 ? Color.green : Color.gray.opacity(0.3))
                 .cornerRadius(10)
                 .padding(.bottom, 10)
+
+
                 
                 // Специалист
                 if let specialist = firebaseSpecialist {
@@ -419,13 +420,21 @@ struct RecordModalView: View {
     
     // Функция для подтверждения записи (PUT запрос)
     func confirmRecord() {
-        guard let visitId = record.visit_id else { return }
+        print("Вызов функции confirmRecord() для записи id: \(record.id)")
+        guard let visitId = record.visit_id else {
+            print("visit_id отсутствует для записи id: \(record.id)")
+            return
+        }
         let recordId = record.id
         let apiUrl = "https://api.yclients.com/api/v1/visits/\(visitId)/\(recordId)"
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         
-        guard let url = URL(string: apiUrl) else { return }
+        guard let url = URL(string: apiUrl) else {
+            print("Неверный URL: \(apiUrl)")
+            return
+        }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
@@ -446,7 +455,11 @@ struct RecordModalView: View {
             "comment": "Запись подтверждена пользователем",
             "services": servicesArray
         ]
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else { return }
+        
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
+            print("Ошибка сериализации body: \(body)")
+            return
+        }
         request.httpBody = jsonData
         
         URLSession.shared.dataTask(with: request) { data, response, error in
@@ -455,13 +468,20 @@ struct RecordModalView: View {
                 return
             }
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                print("Запись id \(record.id) успешно подтверждена (HTTP статус 200)")
                 DispatchQueue.main.async {
                     viewModel.showModal = false
                     // При необходимости обновите данные через viewModel.refreshData()
                 }
+            } else {
+                print("Ответ сервера не равен 200")
+                if let data = data, let responseBody = try? JSONSerialization.jsonObject(with: data) {
+                    print("Response body: \(responseBody)")
+                }
             }
         }.resume()
     }
+
     
     // Функция для удаления записи (DELETE запрос)
     func confirmDelete() {

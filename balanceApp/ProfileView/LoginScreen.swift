@@ -10,7 +10,7 @@ struct LoginScreen: View {
     @State private var alertMessage: String = ""
     @State private var showingAlert: Bool = false
     @State private var shouldNavigate: Bool = false
-
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
@@ -87,10 +87,10 @@ struct LoginScreen: View {
                 Alert(title: Text("Сообщение"),
                       message: Text(alertMessage),
                       dismissButton: .default(Text("OK"), action: {
-                          if alertMessage == "Вход выполнен!" {
-                              shouldNavigate = true
-                          }
-                      }))
+                    if alertMessage == "Вход выполнен!" {
+                        shouldNavigate = true
+                    }
+                }))
             }
             .onAppear {
                 checkAuthStatus()
@@ -201,9 +201,15 @@ struct LoginScreen: View {
     
     // Отправка SMS-кода для авторизации и получение данных пользователя (name, email)
     private func handleSmsCodeSubmit() {
-        guard let url = URL(string: "https://api.yclients.com/api/v1/user/auth") else { return }
+        guard let url = URL(string: "https://api.yclients.com/api/v1/user/auth") else {
+            print("Неверный URL")
+            return
+        }
         let dataDict: [String: Any] = ["phone": username, "code": smsCode]
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: dataDict) else { return }
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: dataDict) else {
+            print("Ошибка сериализации JSON")
+            return
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -212,34 +218,55 @@ struct LoginScreen: View {
         request.setValue("Bearer 88fnh8jbmt44er5y28nj", forHTTPHeaderField: "Authorization")
         request.httpBody = jsonData
         
+        print("Отправка запроса на авторизацию с данными: \(dataDict)")
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
+                    print("Ошибка сети: \(error.localizedDescription)")
                     alertMessage = "Ошибка при входе: \(error.localizedDescription)"
                     showingAlert = true
-                } else if let data = data {
-                    // Разбираем JSON-ответ
-                    if let jsonResponse = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                       let dataObject = jsonResponse["data"] as? [String: Any] {
-                        let name = dataObject["name"] as? String ?? "Имя пользователя"
-                        let email = dataObject["email"] as? String ?? "email@example.com"
-                        // Сохраняем данные пользователя
-                        UserDefaults.standard.set(name, forKey: "userName")
-                        UserDefaults.standard.set(email, forKey: "userEmail")
+                } else if let httpResponse = response as? HTTPURLResponse {
+                    print("Получен ответ с кодом статуса: \(httpResponse.statusCode)")
+                    if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                        print("Ответ сервера: \(responseString)")
                     }
-                    alertMessage = "Вход выполнен!"
-                    UserDefaults.standard.set(true, forKey: "isLoggedIn")
-                    UserDefaults.standard.set(username, forKey: "userPhone")
-                    showingAlert = true
-                    shouldNavigate = true
+                    // Изменили условие проверки: считаем успешным любой статус от 200 до 299
+                    if (200...299).contains(httpResponse.statusCode), let data = data {
+                        if let jsonResponse = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                            print("JSON-ответ: \(jsonResponse)")
+                            if let dataObject = jsonResponse["data"] as? [String: Any] {
+                                let name = dataObject["name"] as? String ?? "Имя пользователя"
+                                let email = dataObject["email"] as? String ?? "email@example.com"
+                                // Сохраняем данные пользователя
+                                UserDefaults.standard.set(name, forKey: "userName")
+                                UserDefaults.standard.set(email, forKey: "userEmail")
+                            }
+                            alertMessage = "Вход выполнен!"
+                            UserDefaults.standard.set(true, forKey: "isLoggedIn")
+                            UserDefaults.standard.set(username, forKey: "userPhone")
+                            showingAlert = true
+                            shouldNavigate = true
+                        } else {
+                            print("Не удалось разобрать JSON-ответ")
+                            alertMessage = "Ошибка разбора ответа сервера"
+                            showingAlert = true
+                        }
+                    } else {
+                        print("Неверный код, статус ответа: \(httpResponse.statusCode)")
+                        alertMessage = "Неверный код"
+                        showingAlert = true
+                    }
                 }
             }
         }.resume()
     }
-}
 
-struct LoginScreen_Previews: PreviewProvider {
-    static var previews: some View {
-        LoginScreen()
+
+    
+    struct LoginScreen_Previews: PreviewProvider {
+        static var previews: some View {
+            LoginScreen()
+        }
     }
 }

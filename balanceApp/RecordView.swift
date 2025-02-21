@@ -4,12 +4,13 @@ import FirebaseDatabase
 
 
 extension Record {
-    var visit_id: Int? { return nil }
+    // Удалите или закомментируйте эту строку:
+    // var visit_id: Int? { return nil }
+    
     var lengthValue: Int {
-        return length ?? 600  // Если length отсутствует, можно использовать значение по умолчанию
+        return length ?? 600  // Если length отсутствует, используем значение по умолчанию
     }
-    // Удалите эту строку:
-    // var services: [Service]? { return [] }
+    
     var staff: Staff? { return nil }
     
     var asRecordModal: RecordModal {
@@ -21,9 +22,9 @@ extension Record {
             custom_color: self.custom_color,
             attendance: self.attendance,
             visit_attendance: self.visit_attendance,
-            visit_id: self.visit_id,
+            visit_id: self.visit_id, // теперь будет использовать значение, декодированное из JSON
             length: self.lengthValue,
-            services: self.services,  // Теперь будет использовать значение, полученное из JSON
+            services: self.services,
             staff: self.staff
         )
     }
@@ -42,10 +43,11 @@ struct Record: Identifiable, Codable {
     let visit_attendance: Int?
     let confirmed: Int?
     let length: Int?
-    let services: [Service]?  // Добавляем, чтобы декодировалось из JSON
+    let services: [Service]?
+    let visit_id: Int?  // Добавлено, чтобы декодировалось из JSON
 
     private enum CodingKeys: String, CodingKey {
-        case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed, length, services
+        case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed, length, services, visit_id
     }
 }
 
@@ -360,9 +362,9 @@ struct RecordView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 16) {
+            VStack(spacing: 14) {
                 // Верхняя строка: два блока для "Коммунаров 26" и "Свердлова 126"
-                HStack(spacing: 10) {
+                HStack(spacing: 8) { // расстояние между блоками — 8
                     let companyIds = ["433675", "672239"]
                     
                     ForEach(companyIds, id: \.self) { companyIdKey in
@@ -375,32 +377,33 @@ struct RecordView: View {
                             return false
                         }
                         
-                        if futureRecords.isEmpty {
-                            NoRecordRow(address: address)
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            if let closestRecord = viewModel.closestUpcomingRecord(records: futureRecords) {
-                                let display = viewModel.displayRecord(record: closestRecord)
-                                // Используем RecordRow, который теперь получает customColor, visit_attendance и attendance
-                                RecordRow(address: display.address,
-                                          date: display.dateString,
-                                          customColor: closestRecord.custom_color,
-                                          visit_attendance: closestRecord.visit_attendance,
-                                          attendance: closestRecord.attendance)
-                                    .onTapGesture {
-                                        viewModel.selectedRecord = closestRecord
-                                        viewModel.showModal = true
-                                        _ = viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
-                                    }
-                                    .frame(maxWidth: .infinity)
-                            } else {
+                        Group {
+                            if futureRecords.isEmpty {
                                 NoRecordRow(address: address)
-                                    .frame(maxWidth: .infinity)
+                            } else {
+                                if let closestRecord = viewModel.closestUpcomingRecord(records: futureRecords) {
+                                    let display = viewModel.displayRecord(record: closestRecord)
+                                    RecordRow(address: display.address,
+                                              date: display.dateString,
+                                              customColor: closestRecord.custom_color,
+                                              visit_attendance: closestRecord.visit_attendance,
+                                              attendance: closestRecord.attendance)
+                                        .onTapGesture {
+                                            viewModel.selectedRecord = closestRecord
+                                            viewModel.showModal = true
+                                            _ = viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
+                                        }
+                                } else {
+                                    NoRecordRow(address: address)
+                                }
                             }
                         }
+                        .frame(maxWidth: .infinity) // растягиваем каждый блок на доступную ширину
                     }
                 }
-                .padding(.horizontal)
+                .frame(maxWidth: .infinity) // растягиваем HStack по всей доступной ширине
+                .padding(.horizontal, 8) // отступы от краёв экрана
+
                 
                 // Горизонтальная лента с 10 ближайшими записями
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -477,13 +480,15 @@ struct RecordRow: View {
     }
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 2) {
             Text("Вас ждет на")
                 .font(.subheadline)
                 .foregroundColor(.white)
             Text(address)
                 .font(.headline)
                 .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8) // или другое значение, например 0.7
             Text(date)
                 .font(.subheadline)
                 .foregroundColor(.white)
@@ -500,21 +505,21 @@ struct RecordRow: View {
         .overlay(
             Group {
                 if isConfirmed, let checkmarkUrl = checkmarkUrl, let url = URL(string: checkmarkUrl) {
-                    AsyncImage(url: url) { image in
-                        image.resizable()
-                             .aspectRatio(contentMode: .fit)
-                    } placeholder: {
-                        ProgressView()
+                            AsyncImage(url: url) { image in
+                                image.resizable()
+                                     .aspectRatio(contentMode: .fit)
+                            } placeholder: {
+                                ProgressView()
+                            }
+                            .frame(width: 25, height: 25)
+                            // Убираем .background, .cornerRadius и лишние .padding,
+                            // чтобы галочка выглядела как в модальном окне:
+                            .padding(.top, 8)
+                            .padding(.trailing, 8)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        }
                     }
-                    .frame(width: 25, height: 25)
-                    .padding(5)
-                    .background(Color.white.opacity(0.7))
-                    .cornerRadius(15)
-                    .padding([.top, .trailing], 5)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                }
-            }
-        )
+                )
         .onAppear {
             loadCheckmarkUrl()
             loadSpecialistName()
@@ -557,13 +562,21 @@ struct NoRecordRow: View {
     let address: String
     
     var body: some View {
-        Text("Нет записей на \(address)")
-            .font(.headline)
-            .foregroundColor(.black)
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color(white: 0.9))
-            .cornerRadius(12)
+        VStack(spacing: 4) {
+            Text("Нет записей на")
+                .font(.headline)
+                .foregroundColor(.black)
+            
+            Text(address)
+                .font(.headline)
+                .foregroundColor(.black)
+                .lineLimit(1)             // Только одна строка
+                .minimumScaleFactor(0.8)  // Уменьшаем текст, если не помещается
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(white: 0.9))
+        .cornerRadius(12)
     }
 }
 
