@@ -42,10 +42,10 @@ struct MainView: View {
 }
 
 // MARK: - OneSignalManager (синглтон)
-class OneSignalManager {
+class OneSignalManager: NSObject, OSPushSubscriptionObserver {
     static let shared = OneSignalManager()
     private var isInitialized = false
-    private init() {}
+    private override init() {}
     
     func initializeOneSignal() {
         guard !isInitialized else {
@@ -65,9 +65,31 @@ class OneSignalManager {
             print("User accepted notifications: \(accepted)")
         }, fallbackToSettings: true)
         
-     
+        // Подписываемся на изменения pushSubscription
+        OneSignal.User.pushSubscription.addObserver(self)
+        
+        // Получаем текущий playerId (если доступен)
+        if let playerId = OneSignal.User.pushSubscription.id {
+            self.savePlayerId(playerId)
+        }
         
         print("OneSignal успешно инициализирован")
+    }
+    
+    // MARK: - OSPushSubscriptionObserver
+    func onPushSubscriptionDidChange(state: OSPushSubscriptionChangedState) {
+        if let playerId = state.current.id {
+            self.savePlayerId(playerId)
+        }
+    }
+    
+    private func savePlayerId(_ playerId: String) {
+        UserDefaults.standard.set(playerId, forKey: "OneSignalPlayerID")
+        print("PlayerID сохранен: \(playerId)")
+    }
+    
+    func getPlayerId() -> String? {
+        return UserDefaults.standard.string(forKey: "OneSignalPlayerID")
     }
 }
 
