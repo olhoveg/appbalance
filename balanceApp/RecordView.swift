@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import FirebaseDatabase
+import OneSignalFramework
 
 
 extension Record {
@@ -265,6 +266,7 @@ class RecordViewModel: ObservableObject {
                     if oneHourBefore > now && !playerId.isEmpty {
                         let formattedTime = formattedTime(from: recordDate)
                         let address = companyIdToAddress[String(record.company_id)] ?? ""
+                        log("Условия выполнены для уведомления для записи \(record.id). Отправляем уведомление.")
                         sendNotification(date: record.date, address: address, playerId: playerId, formattedTime: formattedTime)
                     } else {
                         log("Условия для уведомления не выполнены для записи \(record.id): oneHourBefore (\(oneHourBefore)) <= now (\(now)) или playerId пуст")
@@ -280,9 +282,59 @@ class RecordViewModel: ObservableObject {
     }
     
     func sendNotification(date: String, address: String, playerId: String, formattedTime: String) {
-        log("Отправка уведомления: У Вас запись на \(address) в \(formattedTime) [Дата: \(date)] для playerId: \(playerId)")
+        let notificationContent = "У Вас запись на \(address) в \(formattedTime) [Дата: \(date)]"
+        log("Подготовка уведомления: \(notificationContent) для playerId: \(playerId)")
+        
+        guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {
+            log("Неверный URL для OneSignal API")
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Замените <YOUR_REST_API_KEY> на ваш реальный REST API ключ OneSignal
+        request.setValue("Basic ZjRjZTA1NjgtZDNhMS00ZWNkLWIwZjQtYzkwMWI2MThmOTQ2", forHTTPHeaderField: "Authorization")
+        
+        let body: [String: Any] = [
+            "app_id": "61e511f4-5929-448d-85f4-e5bf171f0764",
+            "include_player_ids": [playerId],
+            "contents": ["ru": notificationContent],
+            "data": [
+                "date": date,
+                "address": address,
+                "formattedTime": formattedTime
+            ]
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        } catch {
+            log("Ошибка сериализации данных уведомления: \(error.localizedDescription)")
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.log("Ошибка при отправке уведомления: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.log("Не удалось получить ответ от OneSignal")
+                    return
+                }
+                
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    self.log("Ответ OneSignal: статус \(httpResponse.statusCode), данные: \(responseString)")
+                } else {
+                    self.log("Ответ OneSignal получен, но данные не удалось прочитать")
+                }
+            }
+        }.resume()
     }
-    
+
     // MARK: - Помощники для работы с датами
     
     // Парсит дату из строки вида "yyyy-MM-dd HH:mm:ss"
