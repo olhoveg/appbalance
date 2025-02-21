@@ -3,11 +3,9 @@ import Combine
 import FirebaseDatabase
 import OneSignalFramework
 
+// MARK: - Расширение модели Record
 
 extension Record {
-    // Удалите или закомментируйте эту строку:
-    // var visit_id: Int? { return nil }
-    
     var lengthValue: Int {
         return length ?? 600  // Если length отсутствует, используем значение по умолчанию
     }
@@ -23,14 +21,13 @@ extension Record {
             custom_color: self.custom_color,
             attendance: self.attendance,
             visit_attendance: self.visit_attendance,
-            visit_id: self.visit_id, // теперь будет использовать значение, декодированное из JSON
+            visit_id: self.visit_id,
             length: self.lengthValue,
             services: self.services,
             staff: self.staff
         )
     }
 }
-
 
 // MARK: - Модели данных
 
@@ -45,7 +42,7 @@ struct Record: Identifiable, Codable {
     let confirmed: Int?
     let length: Int?
     let services: [Service]?
-    let visit_id: Int?  // Добавлено, чтобы декодировалось из JSON
+    let visit_id: Int?
 
     private enum CodingKeys: String, CodingKey {
         case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed, length, services, visit_id
@@ -55,7 +52,7 @@ struct Record: Identifiable, Codable {
 struct RecordsResponse: Codable {
     let success: Bool
     let data: [Record]?
-    let meta: [String: Int]?  // Например: page, total_count
+    let meta: [String: Int]?
 }
 
 struct Client: Identifiable, Codable {
@@ -77,12 +74,11 @@ struct ClientsData: Codable {
     let meta: [String]?
 }
 
-// MARK: - ViewModel с отладкой
+// MARK: - RecordViewModel с логикой уведомлений
 
 class RecordViewModel: ObservableObject {
     @Published var phone: String = ""
     @Published var clients: [Client] = []
-    // Словарь: ключ – строковое представление company_id, значение – массив записей
     @Published var recordsByCompany: [String: [Record]] = [:]
     @Published var isLoading: Bool = false
     @Published var playerId: String = ""
@@ -90,13 +86,30 @@ class RecordViewModel: ObservableObject {
     @Published var showModal: Bool = false
     @Published var debugLogs: [String] = []  // Для отладки
 
-    var uniqueRecords: Set<String> = Set()
+    // Словарь для сохранения mapping: [external_id: oneSignalNotificationID]
+    var scheduledNotificationMapping: [String: String] {
+        get {
+            return UserDefaults.standard.dictionary(forKey: "scheduledNotificationMapping") as? [String: String] ?? [:]
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "scheduledNotificationMapping")
+        }
+    }
     
-    // Константы OneSignal (если нужны)
-    let appId = "61e511f4-5929-448d-85f4-e5bf171f0764"
-    let restApiKey = "ZjRjZTA1NjgtZDNhMS00ZWNkLWIwZjQtYzkwMWI2MThmOTQ2"
+    // Словарь для хранения external_id для каждой записи.
+    // Ключ – record.id (как строка), значение – "externalId|lastChangeDate"
+    var externalIdMapping: [String: String] {
+        get {
+            return UserDefaults.standard.dictionary(forKey: "externalIdMapping") as? [String: String] ?? [:]
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "externalIdMapping")
+        }
+    }
     
-    // Преобразуем числовой company_id в строку для словаря адресов
+    // Константы OneSignal и сопоставление адресов
+    let appId: String = "61e511f4-5929-448d-85f4-e5bf171f0764"
+    let restApiKey: String = "ZjRjZTA1NjgtZDNhMS00ZWNkLWIwZjQtYzkwMWI2MThmOTQ2"
     let companyIdToAddress: [String: String] = [
         "433675": "Коммунаров 26",
         "672239": "Свердлова 126"
@@ -110,39 +123,87 @@ class RecordViewModel: ObservableObject {
         print(message)
     }
     
-    // MARK: - Получение номера телефона
+    // MARK: - Методы работы с external_id для записи
+    func getExternalIdMapping() -> [String: (externalId: String, lastChangeDate: String)] {
+        var mapping: [String: (externalId: String, lastChangeDate: String)] = [:]
+        for (key, value) in self.externalIdMapping {
+            let components = value.split(separator: "|")
+            if components.count == 2 {
+                mapping[key] = (externalId: String(components[0]), lastChangeDate: String(components[1]))
+            }
+        }
+        return mapping
+    }
+    
+    func setExternalIdMapping(_ mapping: [String: (externalId: String, lastChangeDate: String)]) {
+        var dict: [String: String] = [:]
+        for (key, tuple) in mapping {
+            dict[key] = "\(tuple.externalId)|\(tuple.lastChangeDate)"
+        }
+        self.externalIdMapping = dict
+    }
+    
+    /// Возвращает стабильный external_id для записи. Если запись не изменилась (last_change_date не поменялся) – возвращается сохранённое значение.
+    func externalIdForRecord(_ record: Record) -> String {
+        var mapping = getExternalIdMapping()
+        let recordKey = "\(record.id)"
+        if let entry = mapping[recordKey] {
+            if entry.lastChangeDate == record.last_change_date {
+                return entry.externalId
+            } else {
+                let newExternalId = UUID().uuidString
+                mapping[recordKey] = (externalId: newExternalId, lastChangeDate: record.last_change_date)
+                setExternalIdMapping(mapping)
+                return newExternalId
+            }
+        } else {
+            let newExternalId = UUID().uuidString
+            mapping[recordKey] = (externalId: newExternalId, lastChangeDate: record.last_change_date)
+            setExternalIdMapping(mapping)
+            return newExternalId
+        }
+    }
+    
+    // MARK: - Получение номера телефона и playerId
     func getPhoneNumber() {
         log("Получение номера телефона из UserDefaults")
         let isLoggedIn = UserDefaults.standard.bool(forKey: "isLoggedIn")
         if isLoggedIn, let savedPhone = UserDefaults.standard.string(forKey: "userPhone") {
-            phone = savedPhone
+            self.phone = savedPhone
             log("Найден сохраненный телефон: \(savedPhone)")
         } else {
             log("Пользователь не авторизован или телефон не найден")
+        }
+        
+        if let storedPlayerId = UserDefaults.standard.string(forKey: "OneSignalPlayerID") {
+            self.playerId = storedPlayerId
+            log("Получен playerId: \(storedPlayerId)")
+        } else {
+            log("playerId не найден в UserDefaults")
         }
     }
     
     // MARK: - Обновление данных
     func refreshData() {
         log("Начало обновления данных")
-        uniqueRecords.removeAll()
-        recordsByCompany.removeAll()
-        fetchClients()
+        // Не очищаем externalIdMapping, чтобы сохранить историю для сравнения
+        self.recordsByCompany.removeAll()
+        self.fetchClients()
     }
     
     // MARK: - Запрос клиентов
     func fetchClients() {
-        guard !phone.isEmpty else {
+        guard !self.phone.isEmpty else {
             log("Номер телефона пустой, невозможно получить клиентов")
             return
         }
-        isLoading = true
-        log("Запрос клиентов для телефона: \(phone)")
+        self.isLoading = true
+        log("Запрос клиентов для телефона: \(self.phone)")
         
         let baseApiUrl = "https://api.yclients.com/api/v1/group/415038/clients/"
-        guard let url = URL(string: "\(baseApiUrl)?phone=\(phone)") else {
+        guard let url = URL(string: "\(baseApiUrl)?phone=\(self.phone)") else {
             log("Неверный URL для клиентов")
-            isLoading = false
+            self.isLoading = false
             return
         }
         log("Сформированный URL для клиентов: \(url.absoluteString)")
@@ -187,13 +248,12 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
     
-    // MARK: - Запрос записей для конкретного клиента
     func fetchClientRecords(companyId: Int, clientId: Int) {
-        isLoading = true
+        self.isLoading = true
         log("Начало запроса записей для companyId: \(companyId), clientId: \(clientId)")
         guard let url = URL(string: "https://api.yclients.com/api/v1/records/\(companyId)?client_id=\(clientId)") else {
             log("Неверный URL для записей")
-            isLoading = false
+            self.isLoading = false
             return
         }
         log("Сформированный URL для записей: \(url.absoluteString)")
@@ -232,7 +292,7 @@ class RecordViewModel: ObservableObject {
                 let decoded = try JSONDecoder().decode(RecordsResponse.self, from: data)
                 DispatchQueue.main.async {
                     let records = decoded.data ?? []
-                    self.recordsByCompany[String(companyId)] = records
+                    self.recordsByCompany["\(companyId)"] = records
                     self.log("Получены записи для companyId \(companyId): \(records.map { String($0.id) }.joined(separator: ", "))")
                     self.scheduleNotificationsForRecords(records: records)
                 }
@@ -242,7 +302,80 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
     
-    // MARK: - Планирование уведомлений (пример логики)
+    // MARK: - Вспомогательная функция для форматирования даты для send_after
+    func formattedSendAfter(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss 'GMT'Z"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(abbreviation: "GMT")
+        return formatter.string(from: date)
+    }
+    
+    // MARK: - Методы работы с запланированными уведомлениями
+    func saveScheduledNotification(notificationId: String, for externalId: String) {
+        var mapping = self.scheduledNotificationMapping
+        mapping[externalId] = notificationId
+        self.scheduledNotificationMapping = mapping
+    }
+    
+    func removeScheduledNotification(for externalId: String) {
+        var mapping = self.scheduledNotificationMapping
+        mapping.removeValue(forKey: externalId)
+        self.scheduledNotificationMapping = mapping
+    }
+    
+    func notificationId(for externalId: String) -> String? {
+        return self.scheduledNotificationMapping[externalId]
+    }
+    
+    func isNotificationScheduled(for externalId: String) -> Bool {
+        return self.scheduledNotificationMapping.keys.contains(externalId)
+    }
+    
+    // MARK: - Отмена уведомлений (отменяем старое только если запись изменилась)
+    func cancelExistingNotification(for record: Record) {
+        let recordId = "\(record.id)"
+        // Получаем сохранённое external_id для этой записи
+        let mapping = getExternalIdMapping()
+        if let storedEntry = mapping[recordId] {
+            let currentExternalId = externalIdForRecord(record)
+            if storedEntry.externalId != currentExternalId {
+                // Если external_id изменился, значит запись изменилась – отменяем старое уведомление
+                if let notifId = notificationId(for: storedEntry.externalId) {
+                    log("Для записи \(record.id) обнаружено старое уведомление с external_id \(storedEntry.externalId). Отменяем его.")
+                    cancelNotification(notificationId: notifId, externalId: storedEntry.externalId)
+                }
+            }
+        }
+    }
+    
+    func cancelNotification(notificationId: String, externalId: String) {
+        let urlString = "https://onesignal.com/api/v1/notifications/\(notificationId)?app_id=\(self.appId)"
+        guard let url = URL(string: urlString) else {
+            log("Неверный URL для отмены уведомления")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Basic \(self.restApiKey)", forHTTPHeaderField: "Authorization")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.log("Ошибка при отмене уведомления: \(error.localizedDescription)")
+                    return
+                }
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.log("Не удалось получить ответ от OneSignal при отмене уведомления")
+                    return
+                }
+                self.log("Уведомление с external_id \(externalId) отменено. Код ответа: \(httpResponse.statusCode)")
+                self.removeScheduledNotification(for: externalId)
+            }
+        }.resume()
+    }
+    
+    // MARK: - Планирование уведомлений с учетом отмены старых при изменении записи
     func scheduleNotificationsForRecords(records: [Record]) {
         log("Начало планирования уведомлений для \(records.count) записей")
         let now = Date()
@@ -252,24 +385,35 @@ class RecordViewModel: ObservableObject {
                 log("Невозможно преобразовать дату \(record.date) для записи id: \(record.id)")
                 continue
             }
-            // Пример: показываем только записи, подтверждённые (confirmed == 1)
             if recordDate > now && (record.confirmed ?? 0) == 1 {
-                let recordKey = "\(record.last_change_date)_\(record.company_id)_\(playerId)_\(record.last_change_date)"
-                if uniqueRecords.contains(recordKey) {
-                    log("Пропуск дубликата записи: \(recordKey)")
+                // Отменяем старое уведомление только если запись изменилась
+                cancelExistingNotification(for: record)
+                
+                let externalId = externalIdForRecord(record)
+                if isNotificationScheduled(for: externalId) {
+                    log("Уведомление для записи \(record.id) уже запланировано")
                     continue
                 }
-                uniqueRecords.insert(recordKey)
                 
                 if let oneHourBefore = Calendar.current.date(byAdding: .hour, value: -1, to: recordDate) {
-                    log("Вычисленное время (за час до записи): \(oneHourBefore)")
-                    if oneHourBefore > now && !playerId.isEmpty {
+                    log("Вычислено время за час до записи для id \(record.id): \(oneHourBefore)")
+                    if oneHourBefore > now && !self.playerId.isEmpty {
                         let formattedTime = formattedTime(from: recordDate)
-                        let address = companyIdToAddress[String(record.company_id)] ?? ""
-                        log("Условия выполнены для уведомления для записи \(record.id). Отправляем уведомление.")
-                        sendNotification(date: record.date, address: address, playerId: playerId, formattedTime: formattedTime)
+                        let address = self.companyIdToAddress["\(record.company_id)"] ?? ""
+                        let sendAfter = formattedSendAfter(from: oneHourBefore)
+                        log("Планирование уведомления для записи id \(record.id) с send_after: \(sendAfter)")
+                        
+                        // Сохраняем external_id (notification_id обновится после ответа)
+                        saveScheduledNotification(notificationId: "", for: externalId)
+                        
+                        sendNotification(date: record.date,
+                                         address: address,
+                                         playerId: self.playerId,
+                                         formattedTime: formattedTime,
+                                         sendAfter: sendAfter,
+                                         externalId: externalId)
                     } else {
-                        log("Условия для уведомления не выполнены для записи \(record.id): oneHourBefore (\(oneHourBefore)) <= now (\(now)) или playerId пуст")
+                        log("Условия не выполнены для записи \(record.id): oneHourBefore (\(oneHourBefore)) <= now (\(now)) или playerId пуст")
                     }
                 } else {
                     log("Не удалось вычислить oneHourBefore для записи \(record.id)")
@@ -281,8 +425,9 @@ class RecordViewModel: ObservableObject {
         log("Завершено планирование уведомлений для записей")
     }
     
-    func sendNotification(date: String, address: String, playerId: String, formattedTime: String) {
-        let notificationContent = "У Вас запись на \(address) в \(formattedTime) [Дата: \(date)]"
+    // MARK: - Отправка уведомления с external_id
+    func sendNotification(date: String, address: String, playerId: String, formattedTime: String, sendAfter: String, externalId: String) {
+        let notificationContent = "У Вас запись на \(address) в \(formattedTime)"
         log("Подготовка уведомления: \(notificationContent) для playerId: \(playerId)")
         
         guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {
@@ -293,13 +438,17 @@ class RecordViewModel: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Замените <YOUR_REST_API_KEY> на ваш реальный REST API ключ OneSignal
-        request.setValue("Basic ZjRjZTA1NjgtZDNhMS00ZWNkLWIwZjQtYzkwMWI2MThmOTQ2", forHTTPHeaderField: "Authorization")
+        request.setValue("Basic \(self.restApiKey)", forHTTPHeaderField: "Authorization")
         
         let body: [String: Any] = [
-            "app_id": "61e511f4-5929-448d-85f4-e5bf171f0764",
+            "app_id": self.appId,
             "include_player_ids": [playerId],
-            "contents": ["ru": notificationContent],
+            "external_id": externalId,
+            "contents": [
+                "en": notificationContent,
+                "ru": notificationContent
+            ],
+            "send_after": sendAfter,
             "data": [
                 "date": date,
                 "address": address,
@@ -326,18 +475,24 @@ class RecordViewModel: ObservableObject {
                     return
                 }
                 
+                self.log("Уведомление отправлено. Код ответа: \(httpResponse.statusCode)")
+                
                 if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                    self.log("Ответ OneSignal: статус \(httpResponse.statusCode), данные: \(responseString)")
+                    self.log("Ответ OneSignal: \(responseString)")
+                    
+                    if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                       let notificationId = json["id"] as? String {
+                        self.log("Сохранён notification_id: \(notificationId) для external_id: \(externalId)")
+                        self.saveScheduledNotification(notificationId: notificationId, for: externalId)
+                    }
                 } else {
                     self.log("Ответ OneSignal получен, но данные не удалось прочитать")
                 }
             }
         }.resume()
     }
-
-    // MARK: - Помощники для работы с датами
     
-    // Парсит дату из строки вида "yyyy-MM-dd HH:mm:ss"
+    // MARK: - Вспомогательные методы для работы с датами
     func recordDate(from dateString: String) -> Date? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -345,7 +500,6 @@ class RecordViewModel: ObservableObject {
         return formatter.date(from: dateString)
     }
     
-    // Форматирует дату для отображения, например: "14 февраля 15:30"
     func formattedTime(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
@@ -353,49 +507,43 @@ class RecordViewModel: ObservableObject {
         return formatter.string(from: date)
     }
     
-    // Получает 10 ближайших записей
+    // MARK: - Методы для интерфейса
     func upcomingTenRecords() -> [Record] {
         var upcoming: [Record] = []
         let now = Date()
-        for (_, records) in recordsByCompany {
+        for (_, records) in self.recordsByCompany {
             for record in records {
-                if let recordDate = recordDate(from: record.date), recordDate > now {
+                if let recordDate = self.recordDate(from: record.date), recordDate > now {
                     upcoming.append(record)
                 }
             }
         }
         upcoming.sort {
-            guard let d1 = recordDate(from: $0.date),
-                  let d2 = recordDate(from: $1.date) else { return false }
+            guard let d1 = self.recordDate(from: $0.date),
+                  let d2 = self.recordDate(from: $1.date) else { return false }
             return d1 < d2
         }
         return Array(upcoming.prefix(10))
     }
     
-    // Находит ближайшую запись
     func closestUpcomingRecord(records: [Record]) -> Record? {
         let now = Date()
         let futureRecords = records.filter {
-            if let d = recordDate(from: $0.date) {
+            if let d = self.recordDate(from: $0.date) {
                 return d > now
             }
             return false
         }
-        let closest = futureRecords.min {
-            guard let d1 = recordDate(from: $0.date),
-                  let d2 = recordDate(from: $1.date) else { return false }
+        return futureRecords.min {
+            guard let d1 = self.recordDate(from: $0.date),
+                  let d2 = self.recordDate(from: $1.date) else { return false }
             return d1 < d2
         }
-        if let closest = closest {
-        } else {
-        }
-        return closest
     }
     
-    // Форматирует запись для отображения (адрес и дата)
     func displayRecord(record: Record) -> (address: String, dateString: String) {
-        let address = companyIdToAddress[String(record.company_id)] ?? ""
-        guard let date = recordDate(from: record.date) else {
+        let address = self.companyIdToAddress["\(record.company_id)"] ?? ""
+        guard let date = self.recordDate(from: record.date) else {
             log("Невозможно преобразовать дату \(record.date) для записи \(record.id)")
             return (address, record.date)
         }
@@ -415,10 +563,8 @@ struct RecordView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 14) {
-                // Верхняя строка: два блока для "Коммунаров 26" и "Свердлова 126"
-                HStack(spacing: 8) { // расстояние между блоками — 8
+                HStack(spacing: 8) {
                     let companyIds = ["433675", "672239"]
-                    
                     ForEach(companyIds, id: \.self) { companyIdKey in
                         let address = viewModel.companyIdToAddress[companyIdKey] ?? ""
                         let records = viewModel.recordsByCompany[companyIdKey] ?? []
@@ -428,7 +574,6 @@ struct RecordView: View {
                             }
                             return false
                         }
-                        
                         Group {
                             if futureRecords.isEmpty {
                                 NoRecordRow(address: address)
@@ -450,19 +595,17 @@ struct RecordView: View {
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity) // растягиваем каждый блок на доступную ширину
+                        .frame(maxWidth: .infinity)
                     }
                 }
-                .frame(maxWidth: .infinity) // растягиваем HStack по всей доступной ширине
-                .padding(.horizontal, 8) // отступы от краёв экрана
-
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8)
                 
-                // Горизонтальная лента с 10 ближайшими записями
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(viewModel.upcomingTenRecords()) { record in
                             if let date = viewModel.recordDate(from: record.date) {
-                                let address = viewModel.companyIdToAddress[String(record.company_id)] ?? ""
+                                let address = viewModel.companyIdToAddress["\(record.company_id)"] ?? ""
                                 UpcomingRecordBlock(date: date, address: address)
                                     .onTapGesture {
                                         viewModel.selectedRecord = record
@@ -504,7 +647,7 @@ struct RecordView: View {
     }
 }
 
-// MARK: - Запись с автоматическим подставлением специалиста
+// MARK: - Запись с подстановкой специалиста
 
 struct RecordRow: View {
     let address: String
@@ -516,7 +659,6 @@ struct RecordRow: View {
     @State private var specialistName: String = ""
     @State private var checkmarkUrl: String? = nil
     
-    // Проверка на подтверждённость записи (visit_attendance или attendance равны 2)
     var isConfirmed: Bool {
         (visit_attendance == 2 || attendance == 2)
     }
@@ -540,7 +682,7 @@ struct RecordRow: View {
                 .font(.headline)
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8) // или другое значение, например 0.7
+                .minimumScaleFactor(0.8)
             Text(date)
                 .font(.subheadline)
                 .foregroundColor(.white)
@@ -557,28 +699,25 @@ struct RecordRow: View {
         .overlay(
             Group {
                 if isConfirmed, let checkmarkUrl = checkmarkUrl, let url = URL(string: checkmarkUrl) {
-                            AsyncImage(url: url) { image in
-                                image.resizable()
-                                     .aspectRatio(contentMode: .fit)
-                            } placeholder: {
-                                ProgressView()
-                            }
-                            .frame(width: 25, height: 25)
-                            // Убираем .background, .cornerRadius и лишние .padding,
-                            // чтобы галочка выглядела как в модальном окне:
-                            .padding(.top, 8)
-                            .padding(.trailing, 8)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        }
+                    AsyncImage(url: url) { image in
+                        image.resizable()
+                             .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        ProgressView()
                     }
-                )
+                    .frame(width: 25, height: 25)
+                    .padding(.top, 8)
+                    .padding(.trailing, 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+            }
+        )
         .onAppear {
             loadCheckmarkUrl()
             loadSpecialistName()
         }
     }
     
-    /// Загружает URL иконки галочки из Firebase
     func loadCheckmarkUrl() {
         let ref = Database.database().reference(withPath: "specialists/checkmarkUrl")
         ref.observeSingleEvent(of: .value) { snapshot in
@@ -588,7 +727,6 @@ struct RecordRow: View {
         }
     }
     
-    /// Загружает имя специалиста из Firebase, подбирая по значению customColor
     func loadSpecialistName() {
         guard let customColor = customColor else { return }
         let ref = Database.database().reference(withPath: "specialists")
@@ -608,7 +746,7 @@ struct RecordRow: View {
     }
 }
 
-// MARK: - Нет записей (серый блок)
+// MARK: - Блок "Нет записей"
 
 struct NoRecordRow: View {
     let address: String
@@ -618,12 +756,11 @@ struct NoRecordRow: View {
             Text("Нет записей на")
                 .font(.headline)
                 .foregroundColor(.black)
-            
             Text(address)
                 .font(.headline)
                 .foregroundColor(.black)
-                .lineLimit(1)             // Только одна строка
-                .minimumScaleFactor(0.8)  // Уменьшаем текст, если не помещается
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -632,7 +769,7 @@ struct NoRecordRow: View {
     }
 }
 
-// MARK: - Горизонтальная лента с 10 ближайшими записями
+// MARK: - Горизонтальный блок ближайших записей
 
 struct UpcomingRecordBlock: View {
     let date: Date
@@ -641,7 +778,7 @@ struct UpcomingRecordBlock: View {
     var body: some View {
         let calendar = Calendar.current
         let day = calendar.component(.day, from: date)
-        let weekdayIndex = calendar.component(.weekday, from: date) - 1 // В Swift: воскресенье = 1
+        let weekdayIndex = calendar.component(.weekday, from: date) - 1
         let weekdays = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"]
         let dayOfWeek = weekdays[weekdayIndex]
         
@@ -678,7 +815,6 @@ struct UpcomingRecordBlock: View {
                     .foregroundColor(.white)
                 Spacer()
             }
-            
             VStack {
                 HStack {
                     Spacer()
@@ -697,11 +833,7 @@ struct UpcomingRecordBlock: View {
     }
 }
 
-// MARK: - Модальное окно для детального просмотра записи
-
-
-
-// MARK: - Окно для отладки (при необходимости)
+// MARK: - Окно для отладки логов
 
 struct DebugLogsView: View {
     let debugLogs: [String]
