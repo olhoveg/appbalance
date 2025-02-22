@@ -77,6 +77,7 @@ struct ClientsData: Codable {
 // MARK: - RecordViewModel с логикой уведомлений
 
 class RecordViewModel: ObservableObject {
+    static let sharedInstance = RecordViewModel()
     @Published var phone: String = ""
     @Published var clients: [Client] = []
     @Published var recordsByCompany: [String: [Record]] = [:]
@@ -427,7 +428,7 @@ class RecordViewModel: ObservableObject {
     
     // MARK: - Отправка уведомления с external_id
     func sendNotification(date: String, address: String, playerId: String, formattedTime: String, sendAfter: String, externalId: String) {
-        let notificationContent = "У Вас запись на \(address) в \(formattedTime)"
+        let notificationContent = "У Вас запись на 000 \(address) в \(formattedTime)"
         log("Подготовка уведомления: \(notificationContent) для playerId: \(playerId)")
         
         guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {

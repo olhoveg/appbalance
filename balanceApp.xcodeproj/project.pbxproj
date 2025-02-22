@@ -73,11 +73,21 @@
 			);
 			target = 0A6FA65B2D676360009EB62D /* org.reactjs.native.example.balance24App */;
 		};
+		6C908BAE2D693490004BDC9B /* Exceptions for "balanceApp" folder in "balanceApp" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0A5684412D5CDBE200F299AA /* balanceApp */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0A5684442D5CDBE200F299AA /* balanceApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6C908BAE2D693490004BDC9B /* Exceptions for "balanceApp" folder in "balanceApp" target */,
+			);
 			path = balanceApp;
 			sourceTree = "<group>";
 		};
@@ -529,6 +539,7 @@
 				DEVELOPMENT_TEAM = B9K44XR228;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = balanceApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = 24balance;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -569,6 +580,7 @@
 				DEVELOPMENT_TEAM = B9K44XR228;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = balanceApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = 24balance;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
