@@ -36,11 +36,24 @@ struct MainView: View {
         }
         .onAppear {
             // Инициализируем OneSignal один раз
-            OneSignalManager.shared.initializeOneSignal()
+            // Запуск OneSignal асинхронно, после отображения UI
+            Task {
+                await initializeOneSignalAsync()
+            }
         }
     }
 }
 
+    func initializeOneSignalAsync() async {
+        // Перемещаем тяжелые операции в фоновую задачу, чтобы не блокировать UI
+        await withCheckedContinuation { continuation in
+            OneSignalManager.shared.initializeOneSignal()
+            continuation.resume()
+        }
+    }
+    
+    
+    
 // MARK: - OneSignalManager (синглтон)
 class OneSignalManager: NSObject, OSPushSubscriptionObserver {
     static let shared = OneSignalManager()
