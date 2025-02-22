@@ -436,7 +436,7 @@ class RecordViewModel: ObservableObject {
     
     // MARK: - Отправка уведомления с external_id
     func sendNotification(date: String, address: String, playerId: String, formattedTime: String, sendAfter: String, externalId: String) {
-        let notificationContent = "У Вас запись на 000 \(address) в \(formattedTime)"
+        let notificationContent = "У Вас запись на \(address) в \(formattedTime)"
         log("Подготовка уведомления: \(notificationContent) для playerId: \(playerId)")
         
         guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {
