@@ -11,7 +11,6 @@ import SwiftData
 import BackgroundTasks
 import os
 
-
 // MARK: - AppDelegate с использованием BGAppRefreshTask
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -67,14 +66,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         os_log("Добавляем операцию в очередь.", log: OSLog.default, type: .info)
         OperationQueue().addOperation(operation)
     }
-    /// Операция для обновления данных через RecordDataManager.
-    /// Замените содержимое main() на ваш реальный код обновления.
+    
+    /// Операция для обновления данных через RecordDataManager
     final class RefreshOperation: Operation, @unchecked Sendable {
         override func main() {
             os_log("Фоновая операция обновления данных началась.", log: OSLog.default, type: .info)
             
             let semaphore = DispatchSemaphore(value: 0)
             
+            // Обновляем данные записей пользователей
             RecordDataManager.shared.refreshData {
                 os_log("Обновление данных в фоне завершено.", log: OSLog.default, type: .info)
                 semaphore.signal()
@@ -85,49 +85,51 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
     
-    // MARK: - Пример синглтона для обновления данных
+    // MARK: - RecordDataManager для обновления данных записей пользователей
     class RecordDataManager {
         static let shared = RecordDataManager()
         
         func refreshData(completion: @escaping () -> Void) {
             print("RecordDataManager: Начало обновления данных...")
-
+            // Вызываем обновление данных из RecordViewModel
+            RecordViewModel.sharedInstance.refreshData()
+            // Предположим, что обновление занимает 2 секунды, затем вызываем completion
             DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
                 os_log("RecordDataManager: Данные обновлены.", log: OSLog.default, type: .info)
                 completion()
             }
         }
     }
+}
+
+// MARK: - Основное приложение
+
+@main
+struct balanceAppApp: App {
+    // Подключаем AppDelegate для BackgroundTasks
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    // MARK: - Основное приложение
+    // Инициализация Firebase
+    init() {
+        FirebaseApp.configure()
+    }
     
-    @main
-    struct balanceAppApp: App {
-        // Подключаем AppDelegate для BackgroundTasks
-        @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-        
-        // Инициализация Firebase
-        init() {
-            FirebaseApp.configure()
+    var sharedModelContainer: ModelContainer = {
+        let schema = Schema([
+            Item.self,
+        ])
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        do {
+            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
         }
-        
-        var sharedModelContainer: ModelContainer = {
-            let schema = Schema([
-                Item.self,
-            ])
-            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            do {
-                return try ModelContainer(for: schema, configurations: [modelConfiguration])
-            } catch {
-                fatalError("Could not create ModelContainer: \(error)")
-            }
-        }()
-        
-        var body: some Scene {
-            WindowGroup {
-                ContentView() // Ваш основной SwiftUI интерфейс
-            }
-            .modelContainer(sharedModelContainer)
+    }()
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView() // Ваш основной SwiftUI интерфейс
         }
+        .modelContainer(sharedModelContainer)
     }
 }

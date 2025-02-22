@@ -1,3 +1,10 @@
+//
+//  RecordViewModule.swift
+//  balanceApp
+//
+//  Created by Evgeniy Olkhov on 12.02.2025.
+//
+
 import SwiftUI
 import Combine
 import FirebaseDatabase
@@ -186,6 +193,7 @@ class RecordViewModel: ObservableObject {
     
     // MARK: - Обновление данных
     func refreshData() {
+        getPhoneNumber()
         log("Начало обновления данных")
         // Не очищаем externalIdMapping, чтобы сохранить историю для сравнения
         self.recordsByCompany.removeAll()
