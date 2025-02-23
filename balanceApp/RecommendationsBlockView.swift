@@ -12,16 +12,17 @@ import FirebaseDatabase
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
-
+    
     func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(roundedRect: rect,
-                                byRoundingCorners: corners,
-                                cornerRadii: CGSize(width: radius, height: radius))
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
         return Path(path.cgPath)
     }
 }
 
-// Расширение для применения округления к указанным углам
 extension View {
     func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: corners))
@@ -132,46 +133,76 @@ struct RecommendationItemView: View {
     let recommendation: Recommendation
     @Environment(\.colorScheme) var colorScheme
     
-    // Фон карточки: для темной темы — серый оттенок, для светлой — стандартный
+    // Фон карточки: в тёмной теме — серый, в светлой — системный фон
     var cardBackground: Color {
         colorScheme == .dark ? Color(UIColor.systemGray6) : Color(UIColor.systemBackground)
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Изображение – округляем только верхние углы, чтобы сохранить целостность карточки
-            AsyncImage(url: URL(string: recommendation.image)) { phase in
-                if let image = phase.image {
-                    image.resizable()
-                         .scaledToFill()
-                         .frame(width: 160, height: 120)
-                         .cornerRadius(10, corners: [.topLeft, .topRight])
-                } else if phase.error != nil {
-                    Color.gray
+        ZStack {
+            // Фон карточки с закруглением и тенью
+            cardBackground
+                .cornerRadius(10)
+                .shadow(radius: 4)
+            
+            // Содержимое карточки
+            VStack(alignment: .leading, spacing: 6) {
+                // Изображение и placeholder
+                ZStack {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
                         .frame(width: 160, height: 120)
                         .cornerRadius(10, corners: [.topLeft, .topRight])
-                } else {
-                    ProgressView()
-                        .frame(width: 160, height: 120)
-                        .cornerRadius(10, corners: [.topLeft, .topRight])
+                    
+                    AsyncImage(
+                        url: URL(string: recommendation.image),
+                        transaction: Transaction(animation: .none)
+                    ) { phase in
+                        switch phase {
+                        case .empty:
+                            EmptyView()
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 160, height: 120)
+                                .cornerRadius(10, corners: [.topLeft, .topRight])
+                        case .failure:
+                            Color.gray
+                                .frame(width: 160, height: 120)
+                                .cornerRadius(10, corners: [.topLeft, .topRight])
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
                 }
+                
+                // Категория с отступом слева
+                Text(recommendation.category)
+                    .font(.system(size: 14))
+                    .foregroundColor(Color(UIColor.secondaryLabel))
+                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
+                    .padding(.leading, 4)
+                
+                // Заголовок с отступом слева, позволяющий перенос на две строки
+                Text(recommendation.title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(Color(UIColor.label))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .padding(.leading, 4)
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                Spacer()
             }
-            Text(recommendation.category)
-                .font(.system(size: 14))
-                .foregroundColor(Color(UIColor.secondaryLabel))
-                .lineLimit(1)
-            Text(recommendation.title)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(Color(UIColor.label))
-                .lineLimit(2)
+            .frame(width: 160, height: 200, alignment: .top)
         }
-        .frame(width: 160)
-        .padding(8)
-        .background(cardBackground)
-        .cornerRadius(10)
-        .shadow(radius: 4)
+        .frame(width: 160, height: 200)
+        .padding(.vertical, 4)
     }
 }
+
 
 // MARK: - Детальный экран рекомендации (HTML → AttributedString)
 struct RecommendationDetailsView: View {
