@@ -27,6 +27,10 @@ struct MainView: View {
                         
                         Divider()
                         
+                        ServicesBlockView()
+                        
+                        Divider()
+                        
                         ArticlesView()
                     }
                     .padding()
