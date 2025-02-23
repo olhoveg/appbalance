@@ -23,7 +23,7 @@ struct MainView: View {
                         
                         Divider()
                         
-                        RecommendationsView()
+                        RecommendationsBlockView()
                         
                         Divider()
                         

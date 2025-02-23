@@ -128,7 +128,7 @@ struct balanceAppApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView() // Ваш основной SwiftUI интерфейс
+            SplashScreen() // Ваш основной SwiftUI интерфейс
         }
         .modelContainer(sharedModelContainer)
     }
