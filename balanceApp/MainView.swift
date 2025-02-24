@@ -112,13 +112,15 @@ class OneSignalManager: NSObject, OSPushSubscriptionObserver {
 
 // MARK: - Кастомный NavigationBar
 struct CustomNavigationBar: View {
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         HStack {
             NavigationLink(destination: ProfileView()) {
                 Image(systemName: "person.crop.circle.fill")
                     .resizable()
                     .frame(width: 30, height: 30)
-                    .foregroundColor(.black)
+                    .foregroundColor(colorScheme == .dark ? .white : .black)
                     .padding(10)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
@@ -130,6 +132,7 @@ struct CustomNavigationBar: View {
             
             Text("Главная")
                 .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(colorScheme == .dark ? .white : .black)
             
             Spacer()
             
@@ -161,8 +164,8 @@ struct CustomNavigationBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
-        .background(Color.white)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .background(colorScheme == .dark ? Color.black : Color.white)
+        .shadow(color: colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -192,22 +195,7 @@ struct RecommendationsView: View {
     }
 }
 
-// MARK: - Пример блока статей
-struct ArticlesView: View {
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text("Статьи")
-                .font(.headline)
-                .padding(.leading)
-            List(0..<5, id: \.self) { index in
-                NavigationLink(destination: ArticleDetailView(id: index)) {
-                    Text("Статья \(index + 1)")
-                }
-            }
-            .frame(height: 250)
-        }
-    }
-}
+
 
 // MARK: - Детальные страницы
 struct RecommendationDetailView: View {
