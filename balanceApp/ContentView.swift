@@ -27,10 +27,10 @@ struct ContentView: View {
                     Text("Чат")
                 }
             
-            ProfileView()
+            SolariumView()
                 .tabItem {
                     Image(systemName: "person.fill")
-                    Text("Профиль")
+                    Text("Записаться")
                 }
         }
     }
