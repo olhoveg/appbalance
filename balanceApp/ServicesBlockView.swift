@@ -27,6 +27,7 @@ class ServicesViewModel: ObservableObject {
     private let apiKey = "88fnh8jbmt44er5y28nj"
     private let userToken = "9d241fb00061c17a5e2e76a23b214b20"
     
+    @MainActor
     func fetchServices() async {
         guard let url = URL(string: apiURL) else {
             print("Invalid URL")
@@ -40,20 +41,18 @@ class ServicesViewModel: ObservableObject {
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                 print("Server error")
                 return
             }
             let decoder = JSONDecoder()
             let servicesResponse = try decoder.decode(ServicesResponse.self, from: data)
-            DispatchQueue.main.async {
-                self.services = servicesResponse.data
-            }
+            self.services = servicesResponse.data
         } catch {
             print("Error fetching services: \(error)")
         }
     }
+
     
     func refresh() async {
         isRefreshing = true
@@ -203,7 +202,10 @@ struct ServiceBlockCardView: View {
             if fetchedImageUrl == nil {
                 Task {
                     let url = await getImageByServiceTitle(service.title)
-                    fetchedImageUrl = url
+                    await MainActor.run {
+                        
+                        fetchedImageUrl = url
+                    }
                 }
             }
         }

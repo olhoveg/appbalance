@@ -43,10 +43,12 @@ class RecommendationsViewModel: ObservableObject {
     @Published var recommendations: [Recommendation] = []
     
     init() {
-        fetchRecommendations()
+        Task {
+            await fetchRecommendations()
+        }
     }
     
-    func fetchRecommendations() {
+    func fetchRecommendations() async {
         let ref = Database.database().reference(withPath: "recommendations/recommendations")
         ref.observeSingleEvent(of: .value) { snapshot in
             print("Snapshot received: \(snapshot.value ?? "нет данных")")
@@ -108,10 +110,8 @@ class RecommendationsViewModel: ObservableObject {
 
 // MARK: - Блок рекомендаций в SwiftUI
 struct RecommendationsBlockView: View {
-    @ObservedObject var viewModel = RecommendationsViewModel()
-    @Environment(\.colorScheme) var colorScheme
+    @StateObject var viewModel = RecommendationsViewModel()
     
-    // Фон для карточек – для темной темы стандартный фон для элементов, в светлой тоже
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -125,9 +125,11 @@ struct RecommendationsBlockView: View {
         }
         .padding(.vertical, 10)
         .background(Color(UIColor.systemBackground))
+        .task {
+            await viewModel.fetchRecommendations()
+        }
     }
 }
-
 // MARK: - Отдельная карточка рекомендации
 struct RecommendationItemView: View {
     let recommendation: Recommendation

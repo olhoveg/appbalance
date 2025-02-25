@@ -7,36 +7,41 @@ struct Article: Identifiable {
     let title: String
     let imageUrl: String
     let content: String
+    let plainContent: String  // вычисленный один раз результат удаления HTML-тегов
 }
 
 // MARK: - ViewModel для загрузки статей
 class ArticlesViewModel: ObservableObject {
     @Published var articles: [Article] = []
     
-    func fetchArticles() {
+    func fetchArticles() async {
         guard let feedURL = URL(string: "https://www.24balance.ru/post/rss/latest-posts") else {
             print("Invalid feed URL")
             return
         }
         
         let parser = FeedParser(URL: feedURL)
-        parser.parseAsync { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let feed):
-                    if let rssFeed = feed.rssFeed, let items = rssFeed.items {
-                        self.articles = items.compactMap { item in
-                            let title = item.title ?? "Без заголовка"
-                            // Используем enclosure.attributes?.url для картинки
-                            let imageUrl = item.enclosure?.attributes?.url ?? "https://via.placeholder.com/150"
-                            let rawContent = item.description ?? ""
-                            let content = removeHTMLTags(rawContent)
-                            return Article(title: title, imageUrl: imageUrl, content: content)
-                        }
+        let result = await withCheckedContinuation { continuation in
+            parser.parseAsync { result in
+                continuation.resume(returning: result)
+            }
+        }
+        
+        DispatchQueue.main.async {
+            switch result {
+            case .success(let feed):
+                if let rssFeed = feed.rssFeed, let items = rssFeed.items {
+                    self.articles = items.compactMap { item in
+                        let title = item.title ?? "Без заголовка"
+                        // Если enclosure не указан – используем placeholder
+                        let imageUrl = item.enclosure?.attributes?.url ?? "https://via.placeholder.com/150"
+                        let rawContent = item.description ?? ""
+                        let plain = removeHTMLTags(rawContent)
+                        return Article(title: title, imageUrl: imageUrl, content: rawContent, plainContent: plain)
                     }
-                case .failure(let error):
-                    print("Failed to parse feed: \(error)")
                 }
+            case .failure(let error):
+                print("Failed to parse feed: \(error)")
             }
         }
     }
@@ -85,7 +90,7 @@ struct ArticleCardView: View {
                 .foregroundColor(.primary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(removeHTMLTags(article.content))
+            Text(article.plainContent)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .lineLimit(3)
@@ -108,7 +113,6 @@ struct ArticlesView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
                     ForEach(viewModel.articles) { article in
-                        // Используем Button вместо NavigationLink, чтобы установить selectedArticle
                         Button(action: {
                             selectedArticle = article
                         }) {
@@ -119,13 +123,12 @@ struct ArticlesView: View {
                 .padding()
             }
             .navigationTitle("Статьи")
-            .onAppear {
-                viewModel.fetchArticles()
+            .task {
+                await viewModel.fetchArticles()
             }
             .refreshable {
-                viewModel.fetchArticles()
+                await viewModel.fetchArticles()
             }
-            // Полноэкранное модальное представление для выбранной статьи
             .fullScreenCover(item: $selectedArticle) { article in
                 ArticleDetailsView(article: article)
             }
@@ -157,7 +160,7 @@ struct ArticleDetailsView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
                     
-                    Text(removeHTMLTags(article.content))
+                    Text(article.plainContent)
                         .font(.body)
                         .foregroundColor(.primary)
                     
@@ -170,8 +173,6 @@ struct ArticleDetailsView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Закрыть") {
-                        // Закрываем модальное окно
-                        // Для fullScreenCover достаточно вызвать dismiss через Environment
                         dismiss()
                     }
                 }

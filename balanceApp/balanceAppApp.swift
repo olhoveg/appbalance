@@ -13,7 +13,7 @@ import os
 
 // MARK: - AppDelegate с использованием BGAppRefreshTask
 
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // Логируем запуск приложения
