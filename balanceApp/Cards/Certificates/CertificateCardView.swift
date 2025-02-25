@@ -1,10 +1,13 @@
 import SwiftUI
+import FirebaseDatabase
 
 struct CertificateCardView: View {
     let certificate: Certificate
     let isOwned: Bool
     @StateObject private var imageCache = ImageCache()
     @State private var loadedImage: UIImage? = nil
+
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         if isOwned {
@@ -36,22 +39,25 @@ struct CertificateCardView: View {
                         .foregroundColor(.primary)
                         .padding(.top, 8)
                     
+                    // Дата покупки стилизована как в абонементах
                     if let purchaseDate = certificate.createdDate {
                         Text("Дата покупки: \(formattedDate(purchaseDate))")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                    
+                    // Срок действия стилизован аналогично
                     if let expirationDate = certificate.expirationDate {
                         Text("Срок действия: \(formattedDate(expirationDate))")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.red)
                     } else if let expText = certificate.expirationText {
                         Text("Срок действия: \(expText)")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.red)
                     } else {
                         Text("Срок действия: Бессрочный")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.green)
                     }
                 }
@@ -60,9 +66,9 @@ struct CertificateCardView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.top, 10)
-            .background(Color.white)
+            .background(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white)
             .cornerRadius(15)
-            .shadow(radius: 5)
+            .shadow(color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.1), radius: 5)
         } else {
             // Сертификаты, доступные к покупке - без внешнего контейнера и без баланса
             HStack {
@@ -89,7 +95,6 @@ struct CertificateCardView: View {
                     }
                 }
             }
-            // Без дополнительного контейнера (padding, background, cornerRadius и shadow)
         }
     }
     
@@ -120,7 +125,7 @@ struct CertificateCardView: View {
         }
     }
     
-    // Форматирование даты на русский язык
+    // Форматирование даты на русский язык, как в абонементах
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")

@@ -1,4 +1,3 @@
-// AbonementCardView.swift
 import SwiftUI
 import FirebaseDatabase
 
@@ -8,7 +7,9 @@ struct AbonementCardView: View {
     @State private var imageUrl: String?
     @StateObject private var imageCache = ImageCache()
     @State private var loadedImage: UIImage?
-
+    
+    @Environment(\.colorScheme) var colorScheme
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .topTrailing) {
@@ -55,12 +56,12 @@ struct AbonementCardView: View {
             
             Text(displayBalance())
                 .font(.headline)
-                .foregroundColor(.primary)
+                .foregroundColor(colorScheme == .dark ? .white : .primary)
                 .padding(.top, 8)
             
             Text("Дата покупки: \(formattedDate(abonement.createdDate))")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(colorScheme == .dark ? .gray : .secondary)
             
             if let expDate = abonement.expirationDate {
                 Text("Срок окончания: \(formattedDate(expDate))")
@@ -77,9 +78,9 @@ struct AbonementCardView: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white)
         .cornerRadius(20)
-        .shadow(radius: 5)
+        .shadow(color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .onAppear {
             fetchAbonementImage()
         }
@@ -99,7 +100,6 @@ struct AbonementCardView: View {
     }
     
     private func displayBalance() -> String {
-        // 1. Попытка извлечь значение из balanceString
         if let balanceStr = abonement.balanceString {
             let pattern = "\\(x(\\d+)\\)"
             if let regex = try? NSRegularExpression(pattern: pattern),
@@ -112,12 +112,10 @@ struct AbonementCardView: View {
             }
         }
         
-        // 2. Используем united_balance_services_count
         if let count = abonement.united_balance_services_count {
             return formatBalance(count: count, title: abonement.type.title)
         }
         
-        // 3. Суммируем значения из balanceContainer
         if let container = abonement.balanceContainer {
             let total = container.links.reduce(0) { $0 + $1.count }
             if total > 0 {
