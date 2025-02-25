@@ -1,6 +1,7 @@
 import SwiftUI
 import Firebase
 import FirebaseDatabase
+import Foundation
 
 // MARK: - Константы и идентификаторы
 fileprivate let SCHEDULE_API_URL = "https://api.yclients.com/api/v1/book_times"
@@ -143,14 +144,6 @@ class SolariumViewModel: ObservableObject {
                let success = result["success"] as? Bool, success == true,
                let dataArr = result["data"] as? [[String: Any]] {
                 print("Получено расписание солярия, количество записей: \(dataArr.count)")
-                for dict in dataArr {
-                    if let datetimeStr = dict["datetime"] as? String,
-                       let date = iso8601StringToDate(datetimeStr) {
-                        let minutes = Calendar.current.component(.minute, from: date)
-                        let formattedTime = formatDateToHHmm(date: date)
-                        print("Запись: \(formattedTime), минуты: \(minutes)")
-                    }
-                }
                 
                 let slots = dataArr.compactMap { dict -> TimeSlot? in
                     guard let datetimeStr = dict["datetime"] as? String,
@@ -319,16 +312,16 @@ class SolariumViewModel: ObservableObject {
         
         switch serviceType {
         case .horizontal:
-            serviceId = "12807679"
+            serviceId = "12807679" // Service ID for horizontal solarium
             bookRecordApiUrl = BOOK_RECORD_API_URL_CAB
         case .vertical:
-            serviceId = "12807679"
+            serviceId = "12807679" // Service ID for vertical solarium
             bookRecordApiUrl = BOOK_RECORD_API_URL_CAB
         case .cab:
-            serviceId = "12831233"
+            serviceId = "12831233" // Service ID for cabinets 1-4
             bookRecordApiUrl = BOOK_RECORD_API_URL_CAB
         case .cab5:
-            serviceId = "12838467"
+            serviceId = "12838467" // Service ID for cabinets 5-8
             bookRecordApiUrl = BOOK_RECORD_API_URL_OTHER_CAB
         default:
             break
@@ -392,24 +385,33 @@ class SolariumViewModel: ObservableObject {
     // MARK: - Хелперы
     private func formatDateForAPI(date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
     }
     
     private func formatDateToHHmm(date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "d MMMM yyyy" // например, "24 февраля 2025"
         return formatter.string(from: date)
     }
     
     private func iso8601StringToDate(_ string: String) -> Date? {
         let isoFormatter = ISO8601DateFormatter()
-        // Попытка с дробными секундами
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = isoFormatter.date(from: string) {
             return date
         }
-        // Если не получилось, пробуем без дробных секунд
         isoFormatter.formatOptions = [.withInternetDateTime]
         return isoFormatter.date(from: string)
     }
@@ -444,6 +446,7 @@ enum BookingError: Error, LocalizedError {
 // MARK: - Основной SwiftUI-экран
 struct SolariumView: View {
     @StateObject private var viewModel = SolariumViewModel()
+    @Environment(\.colorScheme) var colorScheme
     
     // Для показа диалога подтверждения бронирования с вариантами "Да" / "Нет"
     @State private var showConfirmationDialog = false
@@ -464,16 +467,22 @@ struct SolariumView: View {
                 }
             }
             .navigationBarHidden(true)
+            .background(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white)
             .alert(alertMessage, isPresented: $showAlert) {
                 Button("OK", role: .cancel) { }
             }
-            .confirmationDialog("Подтверждение записи",
-                                isPresented: $showConfirmationDialog,
-                                titleVisibility: .visible) {
+            .confirmationDialog("Подтверждение записи", isPresented: $showConfirmationDialog, titleVisibility: .visible) {
                 Button("Да") {
                     handleBookingConfirmation()
                 }
                 Button("Нет", role: .cancel) { }
+            } message: {
+                // Здесь добавляем сообщение с датой и временем записи
+                if let slot = pendingTimeSlot, let bookingDate = iso8601StringToDate(slot.dateTimeString) {
+                    Text("Запись на \(formattedDate(bookingDate)) в \(slot.displayTime)")
+                } else {
+                    Text("")
+                }
             }
         }
         .task { }
@@ -486,65 +495,81 @@ struct SolariumView: View {
                 Button(action: { viewModel.selectedType = .horizontal }) {
                     HStack {
                         Text("Горизонтальный солярий")
-                            .foregroundColor(.black)
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
                         Spacer()
                         AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/solarium/gorizontal-solary.png")) { phase in
                             if let image = phase.image {
-                                image.resizable().scaledToFit().frame(width: 100, height: 100)
+                                image.resizable()
+                                    .scaledToFit()
+                                    .frame(width: 100, height: 100)
                             } else {
                                 ProgressView().frame(width: 100, height: 100)
                             }
                         }
                     }
-                    .padding().background(Color.blue.opacity(0.2)).cornerRadius(20)
+                    .padding()
+                    .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
+                    .cornerRadius(20)
                 }
                 
                 Button(action: { viewModel.selectedType = .vertical }) {
                     HStack {
                         Text("Вертикальный солярий")
-                            .foregroundColor(.black)
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
                         Spacer()
                         AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/solarium/vertical-solariy.png")) { phase in
                             if let image = phase.image {
-                                image.resizable().scaledToFit().frame(width: 100, height: 100)
+                                image.resizable()
+                                    .scaledToFit()
+                                    .frame(width: 100, height: 100)
                             } else {
                                 ProgressView().frame(width: 100, height: 100)
                             }
                         }
                     }
-                    .padding().background(Color.blue.opacity(0.2)).cornerRadius(20)
+                    .padding()
+                    .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
+                    .cornerRadius(20)
                 }
                 
                 Button(action: { viewModel.selectedType = .cab }) {
                     HStack {
                         Text("Массаж на Свердлова 126")
-                            .foregroundColor(.black)
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
                         Spacer()
                         AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/market/Foto_massage126_1.png")) { phase in
                             if let image = phase.image {
-                                image.resizable().scaledToFit().frame(width: 100, height: 100)
+                                image.resizable()
+                                    .scaledToFit()
+                                    .frame(width: 100, height: 100)
                             } else {
                                 ProgressView().frame(width: 100, height: 100)
                             }
                         }
                     }
-                    .padding().background(Color.blue.opacity(0.2)).cornerRadius(20)
+                    .padding()
+                    .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
+                    .cornerRadius(20)
                 }
                 
                 Button(action: { viewModel.selectedType = .cab5 }) {
                     HStack {
                         Text("Массаж на Коммунаров 26")
-                            .foregroundColor(.black)
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
                         Spacer()
                         AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/market/Foto_massage26_2.png")) { phase in
                             if let image = phase.image {
-                                image.resizable().scaledToFit().frame(width: 100, height: 100)
+                                image.resizable()
+                                    .scaledToFit()
+                                    .frame(width: 100, height: 100)
                             } else {
                                 ProgressView().frame(width: 100, height: 100)
                             }
                         }
                     }
-                    .padding().background(Color.blue.opacity(0.2)).cornerRadius(20)
+                    .padding()
+                    .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
+                    .cornerRadius(20)
                 }
             }
             .padding(.horizontal, 16)
@@ -571,8 +596,8 @@ struct SolariumView: View {
                     .bold()
                     .padding(.vertical, 10)
                     .frame(maxWidth: .infinity)
-                    .background(Color.blue.opacity(0.2))
-                    .foregroundColor(.black)
+                    .background(colorScheme == .dark ? Color.black.opacity(0.6) : Color.blue.opacity(0.2))
+                    .foregroundColor(colorScheme == .dark ? .white : .black)
                 
                 datePickerView
                 
@@ -611,6 +636,7 @@ struct SolariumView: View {
             selection: $viewModel.selectedDate,
             displayedComponents: [.date]
         )
+        .environment(\.locale, Locale(identifier: "ru_RU"))
         .datePickerStyle(.compact)
         .labelsHidden()
         .padding()
@@ -637,9 +663,12 @@ struct SolariumView: View {
             if let cabinet = viewModel.cabinetsInfo[cabKey] {
                 Text(cabinet.name)
                     .font(.headline)
+                    .foregroundColor(colorScheme == .dark ? .white : .black)
                 AsyncImage(url: URL(string: cabinet.image)) { phase in
                     if let image = phase.image {
-                        image.resizable().scaledToFit().frame(width: 120, height: 120)
+                        image.resizable()
+                            .scaledToFit()
+                            .frame(width: 120, height: 120)
                     } else {
                         ProgressView().frame(width: 120, height: 120)
                     }
@@ -651,7 +680,8 @@ struct SolariumView: View {
                     timeGrid(times: slots, staffId: staffId)
                 }
             } else {
-                Text("Загрузка...").foregroundColor(.gray)
+                Text("Загрузка...")
+                    .foregroundColor(.gray)
             }
         }
         .padding(.bottom, 20)
@@ -661,17 +691,19 @@ struct SolariumView: View {
     private func timeGrid(times: [TimeSlot], staffId: String) -> some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 60), spacing: 10), count: 5), spacing: 10) {
             ForEach(times) { slot in
-                Button(slot.displayTime) {
-                    // При нажатии сохраняем выбранный слот и id, затем показываем диалог подтверждения
+                Button {
                     pendingTimeSlot = slot
                     pendingStaffId = staffId
                     showConfirmationDialog = true
                     print("Выбран слот \(slot.displayTime) для записи")
+                } label: {
+                    Text(slot.displayTime)
+                        .frame(height: 40)
+                        .frame(maxWidth: .infinity)
+                        .background(colorScheme == .dark ? Color(UIColor.systemGray4) : Color.gray.opacity(0.2))
+                        .cornerRadius(8)
+                        .foregroundColor(colorScheme == .dark ? .white : .black)
                 }
-                .frame(height: 40)
-                .background(Color.gray.opacity(0.2))
-                .cornerRadius(8)
-                .foregroundColor(.black)
             }
         }
         .padding()
@@ -713,10 +745,59 @@ struct SolariumView: View {
             showAlert = true
         }
     }
-}
-
-struct SolariumView_Previews: PreviewProvider {
-    static var previews: some View {
-        SolariumView()
+    
+    // MARK: - Локальные функции для форматирования даты (для использования в диалоге)
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "d MMMM yyyy" // например, "24 февраля 2025"
+        return formatter.string(from: date)
+    }
+    
+    private func iso8601StringToDate(_ string: String) -> Date? {
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = isoFormatter.date(from: string) {
+            return date
+        }
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        return isoFormatter.date(from: string)
+    }
+    
+    enum BookingError: Error, LocalizedError {
+        case phoneNotFound
+        case invalidURL
+        case noResponse
+        case serverError
+        case unknown
+        case custom(String)
+        
+        var errorDescription: String? {
+            switch self {
+            case .phoneNotFound:
+                return "Номер телефона не найден. Авторизуйтесь, чтобы продолжить."
+            case .invalidURL:
+                return "Некорректный URL."
+            case .noResponse:
+                return "Нет ответа от сервера."
+            case .serverError:
+                return "Ошибка сервера."
+            case .unknown:
+                return "Неизвестная ошибка."
+            case .custom(let message):
+                return message
+            }
+        }
+    }
+    
+    struct SolariumView_Previews: PreviewProvider {
+        static var previews: some View {
+            SolariumView()
+                .preferredColorScheme(.light)
+            SolariumView()
+                .preferredColorScheme(.dark)
+        }
     }
 }

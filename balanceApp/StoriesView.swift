@@ -33,7 +33,11 @@ struct StoryIcon: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     } else if phase.error != nil {
-                        Color.red
+                        // Вместо красного цвета выводим placeholder
+                        Image(systemName: "person.crop.circle.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .foregroundColor(.gray)
                     } else {
                         ProgressView()
                     }
