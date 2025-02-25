@@ -29,7 +29,7 @@ struct ContentView: View {
             
             SolariumView()
                 .tabItem {
-                    Image(systemName: "person.fill")
+                    Image(systemName: "calendar.badge.plus")
                     Text("Записаться")
                 }
         }

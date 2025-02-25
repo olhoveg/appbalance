@@ -122,7 +122,8 @@ struct ArticlesView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Статьи")
+            // Убираем навигационный заголовок, установив его пустым
+            .navigationTitle("")
             .task {
                 await viewModel.fetchArticles()
             }

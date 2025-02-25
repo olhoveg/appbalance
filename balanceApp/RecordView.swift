@@ -1,5 +1,5 @@
 //
-//  RecordViewModule.swift
+//  RecordView.swift
 //  balanceApp
 //
 //  Created by Evgeniy Olkhov on 12.02.2025.
