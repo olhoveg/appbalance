@@ -9,19 +9,33 @@ import SwiftUI
 import OneSignalFramework
 
 struct MainView: View {
+    @Binding var selectedTab: Tab
     @StateObject var recordViewModel = RecordViewModel.sharedInstance
-    // Если другие блоки используют свои viewModel, их тоже можно создать или передать
 
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 CustomNavigationBar()
                 
-                // Основной контент с добавлением refreshable:
-                ScrollView {
+                ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         StoriesView()
-                        RecordView()
+                        
+                        // Кнопка "Записаться" для переключения вкладки
+                        Button(action: {
+                            selectedTab = .solarium
+                        }) {
+                            Text("Записаться")
+                                .font(.headline)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            // Убираем padding по горизонтали для кнопки, если он не нужен
+                        }
+                        
+                        RecordView(viewModel: recordViewModel)
                         Divider()
                         RecommendationsBlockView()
                         Divider()
@@ -29,13 +43,13 @@ struct MainView: View {
                         Divider()
                         ArticlesView()
                     }
-                    .padding()
+                    .padding(.vertical) // Только вертикальные отступы, горизонтальные убраны
                 }
+                .ignoresSafeArea(edges: .horizontal)
+                
+                
                 .refreshable {
-                    // Здесь вызываются методы обновления данных для всех блоков.
-                    // Например, обновление для RecordView:
                     recordViewModel.refreshData()
-                    // Аналогично можно добавить обновление данных для Stories, Recommendations и т.д.
                 }
             }
             .navigationBarHidden(true)
@@ -218,7 +232,7 @@ struct ArticleDetailView: View {
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
-            MainView()
+            MainView(selectedTab: .constant(.main))
         }
     }
 }

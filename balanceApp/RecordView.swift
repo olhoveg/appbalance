@@ -567,95 +567,82 @@ class RecordViewModel: ObservableObject {
 // MARK: - Основной SwiftUI интерфейс
 
 struct RecordView: View {
-    @StateObject var viewModel = RecordViewModel()
-    
+    @StateObject var viewModel = RecordViewModel.sharedInstance
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 14) {
-                HStack(spacing: 8) {
-                    let companyIds = ["433675", "672239"]
-                    ForEach(companyIds, id: \.self) { companyIdKey in
-                        let address = viewModel.companyIdToAddress[companyIdKey] ?? ""
-                        let records = viewModel.recordsByCompany[companyIdKey] ?? []
-                        let futureRecords = records.filter {
-                            if let d = viewModel.recordDate(from: $0.date) {
-                                return d > Date()
-                            }
-                            return false
+        // Убираем NavigationView и navigationTitle
+        VStack(spacing: 14) {
+            HStack(spacing: 8) {
+                let companyIds = ["433675", "672239"]
+                ForEach(companyIds, id: \.self) { companyIdKey in
+                    let address = viewModel.companyIdToAddress[companyIdKey] ?? ""
+                    let records = viewModel.recordsByCompany[companyIdKey] ?? []
+                    let futureRecords = records.filter {
+                        if let d = viewModel.recordDate(from: $0.date) {
+                            return d > Date()
                         }
-                        Group {
-                            if futureRecords.isEmpty {
-                                NoRecordRow(address: address)
-                            } else {
-                                if let closestRecord = viewModel.closestUpcomingRecord(records: futureRecords) {
-                                    let display = viewModel.displayRecord(record: closestRecord)
-                                    RecordRow(address: display.address,
-                                              date: display.dateString,
-                                              customColor: closestRecord.custom_color,
-                                              visit_attendance: closestRecord.visit_attendance,
-                                              attendance: closestRecord.attendance)
-                                        .onTapGesture {
-                                            viewModel.selectedRecord = closestRecord
-                                            viewModel.showModal = true
-                                            _ = viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
-                                        }
-                                } else {
-                                    NoRecordRow(address: address)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
+                        return false
                     }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(viewModel.upcomingTenRecords()) { record in
-                            if let date = viewModel.recordDate(from: record.date) {
-                                let address = viewModel.companyIdToAddress["\(record.company_id)"] ?? ""
-                                UpcomingRecordBlock(date: date, address: address)
+                    Group {
+                        if futureRecords.isEmpty {
+                            NoRecordRow(address: address)
+                        } else {
+                            if let closestRecord = viewModel.closestUpcomingRecord(records: futureRecords) {
+                                let display = viewModel.displayRecord(record: closestRecord)
+                                RecordRow(address: display.address,
+                                          date: display.dateString,
+                                          customColor: closestRecord.custom_color,
+                                          visit_attendance: closestRecord.visit_attendance,
+                                          attendance: closestRecord.attendance)
                                     .onTapGesture {
-                                        viewModel.selectedRecord = record
+                                        viewModel.selectedRecord = closestRecord
                                         viewModel.showModal = true
+                                        _ = viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
                                     }
+                            } else {
+                                NoRecordRow(address: address)
                             }
                         }
                     }
-                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity)
                 }
-                
-                Spacer()
             }
-            .navigationTitle("Записи")
-            // Удалите этот блок toolbar:
-            //.toolbar {
-            //    Button(action: {
-            //        viewModel.refreshData()
-            //    }) {
-            //        if viewModel.isLoading {
-            //            ProgressView()
-            //        } else {
-            //            Image(systemName: "arrow.clockwise")
-            //        }
-            //    }
-            //}
-            .refreshable {
-                viewModel.refreshData()
-            }
-            .onAppear {
-                viewModel.getPhoneNumber()
-                viewModel.refreshData()
-            }
-            .sheet(isPresented: $viewModel.showModal) {
-                if let record = viewModel.selectedRecord {
-                    RecordModalView(record: record.asRecordModal, viewModel: viewModel)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 8)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(viewModel.upcomingTenRecords()) { record in
+                        if let date = viewModel.recordDate(from: record.date) {
+                            let address = viewModel.companyIdToAddress["\(record.company_id)"] ?? ""
+                            UpcomingRecordBlock(date: date, address: address)
+                                .onTapGesture {
+                                    viewModel.selectedRecord = record
+                                    viewModel.showModal = true
+                                }
+                        }
+                    }
                 }
+                .padding(.horizontal)
+            }
+            
+            Spacer()
+        }
+        .refreshable {
+            viewModel.refreshData()
+        }
+        .onAppear {
+            viewModel.getPhoneNumber()
+            viewModel.refreshData()
+        }
+        .sheet(isPresented: $viewModel.showModal) {
+            if let record = viewModel.selectedRecord {
+                RecordModalView(record: record.asRecordModal, viewModel: viewModel)
             }
         }
     }
 }
+
 
 // MARK: - Запись с подстановкой специалиста
 
