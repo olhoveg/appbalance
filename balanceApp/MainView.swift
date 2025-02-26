@@ -9,44 +9,45 @@ import SwiftUI
 import OneSignalFramework
 
 struct MainView: View {
+    @StateObject var recordViewModel = RecordViewModel.sharedInstance
+    // Если другие блоки используют свои viewModel, их тоже можно создать или передать
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Наш кастомный NavigationBar наверху
                 CustomNavigationBar()
                 
-                // Основной контент ниже
+                // Основной контент с добавлением refreshable:
                 ScrollView {
                     VStack(spacing: 20) {
                         StoriesView()
                         RecordView()
-                        
                         Divider()
-                        
                         RecommendationsBlockView()
-                        
                         Divider()
-                        
                         ServicesBlockView()
-                        
                         Divider()
-                        
                         ArticlesView()
                     }
                     .padding()
+                }
+                .refreshable {
+                    // Здесь вызываются методы обновления данных для всех блоков.
+                    // Например, обновление для RecordView:
+                    recordViewModel.refreshData()
+                    // Аналогично можно добавить обновление данных для Stories, Recommendations и т.д.
                 }
             }
             .navigationBarHidden(true)
         }
         .onAppear {
-            // Инициализируем OneSignal один раз
-            // Запуск OneSignal асинхронно, после отображения UI
             Task {
                 await initializeOneSignalAsync()
             }
         }
     }
 }
+
 
     func initializeOneSignalAsync() async {
         // Перемещаем тяжелые операции в фоновую задачу, чтобы не блокировать UI

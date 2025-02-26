@@ -1,10 +1,3 @@
-//
-//  RecordModalView.swift
-//  balanceApp
-//
-//  Created by Evgeniy Olkhov on 21.02.2025.
-//
-
 import SwiftUI
 import FirebaseDatabase
 
@@ -60,6 +53,10 @@ struct RecordModalView: View {
     @State private var branchAddress: String? = nil
     @State private var mapImage: String? = nil
     @State private var checkmarkUrl: String? = nil
+    
+    // Состояния для отображения предупреждений
+    @State private var showConfirmationAlert = false
+    @State private var showDeleteAlert = false
 
     // Форматтеры для вывода даты и времени (уже настроены на русский)
     // Настроенные форматтеры с явной временной зоной
@@ -248,7 +245,7 @@ struct RecordModalView: View {
                 // Кнопка подтверждения (если запись не подтверждена)
                 if record.attendance != 2 {
                     Button(action: {
-                        confirmRecord()
+                        showConfirmationAlert = true
                     }) {
                         Text("Подтвердить запись")
                             .font(.headline)
@@ -260,11 +257,19 @@ struct RecordModalView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 10)
+                    .alert("Подтверждение записи", isPresented: $showConfirmationAlert) {
+                        Button("Отмена", role: .cancel) {}
+                        Button("Подтвердить", role: .none) {
+                            confirmRecord()
+                        }
+                    } message: {
+                        Text("Вы уверены, что хотите подтвердить эту запись?")
+                    }
                 }
                 
                 // Кнопка удаления
                 Button(action: {
-                    confirmDelete()
+                    showDeleteAlert = true
                 }) {
                     Text("Удалить запись")
                         .font(.headline)
@@ -276,6 +281,14 @@ struct RecordModalView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 10)
+                .alert("Удаление записи", isPresented: $showDeleteAlert) {
+                    Button("Отмена", role: .cancel) {}
+                    Button("Удалить", role: .destructive) {
+                        confirmDelete()
+                    }
+                } message: {
+                    Text("Вы уверены, что хотите удалить эту запись? Это действие нельзя отменить.")
+                }
                 
                 // Контактная информация (иконки звонка, сайта, WhatsApp)
                 HStack(spacing: 20) {
@@ -513,4 +526,3 @@ struct RecordModalView: View {
         }.resume()
     }
 }
-

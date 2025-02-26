@@ -629,17 +629,18 @@ struct RecordView: View {
                 Spacer()
             }
             .navigationTitle("Записи")
-            .toolbar {
-                Button(action: {
-                    viewModel.refreshData()
-                }) {
-                    if viewModel.isLoading {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-            }
+            // Удалите этот блок toolbar:
+            //.toolbar {
+            //    Button(action: {
+            //        viewModel.refreshData()
+            //    }) {
+            //        if viewModel.isLoading {
+            //            ProgressView()
+            //        } else {
+            //            Image(systemName: "arrow.clockwise")
+            //        }
+            //    }
+            //}
             .refreshable {
                 viewModel.refreshData()
             }
