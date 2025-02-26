@@ -106,36 +106,36 @@ struct ArticleCardView: View {
 // MARK: - Основной экран статей (горизонтальное пролистывание)
 struct ArticlesView: View {
     @StateObject private var viewModel = ArticlesViewModel()
-    @State private var selectedArticle: Article? = nil  // Для хранения выбранной статьи
+    @State private var selectedArticle: Article? = nil
     
     var body: some View {
-        NavigationView {
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(viewModel.articles) { article in
-                        Button(action: {
-                            selectedArticle = article
-                        }) {
-                            ArticleCardView(article: article)
-                        }
+        // Если используете NavigationView, возможно, его тоже стоит убрать,
+        // чтобы не добавлялся дополнительный отступ.
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(viewModel.articles) { article in
+                    Button(action: {
+                        selectedArticle = article
+                    }) {
+                        ArticleCardView(article: article)
                     }
                 }
-                .padding()
             }
-            // Убираем навигационный заголовок, установив его пустым
-            .navigationTitle("")
-            .task {
-                await viewModel.fetchArticles()
-            }
-            .refreshable {
-                await viewModel.fetchArticles()
-            }
-            .fullScreenCover(item: $selectedArticle) { article in
-                ArticleDetailsView(article: article)
-            }
+            .padding(.horizontal) // только горизонтальные отступы
+        }
+        .frame(maxHeight: .infinity, alignment: .top) // выравниваем по верху
+        .task {
+            await viewModel.fetchArticles()
+        }
+        .refreshable {
+            await viewModel.fetchArticles()
+        }
+        .fullScreenCover(item: $selectedArticle) { article in
+            ArticleDetailsView(article: article)
         }
     }
 }
+
 
 // MARK: - Детальный экран статьи
 struct ArticleDetailsView: View {

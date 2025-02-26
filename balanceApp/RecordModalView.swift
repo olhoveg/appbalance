@@ -47,7 +47,7 @@ struct RecordModal: Identifiable, Codable {
 struct RecordModalView: View {
     let record: RecordModal
     @ObservedObject var viewModel: RecordViewModel
-
+    
     @State private var firebaseSpecialist: FirebaseSpecialist? = nil
     @State private var branchName: String? = nil
     @State private var branchAddress: String? = nil
@@ -57,7 +57,7 @@ struct RecordModalView: View {
     // Состояния для отображения предупреждений
     @State private var showConfirmationAlert = false
     @State private var showDeleteAlert = false
-
+    
     // Форматтеры для вывода даты и времени (уже настроены на русский)
     // Настроенные форматтеры с явной временной зоной
     private var headerDateFormatter: DateFormatter {
@@ -67,7 +67,7 @@ struct RecordModalView: View {
         formatter.dateFormat = "d MMMM"  // например, "7 февраля"
         return formatter
     }
-
+    
     private var headerTimeFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
@@ -75,7 +75,7 @@ struct RecordModalView: View {
         formatter.dateFormat = "HH:mm"   // 24-часовой формат
         return formatter
     }
-
+    
     // Функция для парсинга даты с логированием
     func parseDate(_ dateString: String) -> Date? {
         let formatter = DateFormatter()
@@ -111,7 +111,7 @@ struct RecordModalView: View {
                         let dateString = headerDateFormatter.string(from: startDate)
                         let startTimeString = headerTimeFormatter.string(from: startDate)
                         let endTimeString = headerTimeFormatter.string(from: endDate)
-
+                        
                         HStack(spacing: 8) {
                             // Текст с датой и временем
                             Text("\(dateString), \(startTimeString) - \(endTimeString)")
@@ -137,8 +137,8 @@ struct RecordModalView: View {
                 .background(record.attendance == 2 ? Color.green : Color.gray.opacity(0.3))
                 .cornerRadius(10)
                 .padding(.bottom, 10)
-
-
+                
+                
                 
                 // Специалист
                 if let specialist = firebaseSpecialist {
@@ -203,10 +203,10 @@ struct RecordModalView: View {
                     .shadow(radius: 2)
                     .padding(.bottom, 10)
                     .onAppear {
-                         print("Record \(record.id) has \(services.count) services")
-                         for service in services {
-                             print("Service id: \(service.id), title: \(service.title), cost: \(service.cost)")
-                         }
+                        print("Record \(record.id) has \(services.count) services")
+                        for service in services {
+                            print("Service id: \(service.id), title: \(service.title), cost: \(service.cost)")
+                        }
                     }
                 } else {
                     // Если услуг нет, добавляем лог
@@ -216,8 +216,8 @@ struct RecordModalView: View {
                             print("Record \(record.id) has no services")
                         }
                 }
-
-
+                
+                
                 
                 // Локация
                 VStack(alignment: .center, spacing: 8) {
@@ -351,24 +351,24 @@ struct RecordModalView: View {
         .cornerRadius(20)
         .padding()
         .onAppear {
-                // Вывод отладочной информации здесь:
+            // Вывод отладочной информации здесь:
             print("Record received: \(record)")
-                print("Record length: \(record.length) секунд, что составляет \(record.length / 60) минут")
-                
-                if let startDate = parseDate(record.date) {
-                    let duration = record.length > 0 ? record.length : 600
-                    let endDate = calculateEndTime(start: startDate, duration: duration)
-                    print("Start date: \(startDate)")
-                    print("Computed duration: \(duration) секунд (\(duration / 60) минут)")
-                    print("Computed end date: \(endDate)")
-                    print("Start time (Moscow): \(headerTimeFormatter.string(from: startDate))")
-                    print("End time (Moscow): \(headerTimeFormatter.string(from: endDate))")
-                } else {
-                    print("Unable to parse date from: \(record.date)")
-                }
-                loadFirebaseData()
+            print("Record length: \(record.length) секунд, что составляет \(record.length / 60) минут")
+            
+            if let startDate = parseDate(record.date) {
+                let duration = record.length > 0 ? record.length : 600
+                let endDate = calculateEndTime(start: startDate, duration: duration)
+                print("Start date: \(startDate)")
+                print("Computed duration: \(duration) секунд (\(duration / 60) минут)")
+                print("Computed end date: \(endDate)")
+                print("Start time (Moscow): \(headerTimeFormatter.string(from: startDate))")
+                print("End time (Moscow): \(headerTimeFormatter.string(from: endDate))")
+            } else {
+                print("Unable to parse date from: \(record.date)")
             }
+            loadFirebaseData()
         }
+    }
     
     // MARK: - Firebase загрузка данных
     
@@ -422,8 +422,8 @@ struct RecordModalView: View {
     // MARK: - Вспомогательные функции
     
     func calculateEndTime(start: Date, duration: Int) -> Date {
-            return start.addingTimeInterval(TimeInterval(duration))
-        }
+        return start.addingTimeInterval(TimeInterval(duration))
+    }
     
     func openLink(url: String) {
         if let url = URL(string: url) {
@@ -476,25 +476,25 @@ struct RecordModalView: View {
         request.httpBody = jsonData
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Ошибка при подтверждении записи: \(error)")
-                return
-            }
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                print("Запись id \(record.id) успешно подтверждена (HTTP статус 200)")
-                DispatchQueue.main.async {
-                    viewModel.showModal = false
-                    // При необходимости обновите данные через viewModel.refreshData()
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Ошибка подтверждения записи: \(error)")
+                    return
                 }
-            } else {
-                print("Ответ сервера не равен 200")
-                if let data = data, let responseBody = try? JSONSerialization.jsonObject(with: data) {
-                    print("Response body: \(responseBody)")
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    print("Запись id \(record.id) успешно подтверждена (HTTP статус 200)")
+                    // Закрываем окно и обновляем данные
+                    viewModel.showModal = false
+                    viewModel.refreshData()
+                } else {
+                    print("Ошибка подтверждения записи: неожиданный статус ответа")
+                    if let data = data, let responseBody = try? JSONSerialization.jsonObject(with: data) {
+                        print("Response body: \(responseBody)")
+                    }
                 }
             }
         }.resume()
     }
-
     
     // Функция для удаления записи (DELETE запрос)
     func confirmDelete() {
@@ -512,15 +512,17 @@ struct RecordModalView: View {
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Ошибка при удалении записи: \(error)")
-                return
-            }
-            if let httpResponse = response as? HTTPURLResponse,
-               httpResponse.statusCode == 204 || httpResponse.statusCode == 200 {
-                DispatchQueue.main.async {
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Ошибка при удалении записи: \(error)")
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse,
+                   httpResponse.statusCode == 204 || httpResponse.statusCode == 200 {
+                    print("Запись \(record.id) успешно удалена")
+                    // Закрываем окно и обновляем данные
                     viewModel.showModal = false
-                    // При необходимости обновите данные через viewModel.refreshData()
+                    viewModel.refreshData()
                 }
             }
         }.resume()

@@ -1,10 +1,3 @@
-//
-//  RecordView.swift
-//  balanceApp
-//
-//  Created by Evgeniy Olkhov on 12.02.2025.
-//
-
 import SwiftUI
 import Combine
 import FirebaseDatabase
@@ -81,7 +74,7 @@ struct ClientsData: Codable {
     let meta: [String]?
 }
 
-// MARK: - RecordViewModel с логикой уведомлений
+// MARK: - RecordViewModel с логикой уведомлений и обновлением
 
 class RecordViewModel: ObservableObject {
     static let sharedInstance = RecordViewModel()
@@ -562,6 +555,60 @@ class RecordViewModel: ObservableObject {
         let formattedDate = formatter.string(from: date)
         return (address, formattedDate)
     }
+    
+    // MARK: - Методы для подтверждения и удаления записей
+    
+    /// Метод для подтверждения записи
+    func confirmRecord(_ record: Record) {
+        guard let url = URL(string: "https://api.yclients.com/api/v1/confirmRecord/\(record.id)") else {
+            log("Неверный URL для подтверждения записи")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        // При необходимости добавьте нужные заголовки и тело запроса
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.log("Ошибка подтверждения записи: \(error.localizedDescription)")
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    self.log("Запись \(record.id) успешно подтверждена")
+                    self.refreshData() // Обновляем записи после подтверждения
+                } else {
+                    self.log("Ошибка подтверждения записи: неожиданный статус ответа")
+                }
+            }
+        }.resume()
+    }
+    
+    /// Метод для удаления записи
+    func deleteRecord(_ record: Record) {
+        guard let url = URL(string: "https://api.yclients.com/api/v1/records/\(record.id)") else {
+            log("Неверный URL для удаления записи")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        // При необходимости добавьте нужные заголовки
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.log("Ошибка удаления записи: \(error.localizedDescription)")
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    self.log("Запись \(record.id) успешно удалена")
+                    self.refreshData() // Обновляем записи после удаления
+                } else {
+                    self.log("Ошибка удаления записи: неожиданный статус ответа")
+                }
+            }
+        }.resume()
+    }
 }
 
 // MARK: - Основной SwiftUI интерфейс
@@ -642,7 +689,6 @@ struct RecordView: View {
         }
     }
 }
-
 
 // MARK: - Запись с подстановкой специалиста
 
