@@ -207,31 +207,39 @@ struct LoyaltyAbonementCardView: View {
     }
 }
 
-// MARK: - Основной View с горизонтальным скроллом
+// MARK: - Основной View с вертикальным refreshable
 
 struct LoyaltyAbonementMainView: View {
-    @StateObject private var viewModel = LoyaltyAbonementViewModel()
+    @ObservedObject var viewModel: LoyaltyAbonementViewModel
     @AppStorage("userPhone") private var userPhone: String = ""
     
     var body: some View {
-        ZStack {
-            Color(.systemBackground)
-                .ignoresSafeArea()
-            
-            if viewModel.isLoading {
-                ProgressView("Загрузка абонементов...")
-            } else if viewModel.abonements.isEmpty {
-                Text(userPhone.isEmpty ? "Номер клиента не найден" : "Абонементы отсутствуют")
-                    .foregroundColor(.secondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(viewModel.abonements) { abonement in
-                            LoyaltyAbonementCardView(abonement: abonement)
+        ScrollView {
+            ZStack {
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+                
+                if viewModel.isLoading {
+                    ProgressView("Загрузка абонементов...")
+                } else if viewModel.abonements.isEmpty {
+                    Text(userPhone.isEmpty ? "Номер клиента не найден" : "Абонементы отсутствуют")
+                        .foregroundColor(.secondary)
+                } else {
+                    // Горизонтальный скролл с карточками
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(viewModel.abonements) { abonement in
+                                LoyaltyAbonementCardView(abonement: abonement)
+                            }
                         }
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal, 16)
                 }
+            }
+        }
+        .refreshable {
+            if !userPhone.isEmpty {
+                viewModel.fetchAbonements(phone: userPhone)
             }
         }
         .onAppear {
@@ -246,7 +254,7 @@ struct LoyaltyAbonementMainView: View {
 
 struct LoyaltyAbonementMainView_Previews: PreviewProvider {
     static var previews: some View {
-        LoyaltyAbonementMainView()
+        LoyaltyAbonementMainView(viewModel: LoyaltyAbonementViewModel())
             .preferredColorScheme(.light)
     }
 }

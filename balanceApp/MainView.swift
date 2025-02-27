@@ -11,7 +11,11 @@ import OneSignalFramework
 struct MainView: View {
     @Binding var selectedTab: Tab
     @StateObject var recordViewModel = RecordViewModel.sharedInstance
-
+    @StateObject var bonusCardVM = LoyaltyBonusCardViewModel()      // аналогичный принцип для бонусных карт
+    @StateObject var abonementVM = LoyaltyAbonementViewModel()          // создаём экземпляр для абонементов
+    @StateObject var certificateVM = LoyaltyCertificateViewModel()      // и для сертификатов
+    @AppStorage("userPhone") var userPhone: String = ""
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -21,7 +25,6 @@ struct MainView: View {
                     VStack(spacing: 20) {
                         StoriesView()
                         
-                        // Кнопка "Записаться" для переключения вкладки
                         Button(action: {
                             selectedTab = .solarium
                         }) {
@@ -32,29 +35,34 @@ struct MainView: View {
                                 .background(Color.blue)
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
-                            // Убираем padding по горизонтали для кнопки, если он не нужен
                         }
                         
                         RecordView(viewModel: recordViewModel)
                         Divider()
-                        LoyaltyAbonementMainView()
+                        // Передаем viewModel как параметр в дочерние представления
+                        LoyaltyBonusCardMainView(viewModel: bonusCardVM)
                         Divider()
-                        LoyaltyCertificateMainView()
+                        LoyaltyAbonementMainView(viewModel: abonementVM)
+                        Divider()
+                        LoyaltyCertificateMainView(viewModel: certificateVM)
                             .padding(.vertical, 0)
-
                         Divider()
                         RecommendationsBlockView()
-                        Divider();                                               ServicesBlockView()
+                        Divider()
+                        ServicesBlockView()
                         Divider()
                         ArticlesView()
                     }
-                    .padding(.vertical) // Только вертикальные отступы, горизонтальные убраны
+                    .padding(.vertical)
                 }
                 .ignoresSafeArea(edges: .horizontal)
-                
-                
                 .refreshable {
                     recordViewModel.refreshData()
+                    if !userPhone.isEmpty {
+                        bonusCardVM.fetchBonusCards(phone: userPhone)
+                        abonementVM.fetchAbonements(phone: userPhone)
+                        certificateVM.fetchCertificates(phone: userPhone)
+                    }
                 }
             }
             .navigationBarHidden(true)

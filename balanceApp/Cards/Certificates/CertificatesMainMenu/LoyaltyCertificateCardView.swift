@@ -162,7 +162,7 @@ struct LoyaltyCertificateCardView: View {
 // MARK: - Основной View с горизонтальным скроллом
 
 struct LoyaltyCertificateMainView: View {
-    @StateObject private var viewModel = LoyaltyCertificateViewModel()
+    @ObservedObject var viewModel: LoyaltyCertificateViewModel
     @AppStorage("userPhone") private var userPhone: String = ""
     
     var body: some View {
@@ -198,7 +198,7 @@ struct LoyaltyCertificateMainView: View {
 
 struct LoyaltyCertificateMainView_Previews: PreviewProvider {
     static var previews: some View {
-        LoyaltyCertificateMainView()
+        LoyaltyCertificateMainView(viewModel: LoyaltyCertificateViewModel())
             .preferredColorScheme(.light)
     }
 }
