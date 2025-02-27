@@ -7,8 +7,8 @@ import FirebaseDatabase
 struct LoyaltyAbonement: Identifiable, Codable, Equatable {
     let id: Int
     let number: String
-    let type: LoyaltyAbonementType
     let united_balance_services_count: Int?
+    let type: LoyaltyAbonementType
     
     struct LoyaltyAbonementType: Codable, Equatable {
         let title: String
@@ -34,11 +34,13 @@ class LoyaltyAbonementViewModel: ObservableObject {
             print("Номер телефона пустой")
             return
         }
+        
         guard var urlComponents = URLComponents(string: apiURL) else { return }
         urlComponents.queryItems = [
             URLQueryItem(name: "company_id", value: companyId),
             URLQueryItem(name: "phone", value: phone)
         ]
+        
         guard let url = urlComponents.url else { return }
         
         var request = URLRequest(url: url)
@@ -50,14 +52,17 @@ class LoyaltyAbonementViewModel: ObservableObject {
         isLoading = true
         URLSession.shared.dataTask(with: request) { data, _, error in
             DispatchQueue.main.async { self.isLoading = false }
+            
             if let error = error {
                 print("Ошибка при загрузке абонементов: \(error)")
                 return
             }
+            
             guard let data = data else {
                 print("Нет данных")
                 return
             }
+            
             do {
                 let decodedResponse = try JSONDecoder().decode(LoyaltyAbonementResponse.self, from: data)
                 DispatchQueue.main.async {
@@ -70,7 +75,7 @@ class LoyaltyAbonementViewModel: ObservableObject {
     }
 }
 
-// MARK: - Вспомогательные функции для текста
+// MARK: - Грамматические функции
 
 func isSolariumAbonement(_ abonement: LoyaltyAbonement) -> Bool {
     return abonement.type.title.lowercased().contains("солярий")
@@ -84,7 +89,7 @@ func getUnitsEnding(count: Int, isSolarium: Bool) -> String {
     } else if lastDigit == 1 {
         return isSolarium ? "минута" : "сеанс"
     } else if (2...4).contains(lastDigit) {
-        return isSolarium ? "минуты" : "сеансы"
+        return isSolarium ? "минуты" : "сеанса"
     } else {
         return isSolarium ? "минут" : "сеансов"
     }
@@ -112,79 +117,77 @@ func getRemainingWord(count: Int, isSolarium: Bool) -> String {
     }
 }
 
-// MARK: - Вид карточки абонемента
+// MARK: - Карточка абонемента
 
 struct LoyaltyAbonementCardView: View {
     var abonement: LoyaltyAbonement
     @Environment(\.colorScheme) private var colorScheme
-    @State private var cardImageURL: URL?
+    @State private var abonementImageURL: URL?
     
-    // Placeholder с via.placeholder.com; можно заменить на локальный asset
     private var placeholderURL: URL? {
-        let bg = colorScheme == .dark ? "1f1f1f" : "ffffff"
-        let fg = "000000"
-        let urlString = "https://via.placeholder.com/100x60.png?text=Абонемент&bg=\(bg)&fg=\(fg)"
+        let bg = colorScheme == .dark ? "1f1f1f" : "f2f2f7"
+        let fg = "ffffff"
+        let urlString = "https://via.placeholder.com/200x150.png?text=Абонемент&bg=\(bg)&fg=\(fg)"
         return URL(string: urlString)
     }
     
     var body: some View {
         HStack(spacing: 16) {
-            AsyncImage(url: cardImageURL ?? placeholderURL, transaction: Transaction(animation: .easeIn)) { phase in
+            AsyncImage(url: abonementImageURL ?? placeholderURL) { phase in
                 switch phase {
                 case .empty:
                     ProgressView()
-                        .frame(width: 100, height: 60)
+                        .frame(width: 200, height: 150)
                 case .success(let image):
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 100, height: 60)
-                        .clipped()
-                        .cornerRadius(10)
+                        .transition(.opacity)
                 case .failure:
                     Image(systemName: "photo")
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 100, height: 60)
                         .foregroundColor(.gray)
-                        .clipped()
-                        .cornerRadius(10)
                 @unknown default:
-                    EmptyView()
+                    Image(systemName: "photo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .foregroundColor(.gray)
                 }
             }
-            .padding(.leading, 20)
+            .frame(width: 160, height: 100)
+            .cornerRadius(12)
+            .clipped()
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Абонемент")
                     .font(.title2)
                     .bold()
-                Text("Номер карты: \(abonement.number)")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                let count = abonement.united_balance_services_count ?? 0
-                let solarium = isSolariumAbonement(abonement)
-                Text("\(getRemainingWord(count: count, isSolarium: solarium)): \(count) \(getUnitsEnding(count: count, isSolarium: solarium))")
+                Text("Номер: \(abonement.number)")
                     .font(.headline)
+                if let count = abonement.united_balance_services_count {
+                    let solarium = isSolariumAbonement(abonement)
+                    Text("\(getRemainingWord(count: count, isSolarium: solarium)): \(count) \(getUnitsEnding(count: count, isSolarium: solarium))")
+                        .font(.headline)
+                } else {
+                    Text("Осталось: 0 сеансов")
+                        .font(.headline)
+                }
             }
-            .padding(.trailing, 20)
-            
-            Spacer()
+            .padding(.trailing, 16)
         }
-        .padding(.vertical, 20)
+        .padding()
         .background(
-            RoundedRectangle(cornerRadius: 30)
-                .fill(colorScheme == .dark ? Color(.systemGray6) : Color.white)
-                .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
         )
-        .padding(.horizontal, 16)
+        .frame(height: 140)
         .onAppear(perform: fetchAbonementImage)
     }
     
-    // Загрузка изображения абонемента из Firebase Database
     private func fetchAbonementImage() {
         let ref = Database.database().reference(withPath: "abonement_images")
-        ref.observeSingleEvent(of: .value, with: { snapshot in
+        ref.observeSingleEvent(of: .value) { snapshot in
             guard let imagesDict = snapshot.value as? [String: Any] else { return }
             for (_, value) in imagesDict {
                 if let imageInfo = value as? [String: Any],
@@ -193,23 +196,22 @@ struct LoyaltyAbonementCardView: View {
                    let imageUrlString = imageInfo["image_url"] as? String,
                    let url = URL(string: imageUrlString) {
                     DispatchQueue.main.async {
-                        cardImageURL = url
+                        abonementImageURL = url
                     }
                     return
                 }
             }
-        }, withCancel: { error in
+        } withCancel: { error in
             print("Ошибка загрузки изображения: \(error.localizedDescription)")
-        })
+        }
     }
 }
 
-// MARK: - Основной View абонементов
+// MARK: - Основной View с горизонтальным скроллом
 
 struct LoyaltyAbonementMainView: View {
     @StateObject private var viewModel = LoyaltyAbonementViewModel()
     @AppStorage("userPhone") private var userPhone: String = ""
-    @State private var activeIndex: Int = 0
     
     var body: some View {
         ZStack {
@@ -222,18 +224,13 @@ struct LoyaltyAbonementMainView: View {
                 Text(userPhone.isEmpty ? "Номер клиента не найден" : "Абонементы отсутствуют")
                     .foregroundColor(.secondary)
             } else {
-                TabView(selection: $activeIndex) {
-                    ForEach(Array(viewModel.abonements.enumerated()), id: \.element.id) { index, abonement in
-                        LoyaltyAbonementCardView(abonement: abonement)
-                            .tag(index)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(viewModel.abonements) { abonement in
+                            LoyaltyAbonementCardView(abonement: abonement)
+                        }
                     }
-                }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                .animation(.easeInOut, value: viewModel.abonements)
-                .refreshable {
-                    if !userPhone.isEmpty {
-                        viewModel.fetchAbonements(phone: userPhone)
-                    }
+                    .padding(.horizontal, 16)
                 }
             }
         }

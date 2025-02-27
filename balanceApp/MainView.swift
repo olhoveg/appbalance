@@ -37,6 +37,8 @@ struct MainView: View {
                         
                         RecordView(viewModel: recordViewModel)
                         Divider()
+                        LoyaltyAbonementMainView()
+                        Divider()
                         LoyaltyCertificateMainView()
                             .padding(.vertical, 0)
 
