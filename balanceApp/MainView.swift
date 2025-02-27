@@ -37,9 +37,12 @@ struct MainView: View {
                         
                         RecordView(viewModel: recordViewModel)
                         Divider()
-                        RecommendationsBlockView()
+                        LoyaltyCertificateMainView()
+                            .padding(.vertical, 0)
+
                         Divider()
-                        ServicesBlockView()
+                        RecommendationsBlockView()
+                        Divider();                                               ServicesBlockView()
                         Divider()
                         ArticlesView()
                     }

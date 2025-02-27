@@ -1,14 +1,16 @@
 import SwiftUI
+import Firebase
+import FirebaseDatabase
 
 // MARK: - Модель данных
 
-struct LoyaltyCertificate: Identifiable, Codable {
+struct LoyaltyCertificate: Identifiable, Codable, Equatable {
     let id = UUID()
     let number: String
     let balance: Double
     let type: LoyaltyCertificateType
     
-    struct LoyaltyCertificateType: Codable {
+    struct LoyaltyCertificateType: Codable, Equatable {
         let title: String
     }
 }
@@ -17,7 +19,7 @@ struct LoyaltyCertificateResponse: Codable {
     let data: [LoyaltyCertificate]
 }
 
-// MARK: - ViewModel для загрузки сертификатов
+// MARK: - ViewModel
 
 class LoyaltyCertificateViewModel: ObservableObject {
     @Published var certificates: [LoyaltyCertificate] = []
@@ -28,6 +30,11 @@ class LoyaltyCertificateViewModel: ObservableObject {
     private let companyId = "433675"
     
     func fetchCertificates(phone: String) {
+        guard !phone.isEmpty else {
+            print("Номер телефона пустой")
+            return
+        }
+        
         guard var urlComponents = URLComponents(string: apiURL) else { return }
         urlComponents.queryItems = [
             URLQueryItem(name: "company_id", value: companyId),
@@ -68,111 +75,130 @@ class LoyaltyCertificateViewModel: ObservableObject {
     }
 }
 
-// MARK: - Представление для карточки сертификата
+// MARK: - Карточка сертификата
 
 struct LoyaltyCertificateCardView: View {
     var certificate: LoyaltyCertificate
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var certificateImageURL: URL?
     
-    // Placeholder-изображение, можно заменить на логику загрузки изображения по certificate.type.title
-    var imageURL: URL? {
-        URL(string: "https://via.placeholder.com/300x150.png?text=Certificate")
+    private var placeholderURL: URL? {
+        let bg = colorScheme == .dark ? "1f1f1f" : "f2f2f7"
+        let fg = "ffffff"
+        let urlString = "https://via.placeholder.com/200x150.png?text=Сертификат&bg=\(bg)&fg=\(fg)"
+        return URL(string: urlString)
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: imageURL) { phase in
-                if let image = phase.image {
+        HStack(spacing: 16) {
+            AsyncImage(url: certificateImageURL ?? placeholderURL) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .frame(width: 200, height: 150)
+                case .success(let image):
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(height: 150)
-                        .clipped()
-                } else if phase.error != nil {
-                    Color.red.frame(height: 150)
-                } else {
-                    Color.gray.frame(height: 150)
+                        .transition(.opacity)
+                case .failure:
+                    Image(systemName: "photo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .foregroundColor(.gray)
+                @unknown default:
+                    Image(systemName: "photo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .foregroundColor(.gray)
                 }
             }
-            .cornerRadius(10)
+            .frame(width: 160, height: 100)
+            .cornerRadius(12)
+            .clipped()
             
-            Text("Сертификат")
-                .font(.headline)
-            
-            Text("Номер карты: \(certificate.number)")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Text("Баланс: \(certificate.balance, specifier: "%.2f") ₽")
-                .font(.subheadline)
-                .foregroundColor(.primary)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Сертификат")
+                    .font(.title2)
+                    .bold()
+                Text("Номер: \(certificate.number)")
+                    .font(.headline)
+                Text("Баланс: \(certificate.balance, specifier: "%.2f") ₽")
+                    .font(.headline)
+            }
+            .padding(.trailing, 16)
         }
         .padding()
-        .background(Color.white)
-        .cornerRadius(15)
-        .shadow(radius: 4)
-        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+        )
+        .frame(height: 140) // увеличенный блок сертификата
+        .onAppear(perform: fetchCertificateImage)
+    }
+    
+    private func fetchCertificateImage() {
+        let ref = Database.database().reference(withPath: "certificate_images")
+        ref.observeSingleEvent(of: .value) { snapshot in
+            guard let imagesDict = snapshot.value as? [String: Any] else { return }
+            for (_, value) in imagesDict {
+                if let imageInfo = value as? [String: Any],
+                   let title = imageInfo["title"] as? String,
+                   title == certificate.type.title,
+                   let imageUrlString = imageInfo["image_url"] as? String,
+                   let url = URL(string: imageUrlString) {
+                    DispatchQueue.main.async {
+                        certificateImageURL = url
+                    }
+                    return
+                }
+            }
+        } withCancel: { error in
+            print("Ошибка загрузки изображения: \(error.localizedDescription)")
+        }
     }
 }
 
-// MARK: - Основное представление с каруселью сертификатов
+// MARK: - Основной View с горизонтальным скроллом
 
-struct LoyaltyCertificateCarouselView: View {
+struct LoyaltyCertificateMainView: View {
     @StateObject private var viewModel = LoyaltyCertificateViewModel()
-    
-    // Номер телефона можно получать из UserDefaults или другого хранилища; здесь для примера задан статически
-    @State private var phone: String = "1234567890"
+    @AppStorage("userPhone") private var userPhone: String = ""
     
     var body: some View {
-        NavigationView {
-            VStack {
-                if viewModel.isLoading {
-                    ProgressView("Загрузка сертификатов...")
-                        .padding()
-                } else {
-                    if viewModel.certificates.isEmpty {
-                        Text("Сертификаты отсутствуют")
-                            .foregroundColor(.secondary)
-                    } else {
-                        // Используем TabView с PageTabViewStyle для имитации карусели с пагинацией
-                        TabView {
-                            ForEach(viewModel.certificates) { certificate in
-                                LoyaltyCertificateCardView(certificate: certificate)
-                            }
+        ZStack {
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            if viewModel.isLoading {
+                ProgressView("Загрузка сертификатов...")
+            } else if viewModel.certificates.isEmpty {
+                Text(userPhone.isEmpty ? "Номер клиента не найден" : "Сертификаты отсутствуют")
+                    .foregroundColor(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(viewModel.certificates) { certificate in
+                            LoyaltyCertificateCardView(certificate: certificate)
                         }
-                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                        .frame(height: 300)
                     }
+                    .padding(.horizontal, 16)
                 }
-                
-                Spacer()
-                
-                Button(action: {
-                    viewModel.fetchCertificates(phone: phone)
-                }) {
-                    Text("Обновить сертификаты")
-                        .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                        .padding(.horizontal)
-                }
-                .padding(.bottom)
             }
-            .navigationTitle("Сертификаты")
-            .onAppear {
-                viewModel.fetchCertificates(phone: phone)
+        }
+        .onAppear {
+            if !userPhone.isEmpty {
+                viewModel.fetchCertificates(phone: userPhone)
             }
-            .background(Color(UIColor.systemGroupedBackground))
         }
     }
 }
 
 // MARK: - Превью
 
-struct LoyaltyCertificateCarouselView_Previews: PreviewProvider {
+struct LoyaltyCertificateMainView_Previews: PreviewProvider {
     static var previews: some View {
-        LoyaltyCertificateCarouselView()
+        LoyaltyCertificateMainView()
+            .preferredColorScheme(.light)
     }
 }
