@@ -5,7 +5,7 @@ import FirebaseDatabase
 // MARK: - Модель данных
 
 struct LoyaltyCertificate: Identifiable, Codable, Equatable {
-    let id = UUID()
+    let id: Int
     let number: String
     let balance: Double
     let type: LoyaltyCertificateType
@@ -50,7 +50,7 @@ class LoyaltyCertificateViewModel: ObservableObject {
         request.addValue("Bearer \(apiKey), User 9d241fb00061c17a5e2e76a23b214b20", forHTTPHeaderField: "Authorization")
         
         isLoading = true
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: request) { data, _, error in
             DispatchQueue.main.async { self.isLoading = false }
             
             if let error = error {
@@ -82,6 +82,15 @@ struct LoyaltyCertificateCardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var certificateImageURL: URL?
     
+    private var screenWidth: CGFloat {
+        UIScreen.main.bounds.width
+    }
+    
+    private var scaleFactor: CGFloat {
+        let baseWidth: CGFloat = 375 // Стандартный размер экрана iPhone 11, 12, 13
+        return max(0.85, min(screenWidth / baseWidth, 1.2)) // Диапазон масштабирования 0.85 - 1.2
+    }
+    
     private var placeholderURL: URL? {
         let bg = colorScheme == .dark ? "1f1f1f" : "f2f2f7"
         let fg = "ffffff"
@@ -90,51 +99,56 @@ struct LoyaltyCertificateCardView: View {
     }
     
     var body: some View {
-        HStack(spacing: 16) {
-            AsyncImage(url: certificateImageURL ?? placeholderURL) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                        .frame(width: 200, height: 150)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .transition(.opacity)
-                case .failure:
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .foregroundColor(.gray)
-                @unknown default:
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .foregroundColor(.gray)
-                }
-            }
-            .frame(width: 160, height: 100)
-            .cornerRadius(12)
-            .clipped()
+        GeometryReader { geometry in
+            let cardWidth = min(geometry.size.width * 1, 400) // Максимальная ширина 400px на больших экранах
+            let cardHeight = cardWidth * 0.4
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Сертификат")
-                    .font(.title2)
-                    .bold()
-                Text("Номер: \(certificate.number)")
-                    .font(.headline)
-                Text("Баланс: \(certificate.balance, specifier: "%.2f") ₽")
-                    .font(.headline)
+            HStack(spacing: 12 * scaleFactor) {
+                AsyncImage(url: certificateImageURL ?? placeholderURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .transition(.opacity)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
+                .cornerRadius(12 * scaleFactor)
+                .clipped()
+                
+                VStack(alignment: .leading, spacing: 6 * scaleFactor) {
+                    Text("Сертификат")
+                        .font(.system(size: 18 * scaleFactor, weight: .bold))
+                    Text("Номер: \(certificate.number)")
+                        .font(.system(size: 14 * scaleFactor))
+                    Text("Баланс: \(Int(certificate.balance)) ₽")
+                        .font(.system(size: 14 * scaleFactor))
+                }
+                .padding(.trailing, 12 * scaleFactor)
             }
-            .padding(.trailing, 16)
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12 * scaleFactor)
+                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+            )
+            .frame(width: cardWidth, height: cardHeight)
+            .onAppear(perform: fetchCertificateImage)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
-        )
-        .frame(height: 140) // увеличенный блок сертификата
-        .onAppear(perform: fetchCertificateImage)
+        .frame(height: 160) // Фиксируем высоту контейнера, чтобы карточки не сжимались
     }
     
     private func fetchCertificateImage() {
@@ -159,31 +173,40 @@ struct LoyaltyCertificateCardView: View {
     }
 }
 
-// MARK: - Основной View с горизонтальным скроллом
+// MARK: - Основной View с вертикальным refreshable
 
 struct LoyaltyCertificateMainView: View {
     @ObservedObject var viewModel: LoyaltyCertificateViewModel
     @AppStorage("userPhone") private var userPhone: String = ""
     
     var body: some View {
-        ZStack {
-            Color(.systemBackground)
-                .ignoresSafeArea()
-            
-            if viewModel.isLoading {
-                ProgressView("Загрузка сертификатов...")
-            } else if viewModel.certificates.isEmpty {
-                Text(userPhone.isEmpty ? "Номер клиента не найден" : "Сертификаты отсутствуют")
-                    .foregroundColor(.secondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(viewModel.certificates) { certificate in
-                            LoyaltyCertificateCardView(certificate: certificate)
+        ScrollView {
+            ZStack {
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+                
+                if viewModel.isLoading {
+                    ProgressView("Загрузка сертификатов...")
+                } else if viewModel.certificates.isEmpty {
+                    Text(userPhone.isEmpty ? "Номер клиента не найден" : "Сертификаты отсутствуют")
+                        .foregroundColor(.secondary)
+                } else {
+                    // Горизонтальный скролл с карточками
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(viewModel.certificates) { certificate in
+                                LoyaltyCertificateCardView(certificate: certificate)
+                                    .frame(width: min(UIScreen.main.bounds.width * 0.9, 400)) // ✅ Ограничиваем максимальную ширину
+                            }
                         }
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal, 16)
                 }
+            }
+        }
+        .refreshable {
+            if !userPhone.isEmpty {
+                viewModel.fetchCertificates(phone: userPhone)
             }
         }
         .onAppear {

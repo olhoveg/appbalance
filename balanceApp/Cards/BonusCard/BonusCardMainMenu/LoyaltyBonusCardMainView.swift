@@ -78,6 +78,15 @@ struct LoyaltyBonusCardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var bonusCardImageURL: URL?
     
+    private var screenWidth: CGFloat {
+        UIScreen.main.bounds.width
+    }
+    
+    private var scaleFactor: CGFloat {
+        let baseWidth: CGFloat = 375 // Базовый размер экрана (iPhone 11, 12, 13)
+        return max(0.85, min(screenWidth / baseWidth, 1.2)) // Масштабирование от 0.85 до 1.2
+    }
+    
     private var placeholderURL: URL? {
         let bg = colorScheme == .dark ? "1f1f1f" : "f2f2f7"
         let fg = "ffffff"
@@ -86,51 +95,56 @@ struct LoyaltyBonusCardView: View {
     }
     
     var body: some View {
-        HStack(spacing: 16) {
-            AsyncImage(url: bonusCardImageURL ?? placeholderURL) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                        .frame(width: 200, height: 150)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .transition(.opacity)
-                case .failure:
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .foregroundColor(.gray)
-                @unknown default:
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .foregroundColor(.gray)
-                }
-            }
-            .frame(width: 160, height: 100)
-            .cornerRadius(12)
-            .clipped()
+        GeometryReader { geometry in
+            let cardWidth = min(geometry.size.width * 1, 400) // Максимальная ширина 400px
+            let cardHeight = cardWidth * 0.4
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Бонусная карта")
-                    .font(.title2)
-                    .bold()
-                Text("Номер карты: \(bonusCard.number)")
-                    .font(.headline)
-                Text("Баланс: \(bonusCard.balance, specifier: "%.2f") ₽")
-                    .font(.headline)
+            HStack(spacing: 12 * scaleFactor) {
+                AsyncImage(url: bonusCardImageURL ?? placeholderURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .transition(.opacity)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
+                .cornerRadius(12 * scaleFactor)
+                .clipped()
+                
+                VStack(alignment: .leading, spacing: 6 * scaleFactor) {
+                    Text("Бонусная карта")
+                        .font(.system(size: 18 * scaleFactor, weight: .bold))
+                    Text("Номер: \(bonusCard.number)")
+                        .font(.system(size: 14 * scaleFactor))
+                    Text("Баланс: \(Int(bonusCard.balance)) ₽")
+                        .font(.system(size: 14 * scaleFactor))
+                }
+                .padding(.trailing, 12 * scaleFactor)
             }
-            .padding(.trailing, 16)
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12 * scaleFactor)
+                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+            )
+            .frame(width: cardWidth, height: cardHeight)
+            .onAppear(perform: fetchBonusCardImage)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
-        )
-        .frame(height: 140)
-        .onAppear(perform: fetchBonusCardImage)
+        .frame(height: 160) // Фиксируем высоту контейнера, чтобы карточки не сжимались
     }
     
     private func fetchBonusCardImage() {
@@ -155,6 +169,7 @@ struct LoyaltyBonusCardView: View {
     }
 }
 
+
 // MARK: - Основной View бонусных карт
 
 struct LoyaltyBonusCardMainView: View {
@@ -176,6 +191,7 @@ struct LoyaltyBonusCardMainView: View {
                     HStack(spacing: 16) {
                         ForEach(viewModel.bonusCards) { bonusCard in
                             LoyaltyBonusCardView(bonusCard: bonusCard)
+                                .frame(width: min(UIScreen.main.bounds.width * 0.9, 400)) // ✅ Ограничиваем максимальную ширину
                         }
                     }
                     .padding(.horizontal, 16)

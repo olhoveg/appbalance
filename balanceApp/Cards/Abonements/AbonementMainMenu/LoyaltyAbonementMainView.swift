@@ -124,6 +124,15 @@ struct LoyaltyAbonementCardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var abonementImageURL: URL?
     
+    private var screenWidth: CGFloat {
+        UIScreen.main.bounds.width
+    }
+    
+    private var scaleFactor: CGFloat {
+        let baseWidth: CGFloat = 375 // Стандартный размер экрана iPhone 11, 12, 13
+        return max(0.85, min(screenWidth / baseWidth, 1.2)) // Диапазон масштабирования 0.85 - 1.2
+    }
+    
     private var placeholderURL: URL? {
         let bg = colorScheme == .dark ? "1f1f1f" : "f2f2f7"
         let fg = "ffffff"
@@ -132,57 +141,63 @@ struct LoyaltyAbonementCardView: View {
     }
     
     var body: some View {
-        HStack(spacing: 16) {
-            AsyncImage(url: abonementImageURL ?? placeholderURL) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                        .frame(width: 200, height: 150)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .transition(.opacity)
-                case .failure:
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .foregroundColor(.gray)
-                @unknown default:
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .foregroundColor(.gray)
-                }
-            }
-            .frame(width: 160, height: 100)
-            .cornerRadius(12)
-            .clipped()
+        GeometryReader { geometry in
+            let cardWidth = min(geometry.size.width * 1, 400) // Максимальная ширина 400px на больших экранах
+            let cardHeight = cardWidth * 0.4
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Абонемент")
-                    .font(.title2)
-                    .bold()
-                Text("Номер: \(abonement.number)")
-                    .font(.headline)
-                if let count = abonement.united_balance_services_count {
-                    let solarium = isSolariumAbonement(abonement)
-                    Text("\(getRemainingWord(count: count, isSolarium: solarium)): \(count) \(getUnitsEnding(count: count, isSolarium: solarium))")
-                        .font(.headline)
-                } else {
-                    Text("Осталось: 0 сеансов")
-                        .font(.headline)
+            HStack(spacing: 12 * scaleFactor) {
+                AsyncImage(url: abonementImageURL ?? placeholderURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .transition(.opacity)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        Image(systemName: "photo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .foregroundColor(.gray)
+                    }
                 }
+                .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
+                .cornerRadius(12 * scaleFactor)
+                .clipped()
+                
+                VStack(alignment: .leading, spacing: 6 * scaleFactor) {
+                    Text("Абонемент")
+                        .font(.system(size: 18 * scaleFactor, weight: .bold))
+                    Text("Номер: \(abonement.number)")
+                        .font(.system(size: 14 * scaleFactor))
+                    
+                    if let count = abonement.united_balance_services_count {
+                        let solarium = isSolariumAbonement(abonement)
+                        Text("\(getRemainingWord(count: count, isSolarium: solarium)): \(count) \(getUnitsEnding(count: count, isSolarium: solarium))")
+                            .font(.system(size: 14 * scaleFactor))
+                    } else {
+                        Text("Осталось: 0 сеансов")
+                            .font(.system(size: 14 * scaleFactor))
+                    }
+                }
+                .padding(.trailing, 12 * scaleFactor)
             }
-            .padding(.trailing, 16)
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12 * scaleFactor)
+                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
+            )
+            .frame(width: cardWidth, height: cardHeight)
+            .onAppear(perform: fetchAbonementImage)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemGray5))
-        )
-        .frame(height: 140)
-        .onAppear(perform: fetchAbonementImage)
+        .frame(height: 160) // Фиксируем высоту контейнера, чтобы карточки не сжимались
     }
     
     private func fetchAbonementImage() {
@@ -207,6 +222,9 @@ struct LoyaltyAbonementCardView: View {
     }
 }
 
+    
+    
+
 // MARK: - Основной View с вертикальным refreshable
 
 struct LoyaltyAbonementMainView: View {
@@ -230,6 +248,7 @@ struct LoyaltyAbonementMainView: View {
                         HStack(spacing: 16) {
                             ForEach(viewModel.abonements) { abonement in
                                 LoyaltyAbonementCardView(abonement: abonement)
+                                    .frame(width: min(UIScreen.main.bounds.width * 0.9, 400)) // ✅ Ограничиваем максимальную ширину
                             }
                         }
                         .padding(.horizontal, 16)

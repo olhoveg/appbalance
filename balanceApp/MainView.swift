@@ -45,7 +45,6 @@ struct MainView: View {
                         LoyaltyAbonementMainView(viewModel: abonementVM)
                         Divider()
                         LoyaltyCertificateMainView(viewModel: certificateVM)
-                            .padding(.vertical, 0)
                         Divider()
                         RecommendationsBlockView()
                         Divider()
