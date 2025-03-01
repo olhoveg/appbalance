@@ -37,10 +37,10 @@ struct ContentView: View {
                 }
                 .tag(Tab.feed)
             
-            ChatView()
+            SpecialistsView()
                 .tabItem {
-                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                    Text("Чат")
+                    Image(systemName: "person.3.fill") // Используем иконку команды
+                    Text("Команда")
                 }
                 .tag(Tab.chat)
             
