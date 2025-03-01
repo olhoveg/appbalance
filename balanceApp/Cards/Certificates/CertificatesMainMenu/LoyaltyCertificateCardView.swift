@@ -137,6 +137,7 @@ struct LoyaltyCertificateCardView: View {
                         .font(.system(size: 14 * scaleFactor))
                     Text("Баланс: \(Int(certificate.balance)) ₽")
                         .font(.system(size: 14 * scaleFactor))
+                        .frame(maxWidth: 150, alignment: .leading) // задаём максимальную ширину
                 }
                 .padding(.trailing, 12 * scaleFactor)
             }
