@@ -15,44 +15,48 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .main
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            MainView(selectedTab: $selectedTab)
-                .tabItem {
-                    Image(systemName: "house.fill")
-                    Text("Главная")
-                }
-                .tag(Tab.main)
-            
-            CardsTabView()
-                .tabItem {
-                    Image(systemName: "creditcard.fill")
-                    Text("Карты")
-                }
-                .tag(Tab.cards)
-            
-            FeedView()
-                .tabItem {
-                    Image(systemName: "newspaper.fill")
-                    Text("Лента")
-                }
-                .tag(Tab.feed)
-            
-            SpecialistsView()
-                .tabItem {
-                    Image(systemName: "person.3.fill") // Используем иконку команды
-                    Text("Команда")
-                }
-                .tag(Tab.chat)
-            
-            SolariumView()
-                .tabItem {
-                    Image(systemName: "calendar.badge.plus")
-                    Text("Записаться")
-                }
-                .tag(Tab.solarium)
-        }
-    }
-}
+           NavigationView {
+               TabView(selection: $selectedTab) {
+                   MainView(selectedTab: $selectedTab)
+                       .tabItem {
+                           Image(systemName: "house.fill")
+                           Text("Главная")
+                       }
+                       .tag(Tab.main)
+                   
+                   CardsTabView()
+                       .tabItem {
+                           Image(systemName: "creditcard.fill")
+                           Text("Карты")
+                       }
+                       .tag(Tab.cards)
+                   
+                   FeedView()
+                       .tabItem {
+                           Image(systemName: "newspaper.fill")
+                           Text("Лента")
+                       }
+                       .tag(Tab.feed)
+                   
+                   SpecialistsView()
+                       .tabItem {
+                           Image(systemName: "person.3.fill")
+                           Text("Команда")
+                       }
+                       .tag(Tab.chat)
+                   
+                   SolariumView()
+                       .tabItem {
+                           Image(systemName: "calendar.badge.plus")
+                           Text("Записаться")
+                       }
+                       .tag(Tab.solarium)
+               }
+               .navigationBarHidden(true)
+           }
+           .ignoresSafeArea(.container, edges: .top)
+       }
+   }
 
 
 
