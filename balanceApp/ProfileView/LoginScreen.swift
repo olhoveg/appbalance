@@ -92,20 +92,20 @@ struct LoginScreen: View {
     @State private var alertMessage: String = ""
     @State private var showingAlert: Bool = false
     @State private var shouldNavigate: Bool = false
-
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
                 Text("Введите номер телефона")
                     .font(.headline)
-
+                
                 PhoneNumberField(text: $formattedPhone)
                     .padding()
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(8)
                     .foregroundColor(Color(.label))
                     .frame(height: 50)
-
+                
                 TextField("Введите код", text: $smsCode)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
@@ -115,7 +115,7 @@ struct LoginScreen: View {
                     .multilineTextAlignment(.center)
                     .font(.title)
                     .foregroundColor(Color(.label))
-
+                
                 Button(action: {
                     handleSmsCodeSubmit()
                 }) {
@@ -127,7 +127,7 @@ struct LoginScreen: View {
                         .cornerRadius(8)
                 }
                 .disabled(formattedPhone.count < 18 || smsCode.count != 4)
-
+                
                 Button(action: {
                     handleRequestCode()
                 }) {
@@ -139,12 +139,12 @@ struct LoginScreen: View {
                         .cornerRadius(8)
                 }
                 .disabled(formattedPhone.count < 18)
-
+                
                 if codeRequested {
                     Text("Повторно запросить код можно через \(remainingTime) секунд")
                         .foregroundColor(.gray)
                 }
-
+                
                 if showRequestAgainButton && remainingTime == 0 {
                     Button(action: {
                         handleRequestCode()
@@ -178,20 +178,26 @@ struct LoginScreen: View {
             ContentView()
         }
     }
-
+    
+    private func cleanPhoneNumber(_ formatted: String) -> String {
+        return formatted
+            .filter { "0123456789".contains($0) } // Оставляем только цифры
+    }
+    
+    
     private func checkAuthStatus() {
         if UserDefaults.standard.bool(forKey: "isLoggedIn") {
             shouldNavigate = true
         }
     }
-
+    
     private func handleRequestCode() {
         codeRequested = true
         remainingTime = 60
         requestSmsCode()
         startTimer()
     }
-
+    
     private func startTimer() {
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             if self.remainingTime > 0 {
@@ -203,47 +209,48 @@ struct LoginScreen: View {
             }
         }
     }
-
+    
     private func requestSmsCode() {
         guard let url = URL(string: "https://api.yclients.com/api/v1/book_code/672239") else { return }
-        let dataDict: [String: Any] = ["phone": formattedPhone]
+        
+        let cleanedPhone = cleanPhoneNumber(formattedPhone) // Очистка номера перед отправкой
+        let dataDict: [String: Any] = ["phone": cleanedPhone]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: dataDict) else { return }
-
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer 88fnh8jbmt44er5y28nj", forHTTPHeaderField: "Authorization")
         request.httpBody = jsonData
-
+        
         URLSession.shared.dataTask(with: request) { _, _, error in
             DispatchQueue.main.async {
                 if let error = error {
                     alertMessage = "Ошибка отправки кода: \(error.localizedDescription)"
                 } else {
-                    alertMessage = "Код отправлен на \(formattedPhone)"
+                    alertMessage = "Код отправлен на \(cleanedPhone)" // Показываем правильный номер
                 }
                 showingAlert = true
             }
         }.resume()
     }
-
+    
+    
     private func handleSmsCodeSubmit() {
-        guard let url = URL(string: "https://api.yclients.com/api/v1/user/auth") else {
-            return
-        }
-        let dataDict: [String: Any] = ["phone": formattedPhone, "code": smsCode]
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: dataDict) else {
-            return
-        }
-
+        guard let url = URL(string: "https://api.yclients.com/api/v1/user/auth") else { return }
+        
+        let cleanedPhone = cleanPhoneNumber(formattedPhone) // Очистка перед отправкой
+        let dataDict: [String: Any] = ["phone": cleanedPhone, "code": smsCode]
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: dataDict) else { return }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer 88fnh8jbmt44er5y28nj", forHTTPHeaderField: "Authorization")
         request.httpBody = jsonData
-
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -252,6 +259,7 @@ struct LoginScreen: View {
                 } else if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
                     alertMessage = "Вход выполнен!"
                     UserDefaults.standard.set(true, forKey: "isLoggedIn")
+                    UserDefaults.standard.set(cleanedPhone, forKey: "userPhone") // Сохраняем правильный номер
                     showingAlert = true
                     shouldNavigate = true
                 } else {
@@ -262,9 +270,9 @@ struct LoginScreen: View {
         }.resume()
     }
 }
-
-struct LoginScreen_Previews: PreviewProvider {
-    static var previews: some View {
-        LoginScreen()
+    struct LoginScreen_Previews: PreviewProvider {
+        static var previews: some View {
+            LoginScreen()
+        }
     }
-}
+

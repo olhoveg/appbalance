@@ -40,6 +40,8 @@ struct MainView: View {
                         RecordView(viewModel: recordViewModel)
                         Divider()
                         // Передаем viewModel как параметр в дочерние представления
+                        BalanceBlockView()
+                        Divider()
                         LoyaltyBonusCardMainView(viewModel: bonusCardVM)
                         Divider()
                         LoyaltyAbonementMainView(viewModel: abonementVM)
