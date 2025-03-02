@@ -143,59 +143,62 @@ class SpecialistsViewModel: ObservableObject {
     }
 }
 
-// MARK: - Основной список специалистов
+// MARK: - ZoomableScrollView (UIViewRepresentable)
 
-struct SpecialistsView: View {
-    @StateObject private var viewModel = SpecialistsViewModel()
-    @State private var selectedExpert: Expert?
+struct ZoomableScrollView<Content: View>: UIViewRepresentable {
+    let content: Content
+    let minScale: CGFloat
+    let maxScale: CGFloat
+
+    init(minScale: CGFloat = 1.0, maxScale: CGFloat = 5.0, @ViewBuilder content: () -> Content) {
+        self.content = content()
+        self.minScale = minScale
+        self.maxScale = maxScale
+    }
     
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(viewModel.experts) { expert in
-                        HStack(spacing: 16) {
-                            AsyncImage(url: URL(string: expert.photoUrl)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 80, height: 80, alignment: .top) // выравнивание по верхней части
-                                    .clipped()
-                                    .clipShape(Circle())
-                            } placeholder: {
-                                Circle()
-                                    .fill(Color.gray)
-                                    .frame(width: 80, height: 80)
-                            }
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(expert.name)
-                                    .font(.headline)
-                                Text(expert.title)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                Text("\(viewModel.titles["experienceSection"] ?? "Опыт работы"): \(expert.experience)")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            Spacer()
-                        }
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray, lineWidth: 1))
-                        .padding(.horizontal)
-                        .onTapGesture {
-                            selectedExpert = expert
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Специалисты")
-            // Детальное окно специалиста открывается как sheet
-            .sheet(item: $selectedExpert) { expert in
-                SpecialistsDetailView(expert: expert, viewModel: viewModel)
-            }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.delegate = context.coordinator
+        scrollView.maximumZoomScale = maxScale
+        scrollView.minimumZoomScale = minScale
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.decelerationRate = .fast
+        scrollView.bouncesZoom = true
+        scrollView.bounces = true
+        
+        let hostedView = context.coordinator.hostingController.view!
+        hostedView.translatesAutoresizingMaskIntoConstraints = true
+        hostedView.frame = scrollView.bounds
+        scrollView.addSubview(hostedView)
+        return scrollView
+    }
+    
+    func updateUIView(_ uiView: UIScrollView, context: Context) {
+        context.coordinator.hostingController.view.frame = uiView.bounds
+    }
+    
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        var parent: ZoomableScrollView
+        var hostingController: UIHostingController<Content>
+        
+        init(_ parent: ZoomableScrollView) {
+            self.parent = parent
+            self.hostingController = UIHostingController(rootView: parent.content)
+            self.hostingController.view.backgroundColor = .clear
+        }
+        
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            return hostingController.view
         }
     }
 }
+
+// MARK: - Shimmer эффект
 
 struct Shimmer: ViewModifier {
     @State private var phase: CGFloat = -100
@@ -231,8 +234,58 @@ extension View {
     }
 }
 
+// MARK: - Основной список специалистов
 
-
+struct SpecialistsView: View {
+    @StateObject private var viewModel = SpecialistsViewModel()
+    @State private var selectedExpert: Expert?
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    ForEach(viewModel.experts) { expert in
+                        HStack(spacing: 16) {
+                            AsyncImage(url: URL(string: expert.photoUrl)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 80, height: 80, alignment: .top)
+                                    .clipped()
+                                    .clipShape(Circle())
+                            } placeholder: {
+                                Circle()
+                                    .fill(Color.gray)
+                                    .frame(width: 80, height: 80)
+                            }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(expert.name)
+                                    .font(.headline)
+                                Text(expert.title)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                Text("\(viewModel.titles["experienceSection"] ?? "Опыт работы"): \(expert.experience)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                        }
+                        .padding()
+                        .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray, lineWidth: 1))
+                        .padding(.horizontal)
+                        .onTapGesture {
+                            selectedExpert = expert
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Специалисты")
+            .sheet(item: $selectedExpert) { expert in
+                SpecialistsDetailView(expert: expert, viewModel: viewModel)
+            }
+        }
+    }
+}
 
 // MARK: - Детальное представление специалиста
 
@@ -241,19 +294,15 @@ struct SpecialistsDetailView: View {
     @ObservedObject var viewModel: SpecialistsViewModel
     @Environment(\.dismiss) var dismiss
 
-    // Локальное состояние для техники
+    // Локальное состояние для техники и дипломов
     @State private var selectedTechnique: Technique?
-    // Локальное состояние для диплома
     @State private var selectedCertificate: ExpertCertificate?
-    
-    // Переменная для зума в CertificateModalView
-    @State private var certificateScale: CGFloat = 1.0
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Зона фотографии с наложением информации о специалисте
+                    // Фотография с наложением информации (ФИО, опыт)
                     ZStack(alignment: .bottomLeading) {
                         AsyncImage(url: URL(string: expert.photoUrl)) { image in
                             image
@@ -264,14 +313,10 @@ struct SpecialistsDetailView: View {
                         } placeholder: {
                             Color.gray.frame(height: 300)
                         }
-                        
-                        // Наложение с градиентом для читаемости текста
                         LinearGradient(gradient: Gradient(colors: [Color.black.opacity(0.0), Color.black.opacity(0.6)]),
                                        startPoint: .center,
                                        endPoint: .bottom)
                             .frame(height: 120)
-                        
-                        // Текст с ФИО и стажем (опыт работы)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(expert.name)
                                 .font(.title)
@@ -284,7 +329,7 @@ struct SpecialistsDetailView: View {
                         .padding()
                     }
                     
-                    // Остальной контент: описание, техники, скиллы, дипломы и т.д.
+                    // Остальной контент: описание, техники, скиллы, дипломы
                     VStack(alignment: .leading, spacing: 16) {
                         Text(expert.description)
                             .padding(.horizontal)
@@ -385,13 +430,11 @@ struct SpecialistsDetailView: View {
                     }
                 }
             }
-            // Модальное окно для техники (поверх окна специалиста)
             .sheet(item: $selectedTechnique) { technique in
                 TechniqueModalView(technique: technique)
             }
-            // Модальное окно для диплома (поверх окна специалиста)
             .sheet(item: $selectedCertificate) { certificate in
-                CertificateModalView(certificate: certificate, scale: $certificateScale)
+                CertificateModalView(certificate: certificate)
             }
         }
     }
@@ -413,50 +456,27 @@ struct SkillBarView: View {
     }
 }
 
+// Модальное окно для диплома с использованием ZoomableScrollView
 struct CertificateModalView: View, Identifiable {
     let id = UUID()
     var certificate: ExpertCertificate
-    @Binding var scale: CGFloat
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
         NavigationView {
-            GeometryReader { geometry in
-                ScrollView([.horizontal, .vertical]) {
-                    VStack {
-                        Text(certificate.title)
-                            .font(.title)
-                            .padding()
-                        AsyncImage(url: URL(string: certificate.imageUrl)) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(
-                                    width: geometry.size.width,
-                                    height: geometry.size.height * 0.8
-                                )
-                                .scaleEffect(scale)
-                                .gesture(
-                                    MagnificationGesture()
-                                        .onChanged { value in
-                                            scale = value
-                                        }
-                                        .onEnded { _ in
-                                            withAnimation {
-                                                scale = 1.0
-                                            }
-                                        }
-                                )
-                                .padding()
-                        } placeholder: {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(
-                                    width: geometry.size.width,
-                                    height: geometry.size.height * 0.8
-                                )
-                                .shimmer() // применяем shimmer эффект
-                        }
+            VStack {
+                Text(certificate.title)
+                    .font(.title)
+                    .padding()
+                ZoomableScrollView {
+                    AsyncImage(url: URL(string: certificate.imageUrl)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.gray.opacity(0.3))
+                            .shimmer()
                     }
                 }
             }
@@ -516,6 +536,8 @@ struct TechniqueModalView: View, Identifiable {
         }
     }
 }
+
+// MARK: - Previews
 
 struct SpecialistsView_Previews: PreviewProvider {
     static var previews: some View {
