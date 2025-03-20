@@ -1,4 +1,5 @@
-//ProfileView.swift
+////ProfileView.swift
+
 
 import SwiftUI
 import Firebase
@@ -131,6 +132,13 @@ struct ProfileView: View {
             .onAppear {
                 checkAuthStatus()
                 if isLoggedIn {
+                    // 1. Достаем из UserDefaults
+                    clientPhone = UserDefaults.standard.string(forKey: "userPhone") ?? "Нет номера"
+                    clientName  = UserDefaults.standard.string(forKey: "userName")  ?? "Имя пользователя"
+                    clientEmail = UserDefaults.standard.string(forKey: "userEmail") ?? "email@example.com"
+                    
+                    // 2. Если у вас есть Firestore – подгружаем из него (если надо)
+                    loadUserDataFromFirestore()
                     loadProfileImage()
                 }
             }
@@ -160,38 +168,42 @@ struct ProfileView: View {
         }
     }
     
-    // Проверка авторизации и загрузка данных пользователя
+    // Чтение данных из UserDefaults
     private func checkAuthStatus() {
         isLoggedIn = UserDefaults.standard.bool(forKey: "isLoggedIn")
         if isLoggedIn {
             clientPhone = UserDefaults.standard.string(forKey: "userPhone") ?? "Нет номера"
-            clientName = UserDefaults.standard.string(forKey: "userName") ?? "Имя пользователя"
+            clientName  = UserDefaults.standard.string(forKey: "userName")  ?? "Имя пользователя"
             clientEmail = UserDefaults.standard.string(forKey: "userEmail") ?? "email@example.com"
+            print("UserDefaults - userPhone: \(clientPhone), userName: \(clientName), userEmail: \(clientEmail)")
         }
     }
     
-    // Функция выхода из аккаунта
-    private func handleLogout() {
-        clearUserData()
-        shouldNavigateToMain = true
+    // Загрузка данных из Firestore с логированием всего документа
+    private func loadUserDataFromFirestore() {
+        let db = Firestore.firestore()
+        db.collection("users").document(clientPhone).getDocument { document, error in
+            if let document = document, document.exists, let data = document.data() {
+                print("Firestore document data: \(data)")
+                if let name = data["name"] as? String {
+                    self.clientName = name
+                    UserDefaults.standard.set(name, forKey: "userName")
+                } else {
+                    print("Поле 'name' отсутствует. Доступные поля: \(data.keys)")
+                }
+                if let email = data["email"] as? String {
+                    self.clientEmail = email
+                    UserDefaults.standard.set(email, forKey: "userEmail")
+                } else {
+                    print("Поле 'email' отсутствует. Доступные поля: \(data.keys)")
+                }
+            } else {
+                print("Документ не найден или произошла ошибка: \(error?.localizedDescription ?? "Неизвестная ошибка")")
+            }
+        }
     }
     
-    // Функция удаления аккаунта (фиктивная)
-    private func handleDeleteAccount() {
-        clearUserData()
-        shouldNavigateToMain = true
-    }
-    
-    // Очистка данных пользователя
-    private func clearUserData() {
-        UserDefaults.standard.set(false, forKey: "isLoggedIn")
-        UserDefaults.standard.removeObject(forKey: "userPhone")
-        UserDefaults.standard.removeObject(forKey: "userName")
-        UserDefaults.standard.removeObject(forKey: "userEmail")
-        isLoggedIn = false
-    }
-    
-    // Загрузка фото в Firebase Storage и сохранение URL в Firestore
+    // Функции работы с фото (uploadPhoto, savePhotoURL, loadProfileImage) остаются без изменений
     private func uploadPhoto() {
         guard let image = profileImage,
               let imageData = image.jpegData(compressionQuality: 0.8),
@@ -214,7 +226,6 @@ struct ProfileView: View {
         }
     }
     
-    // Сохранение URL фотографии в Firestore (коллекция users, id – номер телефона)
     private func savePhotoURL(_ url: URL) {
         let db = Firestore.firestore()
         db.collection("users").document(clientPhone).setData(["profileImageURL": url.absoluteString], merge: true) { error in
@@ -227,16 +238,34 @@ struct ProfileView: View {
         }
     }
     
-    // Загрузка URL фото из Firestore (если ранее оно было загружено)
     private func loadProfileImage() {
         let db = Firestore.firestore()
         db.collection("users").document(clientPhone).getDocument { document, error in
-            if let document = document, document.exists {
-                if let urlString = document.get("profileImageURL") as? String, let url = URL(string: urlString) {
-                    profileImageURL = url
-                }
+            if let document = document, document.exists,
+               let urlString = document.get("profileImageURL") as? String,
+               let url = URL(string: urlString) {
+                profileImageURL = url
             }
         }
+    }
+    
+    // Функции выхода/удаления аккаунта остаются без изменений
+    private func handleLogout() {
+        clearUserData()
+        shouldNavigateToMain = true
+    }
+    
+    private func handleDeleteAccount() {
+        clearUserData()
+        shouldNavigateToMain = true
+    }
+    
+    private func clearUserData() {
+        UserDefaults.standard.set(false, forKey: "isLoggedIn")
+        UserDefaults.standard.removeObject(forKey: "userPhone")
+        UserDefaults.standard.removeObject(forKey: "userName")
+        UserDefaults.standard.removeObject(forKey: "userEmail")
+        isLoggedIn = false
     }
 }
 

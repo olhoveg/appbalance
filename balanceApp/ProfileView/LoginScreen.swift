@@ -1,4 +1,4 @@
-////ProfileView.swift
+////LoginScreen.swift
 
 
 import SwiftUI
@@ -243,7 +243,7 @@ struct LoginScreen: View {
     private func handleSmsCodeSubmit() {
         guard let url = URL(string: "https://api.yclients.com/api/v1/user/auth") else { return }
         
-        let cleanedPhone = cleanPhoneNumber(formattedPhone) // Очистка перед отправкой
+        let cleanedPhone = cleanPhoneNumber(formattedPhone)
         let dataDict: [String: Any] = ["phone": cleanedPhone, "code": smsCode]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: dataDict) else { return }
         
@@ -257,21 +257,61 @@ struct LoginScreen: View {
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    alertMessage = "Ошибка при входе: \(error.localizedDescription)"
-                    showingAlert = true
-                } else if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-                    alertMessage = "Вход выполнен!"
-                    UserDefaults.standard.set(true, forKey: "isLoggedIn")
-                    UserDefaults.standard.set(cleanedPhone, forKey: "userPhone") // Сохраняем правильный номер
-                    showingAlert = true
-                    shouldNavigate = true
-                } else {
-                    alertMessage = "Неверный код"
-                    showingAlert = true
+                    self.alertMessage = "Ошибка при входе: \(error.localizedDescription)"
+                    self.showingAlert = true
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.alertMessage = "Неизвестная ошибка сети"
+                    self.showingAlert = true
+                    return
+                }
+                
+                guard (200...299).contains(httpResponse.statusCode),
+                      let data = data else {
+                    self.alertMessage = "Неверный код"
+                    self.showingAlert = true
+                    return
+                }
+
+                do {
+                    // Пробуем распарсить JSON
+                    if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                       let dataObj = json["data"] as? [String: Any] {
+                        
+                        // Извлекаем name и email (если они приходят в ответе YClients)
+                        let userName = dataObj["name"] as? String ?? "Имя не указано"
+                        let userEmail = dataObj["email"] as? String ?? "email@example.com"
+                        
+                        // Сохраняем в UserDefaults
+                        UserDefaults.standard.set(true, forKey: "isLoggedIn")
+                        UserDefaults.standard.set(cleanedPhone, forKey: "userPhone")
+                        UserDefaults.standard.set(userName, forKey: "userName")
+                        UserDefaults.standard.set(userEmail, forKey: "userEmail")
+                        
+                        // Если нужно — параллельно сохраняем в Firestore
+                        // let db = Firestore.firestore()
+                        // db.collection("users").document(cleanedPhone).setData([
+                        //     "name": userName,
+                        //     "email": userEmail
+                        // ], merge: true)
+                        
+                        self.alertMessage = "Вход выполнен!"
+                        self.showingAlert = true
+                        self.shouldNavigate = true
+                    } else {
+                        self.alertMessage = "Ошибка парсинга ответа сервера"
+                        self.showingAlert = true
+                    }
+                } catch {
+                    self.alertMessage = "Ошибка при чтении данных: \(error.localizedDescription)"
+                    self.showingAlert = true
                 }
             }
         }.resume()
     }
+
 }
     struct LoginScreen_Previews: PreviewProvider {
         static var previews: some View {
