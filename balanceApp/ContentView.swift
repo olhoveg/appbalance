@@ -1,90 +1,58 @@
-//ContentView.swift
-
-
 import SwiftUI
-
 
 // MARK: - Enum вкладок
 enum Tab: Hashable {
-    case main, cards, feed, chat, solarium
+    case main, cards, service, chat, solarium
 }
-
 
 // MARK: - Root ContentView с TabView
 struct ContentView: View {
     @State private var selectedTab: Tab = .main
 
     var body: some View {
-           NavigationView {
-               TabView(selection: $selectedTab) {
-                   MainView(selectedTab: $selectedTab)
-                       .tabItem {
-                           Image(systemName: "house.fill")
-                           Text("Главная")
-                       }
-                       .tag(Tab.main)
-                   
-                   CardsTabView()
-                       .tabItem {
-                           Image(systemName: "creditcard.fill")
-                           Text("Карты")
-                       }
-                       .tag(Tab.cards)
-                   
-                   FeedView()
-                       .tabItem {
-                           Image(systemName: "newspaper.fill")
-                           Text("Лента")
-                       }
-                       .tag(Tab.feed)
-                   
-                   SpecialistsView()
-                       .tabItem {
-                           Image(systemName: "person.3.fill")
-                           Text("Команда")
-                       }
-                       .tag(Tab.chat)
-                   
-                   SolariumView()
-                       .tabItem {
-                           Image(systemName: "calendar.badge.plus")
-                           Text("Записаться")
-                       }
-                       .tag(Tab.solarium)
-               }
-               .navigationBarHidden(true)
-           }
-           .ignoresSafeArea(.container, edges: .top)
-       }
-   }
-
-
-
-
-
-
-
-
-
-// Лента
-struct FeedView: View {
-    var body: some View {
-        Text("Лента")
-            .font(.title)
-            .padding()
+        NavigationView {
+            TabView(selection: $selectedTab) {
+                MainView(selectedTab: $selectedTab)
+                    .tabItem {
+                        Image(systemName: "house.fill")
+                        Text("Главная")
+                    }
+                    .tag(Tab.main)
+                
+                CardsTabView()
+                    .tabItem {
+                        Image(systemName: "creditcard.fill")
+                        Text("Карты")
+                    }
+                    .tag(Tab.cards)
+                
+                // Заменяем ServicesBlockView на APIServicesView
+                VerticalServicesView()
+                    .tabItem {
+                        Image(systemName: "wrench.fill")
+                        Text("Услуги")
+                    }
+                    .tag(Tab.service)
+                
+                SpecialistsView()
+                    .tabItem {
+                        Image(systemName: "person.3.fill")
+                        Text("Команда")
+                    }
+                    .tag(Tab.chat)
+                
+                SolariumView()
+                    .tabItem {
+                        Image(systemName: "calendar.badge.plus")
+                        Text("Записаться")
+                    }
+                    .tag(Tab.solarium)
+            }
+            .navigationBarHidden(true)
+        }
+        .ignoresSafeArea(.container, edges: .top)
     }
 }
-
-// Чат
-struct ChatView: View {
-    var body: some View {
-        Text("Чат")
-            .font(.title)
-            .padding()
-    }
-}
-
-
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
