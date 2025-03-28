@@ -138,22 +138,24 @@ struct VerticalServiceCardView: View {
             .frame(width: cardWidth, height: 250) // ширина = ширина карточки
             .clipped()
             
-            // Заголовок услуги
+            // Заголовок услуги с отступом слева
             Text(service.title)
                 .font(.title2)
                 .fontWeight(.semibold)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .foregroundColor(colorScheme == .dark ? .white : .black)
+                .padding(.leading, 8)
                 .frame(width: cardWidth - 16, alignment: .leading)
             
-            // Цена и время
+            // Цена и время с отступом перед ценой
             HStack {
                 if let price = service.price_max {
                     let currency = service.currency ?? "₽"
                     Text("Цена: \(Int(price)) \(currency)")
                         .font(.subheadline)
                         .foregroundColor(colorScheme == .dark ? .white : .black)
+                        .padding(.leading, 8)
                 }
                 Spacer()
                 if let duration = service.duration {
@@ -185,6 +187,7 @@ struct VerticalServiceCardView: View {
         }
     }
 }
+
 
 // MARK: - Список услуг
 struct VerticalServicesView: View {

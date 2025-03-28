@@ -26,10 +26,10 @@ struct ContentView: View {
                     }
                     .tag(Tab.cards)
                 
-                // Заменяем ServicesBlockView на APIServicesView
+                // Используем новую иконку для услуг (массаж)
                 VerticalServicesView()
                     .tabItem {
-                        Image(systemName: "wrench.fill")
+                        Image(systemName: "figure.mind.and.body")
                         Text("Услуги")
                     }
                     .tag(Tab.service)

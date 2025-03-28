@@ -27,6 +27,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Планируем первое выполнение задачи
         scheduleAppRefresh()
         
+        
+        
         return true
     }
     
