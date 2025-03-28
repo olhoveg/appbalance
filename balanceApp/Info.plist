@@ -6,18 +6,6 @@
 	<array>
 		<string>com.yourcompany.balanceApp.refresh</string>
 	</array>
-	<key>CFBundleDocumentTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>0</integer>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>LSHandlerRank</key>
-			<string>Default</string>
-		</dict>
-		<dict/>
-	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

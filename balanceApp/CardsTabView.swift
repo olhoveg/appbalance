@@ -10,6 +10,7 @@ import SwiftUI
 struct CardsTabView: View {
     @State private var selectedTab = 0 // Устанавливаем 0 для "Абонементы" (он будет первым)
 
+    
     var body: some View {
         VStack {
             Picker("Выбор", selection: $selectedTab) {
