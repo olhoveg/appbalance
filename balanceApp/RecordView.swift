@@ -1,5 +1,3 @@
-//RecordView.swift
-
 import SwiftUI
 import Combine
 import FirebaseDatabase
@@ -12,6 +10,7 @@ extension Record {
         return length ?? 600  // Если length отсутствует, используем значение по умолчанию
     }
     
+    // Используем уже существующий тип Staff из другого модуля/файла
     var staff: Staff? { return nil }
     
     var asRecordModal: RecordModal {
@@ -76,8 +75,15 @@ struct ClientsData: Codable {
     let meta: [String]?
 }
 
+// Если необходимо, убедитесь, что тип Staff импортируется из другого места и не определяется здесь.
+// Например, удалите или закомментируйте следующее:
+// struct Staff: Codable {
+//     let name: String
+// }
+
 // MARK: - RecordViewModel с логикой уведомлений и обновлением
 
+@MainActor
 class RecordViewModel: ObservableObject {
     static let sharedInstance = RecordViewModel()
     @Published var phone: String = ""
@@ -88,6 +94,9 @@ class RecordViewModel: ObservableObject {
     @Published var selectedRecord: Record?
     @Published var showModal: Bool = false
     @Published var debugLogs: [String] = []  // Для отладки
+
+    // Счётчик запросов для клиентов, чтобы понять, когда все записи загружены
+    private var pendingClientRequests: Int = 0
 
     // Словарь для сохранения mapping: [external_id: oneSignalNotificationID]
     var scheduledNotificationMapping: [String: String] {
@@ -110,9 +119,11 @@ class RecordViewModel: ObservableObject {
         }
     }
     
-    // Константы OneSignal и сопоставление адресов
+    // Константы OneSignal
     let appId: String = "61e511f4-5929-448d-85f4-e5bf171f0764"
     let restApiKey: String = "ZjRjZTA1NjgtZDNhMS00ZWNkLWIwZjQtYzkwMWI2MThmOTQ2"
+    
+    // Сопоставление companyId -> адрес
     let companyIdToAddress: [String: String] = [
         "433675": "Коммунаров 26",
         "672239": "Свердлова 126"
@@ -120,10 +131,20 @@ class RecordViewModel: ObservableObject {
     
     // MARK: - Логирование
     func log(_ message: String) {
-        DispatchQueue.main.async {
-            self.debugLogs.append(message)
-        }
+        // Обновляем Published-свойство на главном потоке
+        debugLogs.append(message)
         print(message)
+    }
+    
+    // MARK: - Очистка «битых» уведомлений (пустых notificationId)
+    func cleanupEmptyNotifications() {
+        var mapping = self.scheduledNotificationMapping
+        for (externalId, notifId) in mapping {
+            if notifId.isEmpty {
+                mapping.removeValue(forKey: externalId)
+            }
+        }
+        self.scheduledNotificationMapping = mapping
     }
     
     // MARK: - Методы работы с external_id для записи
@@ -167,6 +188,15 @@ class RecordViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Проверка, есть ли действительно запланированное уведомление
+    /// Возвращает true, только если есть корректный (непустой) notificationId в scheduledNotificationMapping
+    func isNotificationScheduled(for externalId: String) -> Bool {
+        guard let storedId = self.scheduledNotificationMapping[externalId] else {
+            return false
+        }
+        return !storedId.isEmpty
+    }
+    
     // MARK: - Получение номера телефона и playerId
     func getPhoneNumber() {
         log("Получение номера телефона из UserDefaults")
@@ -190,7 +220,11 @@ class RecordViewModel: ObservableObject {
     func refreshData() {
         getPhoneNumber()
         log("Начало обновления данных")
-        // Не очищаем externalIdMapping, чтобы сохранить историю для сравнения
+        
+        // Удаляем «битые» записи, где notificationId = ""
+        cleanupEmptyNotifications()
+        
+        // Очищаем записи, но сохраняем externalIdMapping
         self.recordsByCompany.removeAll()
         self.fetchClients()
     }
@@ -221,33 +255,41 @@ class RecordViewModel: ObservableObject {
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async { self.isLoading = false }
-            if let error = error {
-                self.log("Ошибка получения клиентов: \(error.localizedDescription)")
-                return
-            }
-            guard let data = data else {
-                self.log("Данные клиентов не получены")
-                return
-            }
-            
-            if let jsonString = String(data: data, encoding: .utf8) {
-                self.log("Сырой JSON-ответ от API для клиентов:\n\(jsonString)")
-            } else {
-                self.log("Невозможно преобразовать данные клиентов в строку")
-            }
-            
-            do {
-                let decoded = try JSONDecoder().decode(ClientsResponse.self, from: data)
-                DispatchQueue.main.async {
+            Task { @MainActor in
+                self.isLoading = false
+                if let error = error {
+                    self.log("Ошибка получения клиентов: \(error.localizedDescription)")
+                    return
+                }
+                guard let data = data else {
+                    self.log("Данные клиентов не получены")
+                    return
+                }
+                
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    self.log("Сырой JSON-ответ от API для клиентов:\n\(jsonString)")
+                } else {
+                    self.log("Невозможно преобразовать данные клиентов в строку")
+                }
+                
+                do {
+                    let decoded = try JSONDecoder().decode(ClientsResponse.self, from: data)
                     self.clients = decoded.data.clients
                     self.log("Получены клиенты: \(self.clients.map { String($0.id) }.joined(separator: ", "))")
-                    for client in self.clients {
-                        self.fetchClientRecords(companyId: client.company_id, clientId: client.id)
+                    
+                    // Устанавливаем счётчик запросов равным количеству клиентов
+                    self.pendingClientRequests = self.clients.count
+                    if self.pendingClientRequests == 0 {
+                        self.log("Нет клиентов, проверяем удалённые записи сразу.")
+                        self.checkForDeletedRecords()
+                    } else {
+                        for client in self.clients {
+                            self.fetchClientRecords(companyId: client.company_id, clientId: client.id)
+                        }
                     }
+                } catch {
+                    self.log("Ошибка декодирования клиентов: \(error.localizedDescription)")
                 }
-            } catch {
-                self.log("Ошибка декодирования клиентов: \(error.localizedDescription)")
             }
         }.resume()
     }
@@ -271,39 +313,80 @@ class RecordViewModel: ObservableObject {
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async { self.isLoading = false }
-            if let error = error {
-                self.log("Ошибка получения записей: \(error.localizedDescription)")
-                return
-            }
-            guard let data = data else {
-                self.log("Данные записей не получены")
-                return
-            }
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                self.log("Ответ сервера для записей: статус \(httpResponse.statusCode)")
-                self.log("Заголовки: \(httpResponse.allHeaderFields)")
-            }
-            
-            if let jsonString = String(data: data, encoding: .utf8) {
-                self.log("Сырой JSON-ответ от API для записей:\n\(jsonString)")
-            } else {
-                self.log("Невозможно преобразовать данные записей в строку")
-            }
-            
-            do {
-                let decoded = try JSONDecoder().decode(RecordsResponse.self, from: data)
-                DispatchQueue.main.async {
+            Task { @MainActor in
+                self.isLoading = false
+                if let error = error {
+                    self.log("Ошибка получения записей: \(error.localizedDescription)")
+                    self.pendingClientRequests -= 1
+                    if self.pendingClientRequests == 0 {
+                        self.checkForDeletedRecords()
+                    }
+                    return
+                }
+                guard let data = data else {
+                    self.log("Данные записей не получены")
+                    self.pendingClientRequests -= 1
+                    if self.pendingClientRequests == 0 {
+                        self.checkForDeletedRecords()
+                    }
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    self.log("Ответ сервера для записей: статус \(httpResponse.statusCode)")
+                    self.log("Заголовки: \(httpResponse.allHeaderFields)")
+                }
+                
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    self.log("Сырой JSON-ответ от API для записей:\n\(jsonString)")
+                } else {
+                    self.log("Невозможно преобразовать данные записей в строку")
+                }
+                
+                do {
+                    let decoded = try JSONDecoder().decode(RecordsResponse.self, from: data)
                     let records = decoded.data ?? []
                     self.recordsByCompany["\(companyId)"] = records
                     self.log("Получены записи для companyId \(companyId): \(records.map { String($0.id) }.joined(separator: ", "))")
+                    
                     self.scheduleNotificationsForRecords(records: records)
+                    
+                    self.pendingClientRequests -= 1
+                    if self.pendingClientRequests == 0 {
+                        self.checkForDeletedRecords()
+                    }
+                } catch {
+                    self.log("Ошибка декодирования записей: \(error.localizedDescription)")
+                    self.pendingClientRequests -= 1
+                    if self.pendingClientRequests == 0 {
+                        self.checkForDeletedRecords()
+                    }
                 }
-            } catch {
-                self.log("Ошибка декодирования записей: \(error.localizedDescription)")
             }
         }.resume()
+    }
+    
+    // MARK: - Проверка и отмена уведомлений для удалённых записей
+    func checkForDeletedRecords() {
+        log("Проверка на удалённые записи (сравниваем externalIdMapping с актуальным списком)")
+        let allRecords = self.recordsByCompany.values.flatMap { $0 }
+        let currentRecordIds = Set(allRecords.map { "\($0.id)" })
+        let existingMapping = self.getExternalIdMapping()
+        var updatedMapping = existingMapping
+        
+        for (recordId, mappingValue) in existingMapping {
+            if !currentRecordIds.contains(recordId) {
+                let externalId = mappingValue.externalId
+                log("Запись id \(recordId) была удалена. Отменяем уведомление (если запланировано).")
+                if let notifId = self.notificationId(for: externalId) {
+                    self.cancelNotification(notificationId: notifId, externalId: externalId)
+                }
+                updatedMapping.removeValue(forKey: recordId)
+            }
+        }
+        
+        self.setExternalIdMapping(updatedMapping)
+        log("Проверка удалённых записей завершена.")
     }
     
     // MARK: - Вспомогательная функция для форматирования даты для send_after
@@ -332,19 +415,13 @@ class RecordViewModel: ObservableObject {
         return self.scheduledNotificationMapping[externalId]
     }
     
-    func isNotificationScheduled(for externalId: String) -> Bool {
-        return self.scheduledNotificationMapping.keys.contains(externalId)
-    }
-    
-    // MARK: - Отмена уведомлений (отменяем старое только если запись изменилась)
+    // MARK: - Отмена уведомлений (при изменении или удалении записи)
     func cancelExistingNotification(for record: Record) {
         let recordId = "\(record.id)"
-        // Получаем сохранённое external_id для этой записи
         let mapping = getExternalIdMapping()
         if let storedEntry = mapping[recordId] {
             let currentExternalId = externalIdForRecord(record)
             if storedEntry.externalId != currentExternalId {
-                // Если external_id изменился, значит запись изменилась – отменяем старое уведомление
                 if let notifId = notificationId(for: storedEntry.externalId) {
                     log("Для записи \(record.id) обнаружено старое уведомление с external_id \(storedEntry.externalId). Отменяем его.")
                     cancelNotification(notificationId: notifId, externalId: storedEntry.externalId)
@@ -364,7 +441,7 @@ class RecordViewModel: ObservableObject {
         request.setValue("Basic \(self.restApiKey)", forHTTPHeaderField: "Authorization")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 if let error = error {
                     self.log("Ошибка при отмене уведомления: \(error.localizedDescription)")
                     return
@@ -379,7 +456,7 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
     
-    // MARK: - Планирование уведомлений с учетом отмены старых при изменении записи
+    // MARK: - Планирование уведомлений для записей
     func scheduleNotificationsForRecords(records: [Record]) {
         log("Начало планирования уведомлений для \(records.count) записей")
         let now = Date()
@@ -390,12 +467,11 @@ class RecordViewModel: ObservableObject {
                 continue
             }
             if recordDate > now && (record.confirmed ?? 0) == 1 {
-                // Отменяем старое уведомление только если запись изменилась
                 cancelExistingNotification(for: record)
-                
                 let externalId = externalIdForRecord(record)
+                
                 if isNotificationScheduled(for: externalId) {
-                    log("Уведомление для записи \(record.id) уже запланировано")
+                    log("Уведомление для записи \(record.id) уже запланировано (external_id: \(externalId))")
                     continue
                 }
                 
@@ -407,9 +483,7 @@ class RecordViewModel: ObservableObject {
                         let sendAfter = formattedSendAfter(from: oneHourBefore)
                         log("Планирование уведомления для записи id \(record.id) с send_after: \(sendAfter)")
                         
-                        // Сохраняем external_id (notification_id обновится после ответа)
-                        saveScheduledNotification(notificationId: "", for: externalId)
-                        
+                        // Уведомление будет сохранено только при успешном ответе от OneSignal.
                         sendNotification(date: record.date,
                                          address: address,
                                          playerId: self.playerId,
@@ -429,9 +503,9 @@ class RecordViewModel: ObservableObject {
         log("Завершено планирование уведомлений для записей")
     }
     
-    // MARK: - Отправка уведомления с external_id
+    // MARK: - Отправка уведомления
     func sendNotification(date: String, address: String, playerId: String, formattedTime: String, sendAfter: String, externalId: String) {
-        let notificationContent = "У Вас запись на \(address) в \(formattedTime)"
+        let notificationContent = "У Вас запись 111 на \(address) в \(formattedTime)"
         log("Подготовка уведомления: \(notificationContent) для playerId: \(playerId)")
         
         guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {
@@ -468,7 +542,7 @@ class RecordViewModel: ObservableObject {
         }
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 if let error = error {
                     self.log("Ошибка при отправке уведомления: \(error.localizedDescription)")
                     return
@@ -559,8 +633,6 @@ class RecordViewModel: ObservableObject {
     }
     
     // MARK: - Методы для подтверждения и удаления записей
-    
-    /// Метод для подтверждения записи
     func confirmRecord(_ record: Record) {
         guard let url = URL(string: "https://api.yclients.com/api/v1/confirmRecord/\(record.id)") else {
             log("Неверный URL для подтверждения записи")
@@ -568,17 +640,16 @@ class RecordViewModel: ObservableObject {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        // При необходимости добавьте нужные заголовки и тело запроса
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 if let error = error {
                     self.log("Ошибка подтверждения записи: \(error.localizedDescription)")
                     return
                 }
                 if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                     self.log("Запись \(record.id) успешно подтверждена")
-                    self.refreshData() // Обновляем записи после подтверждения
+                    self.refreshData()
                 } else {
                     self.log("Ошибка подтверждения записи: неожиданный статус ответа")
                 }
@@ -586,7 +657,6 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
     
-    /// Метод для удаления записи
     func deleteRecord(_ record: Record) {
         guard let url = URL(string: "https://api.yclients.com/api/v1/records/\(record.id)") else {
             log("Неверный URL для удаления записи")
@@ -594,17 +664,16 @@ class RecordViewModel: ObservableObject {
         }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-        // При необходимости добавьте нужные заголовки
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 if let error = error {
                     self.log("Ошибка удаления записи: \(error.localizedDescription)")
                     return
                 }
                 if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                     self.log("Запись \(record.id) успешно удалена")
-                    self.refreshData() // Обновляем записи после удаления
+                    self.refreshData()
                 } else {
                     self.log("Ошибка удаления записи: неожиданный статус ответа")
                 }
@@ -619,7 +688,6 @@ struct RecordView: View {
     @StateObject var viewModel = RecordViewModel.sharedInstance
 
     var body: some View {
-        // Убираем NavigationView и navigationTitle
         VStack(spacing: 14) {
             HStack(spacing: 8) {
                 let companyIds = ["433675", "672239"]
@@ -646,7 +714,7 @@ struct RecordView: View {
                                     .onTapGesture {
                                         viewModel.selectedRecord = closestRecord
                                         viewModel.showModal = true
-                                        _ = viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
+                                        viewModel.log("Открытие модального окна для записи \(closestRecord.id)")
                                     }
                             } else {
                                 NoRecordRow(address: address)
@@ -746,7 +814,7 @@ struct RecordRow: View {
                 if isConfirmed, let checkmarkUrl = checkmarkUrl, let url = URL(string: checkmarkUrl) {
                     AsyncImage(url: url) { image in
                         image.resizable()
-                             .aspectRatio(contentMode: .fit)
+                            .aspectRatio(contentMode: .fit)
                     } placeholder: {
                         ProgressView()
                     }

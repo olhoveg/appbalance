@@ -1,6 +1,3 @@
-////ProfileView.swift
-
-
 import SwiftUI
 import Firebase
 import FirebaseFirestore
@@ -160,7 +157,7 @@ struct ProfileView: View {
                 ImagePicker(selectedImage: $profileImage)
             }
             // При выборе нового изображения выполняем его загрузку
-            .onChange(of: profileImage) { newImage in
+            .onChange(of: profileImage) { newImage, _ in
                 if newImage != nil {
                     uploadPhoto()
                 }
@@ -203,7 +200,7 @@ struct ProfileView: View {
         }
     }
     
-    // Функции работы с фото (uploadPhoto, savePhotoURL, loadProfileImage) остаются без изменений
+    // Функции работы с фото (uploadPhoto, savePhotoURL, loadProfileImage)
     private func uploadPhoto() {
         guard let image = profileImage,
               let imageData = image.jpegData(compressionQuality: 0.8),
@@ -249,7 +246,7 @@ struct ProfileView: View {
         }
     }
     
-    // Функции выхода/удаления аккаунта остаются без изменений
+    // Функции выхода/удаления аккаунта
     private func handleLogout() {
         clearUserData()
         shouldNavigateToMain = true

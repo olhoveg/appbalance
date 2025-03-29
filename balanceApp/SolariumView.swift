@@ -640,7 +640,7 @@ struct SolariumView: View {
         .datePickerStyle(.compact)
         .labelsHidden()
         .padding()
-        .onChange(of: viewModel.selectedDate) { _ in
+        .onChange(of: viewModel.selectedDate) {
             Task { await reloadData() }
         }
     }

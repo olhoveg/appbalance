@@ -48,7 +48,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     /// Обработчик фоновой задачи обновления
     func handleAppRefresh(task: BGAppRefreshTask) {
         os_log("Фоновая задача получена от системы.", log: OSLog.default, type: .info)
-
+        
         // Планируем следующую задачу
         scheduleAppRefresh()
         
@@ -76,9 +76,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             
             let semaphore = DispatchSemaphore(value: 0)
             
-            // Обновляем данные записей пользователей
-            RecordDataManager.shared.refreshData {
-                os_log("Обновление данных в фоне завершено.", log: OSLog.default, type: .info)
+            // Выполняем обновление данных на главном акторе
+            Task { @MainActor in
+                RecordViewModel.sharedInstance.refreshData()
                 semaphore.signal()
             }
             
@@ -87,51 +87,56 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
     
+    
     // MARK: - RecordDataManager для обновления данных записей пользователей
     class RecordDataManager {
         static let shared = RecordDataManager()
         
         func refreshData(completion: @escaping () -> Void) {
             print("RecordDataManager: Начало обновления данных...")
-            // Вызываем обновление данных из RecordViewModel
-            RecordViewModel.sharedInstance.refreshData()
-            // Предположим, что обновление занимает 2 секунды, затем вызываем completion
-            DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
-                os_log("RecordDataManager: Данные обновлены.", log: OSLog.default, type: .info)
-                completion()
+            // Выполняем обновление данных на главном акторе:
+            Task { @MainActor in
+                RecordViewModel.sharedInstance.refreshData()
+                // Предположим, что обновление занимает 2 секунды, затем вызываем completion
+                DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                    os_log("RecordDataManager: Данные обновлены.", log: OSLog.default, type: .info)
+                    completion()
+                }
             }
         }
     }
-}
-
-// MARK: - Основное приложение
-
-@main
-struct balanceAppApp: App {
-    // Подключаем AppDelegate для BackgroundTasks
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    // Инициализация Firebase
-    init() {
-        FirebaseApp.configure()
-    }
+    // MARK: - Основное приложение
     
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+    @main
+    @MainActor
+    
+    struct balanceAppApp: App {
+        // Подключаем AppDelegate для BackgroundTasks
+        @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+        
+        // Инициализация Firebase
+        init() {
+            FirebaseApp.configure()
         }
-    }()
-    
-    var body: some Scene {
-        WindowGroup {
-            SplashScreen() // Ваш основной SwiftUI интерфейс
+        
+        var sharedModelContainer: ModelContainer = {
+            let schema = Schema([
+                Item.self,
+            ])
+            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            do {
+                return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            } catch {
+                fatalError("Could not create ModelContainer: \(error)")
+            }
+        }()
+        
+        var body: some Scene {
+            WindowGroup {
+                SplashScreen() // Ваш основной SwiftUI интерфейс
+            }
+            .modelContainer(sharedModelContainer)
         }
-        .modelContainer(sharedModelContainer)
     }
 }
