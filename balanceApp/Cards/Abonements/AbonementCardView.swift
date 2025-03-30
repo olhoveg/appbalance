@@ -1,37 +1,47 @@
-//AbonementCardView.swift
 import SwiftUI
 import FirebaseDatabase
 
 struct AbonementCardView: View {
     let abonement: Abonement
     let phoneNumber: String
-    @State private var imageUrl: String?
-    @StateObject private var imageCache = ImageCache()
-    @State private var loadedImage: UIImage?
-    
+    // Вместо отдельного состояния для загруженного изображения, будем читать из глобального кэша
+    @EnvironmentObject var imageCache: ImageCache
+    // Используем отдельный loader для получения imageUrl из Firebase – он остаётся один для данного ключа
+    @StateObject private var imageLoader: AbonementImageLoader
+
     @Environment(\.colorScheme) var colorScheme
-    
+
+    init(abonement: Abonement, phoneNumber: String) {
+        self.abonement = abonement
+        self.phoneNumber = phoneNumber
+        // Инициализируем loader с ключом, например, названием типа абонемента
+        _imageLoader = StateObject(wrappedValue: AbonementImageLoader(key: abonement.type.title))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .topTrailing) {
-                if let url = imageUrl, !url.isEmpty {
-                    if let image = loadedImage {
-                        Image(uiImage: image)
+                // Используем imageLoader.imageUrl для получения URL
+                if let url = imageLoader.imageUrl, !url.isEmpty {
+                    // Если изображение уже есть в глобальном кэше – используем его немедленно
+                    if let entry = imageCache.cachedImages[url] {
+                        Image(uiImage: entry.image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(height: 180)
                             .clipped()
                     } else {
+                        // Если изображения ещё нет в кэше – показываем placeholder и запускаем загрузку
                         Color.gray.opacity(0.3)
                             .frame(height: 180)
                             .overlay(ProgressView())
                             .onAppear {
-                                imageCache.loadImage(from: url) { img in
-                                    loadedImage = img
-                                }
+                                // Загрузка из глобального кэша (если ещё не загружено)
+                                imageCache.loadImage(from: url) { _ in }
                             }
                     }
                 } else {
+                    // Если URL не получен – показываем fallback
                     ZStack {
                         Color.gray.opacity(0.3)
                         Text("No Image")
@@ -42,7 +52,8 @@ struct AbonementCardView: View {
                 }
                 
                 Text("№ \(abonement.number)")
-                    .font(.footnote).fontWeight(.bold)
+                    .font(.footnote)
+                    .fontWeight(.bold)
                     .padding(8)
                     .background(Color.black.opacity(0.6))
                     .foregroundColor(.white)
@@ -83,19 +94,9 @@ struct AbonementCardView: View {
         .cornerRadius(20)
         .shadow(color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .onAppear {
-            fetchAbonementImage()
-        }
-    }
-    
-    private func fetchAbonementImage() {
-        let db = Database.database().reference()
-        let key = abonement.type.title
-        let ref = db.child("abonement_images").child(key)
-        
-        ref.observeSingleEvent(of: .value) { snapshot in
-            if let data = snapshot.value as? [String: Any],
-               let url = data["image_url"] as? String {
-                imageUrl = url
+            // Если URL еще не загружен, запускаем загрузку из Firebase
+            if imageLoader.imageUrl == nil {
+                imageLoader.loadImage()
             }
         }
     }

@@ -16,8 +16,16 @@ struct BonusBlockView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     if isLoading {
-                        ProgressView()
-                            .padding(.top, 50)
+                        // Пока данные загружаются – показываем несколько скелетонов (например, 3)
+                        TabView {
+                            ForEach(0..<3, id: \.self) { _ in
+                                SkeletonBonusBlockCardView()
+                                    .padding(.horizontal, 20)
+                            }
+                        }
+                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+                        .frame(height: 300)
+                        .animation(.easeInOut, value: activeIndex)
                     } else if bonusCards.isEmpty {
                         Text("Нет бонусных карт")
                             .font(.system(size: 16, weight: .medium, design: .rounded))
@@ -34,7 +42,6 @@ struct BonusBlockView: View {
                         .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
                         .frame(height: 300)
                         .animation(.easeInOut, value: activeIndex)
-                        
                     }
                 }
                 .padding(.vertical, 20)
@@ -90,6 +97,7 @@ struct BonusBlockView: View {
         }.resume()
     }
 }
+
 
 struct PaginationView: View {
     let dots: Int

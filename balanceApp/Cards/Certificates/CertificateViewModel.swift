@@ -24,24 +24,27 @@ class CertificateViewModel: ObservableObject {
     
     private let databaseRef = Database.database().reference()
 
-    func fetchCertificates() {
+    func fetchCertificates(completion: @escaping () -> Void = {}) {
         // Всегда загружаем доступные сертификаты
         fetchAvailableCertificates()
         
-        // Пытаемся получить номер телефона для купленных сертификатов
         guard let phoneNumber = getUserPhoneNumber() else {
-            print("❌ Ошибка: Номер телефона не найден в профиле")
+            print("❌ Ошибка: Номер телефона не найден")
             self.isAuthorized = false
+            completion()
             return
         }
         
         self.isAuthorized = true
-        fetchOwnedCertificates(for: phoneNumber)
+        fetchOwnedCertificates(for: phoneNumber) {
+            completion()
+        }
     }
 
-    private func fetchOwnedCertificates(for phoneNumber: String) {
+    private func fetchOwnedCertificates(for phoneNumber: String, completion: @escaping () -> Void = {}) {
         guard let url = URL(string: "\(API_URL)/loyalty/certificates/?company_id=433675&phone=\(phoneNumber)") else {
             print("Ошибка: Неверный URL")
+            completion()
             return
         }
         
@@ -59,11 +62,13 @@ class CertificateViewModel: ObservableObject {
             
             if let error = error {
                 print("Ошибка загрузки сертификатов: \(error.localizedDescription)")
+                completion()
                 return
             }
             
             guard let data = data else {
                 print("Ошибка: пустой ответ от сервера")
+                completion()
                 return
             }
             
@@ -75,12 +80,15 @@ class CertificateViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.ownedCertificates = decodedResponse.data
                     self.fetchCertificateDetails(for: self.ownedCertificates)
+                    completion()
                 }
             } catch {
                 print("Ошибка декодирования JSON: \(error.localizedDescription)")
+                completion()
             }
         }.resume()
     }
+
 
     private func fetchAvailableCertificates() {
         databaseRef.child("certificate_images").observeSingleEvent(of: .value, with: { snapshot in

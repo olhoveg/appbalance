@@ -4,14 +4,15 @@ import FirebaseDatabase
 struct CertificateCardView: View {
     let certificate: Certificate
     let isOwned: Bool
-    @StateObject private var imageCache = ImageCache()
+    // Используем общий кэш из окружения
+    @EnvironmentObject var imageCache: ImageCache
     @State private var loadedImage: UIImage? = nil
 
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         if isOwned {
-            // Купленные сертификаты (фиксированная высота ~320)
+            // Для купленных сертификатов – карточка с изображением, номером, балансом, датами и т.д.
             VStack(alignment: .leading, spacing: 8) {
                 ZStack(alignment: .topTrailing) {
                     certificateImageView()
@@ -36,19 +37,17 @@ struct CertificateCardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Баланс: \(certificate.balance) ₽")
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .foregroundColor(colorScheme == .dark ? .white : .primary)
                         .padding(.top, 8)
                     
-                    // Дата покупки стилизована как в абонементах
                     if let purchaseDate = certificate.createdDate {
                         Text("Дата покупки: \(formattedDate(purchaseDate))")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(colorScheme == .dark ? .gray : .secondary)
                     }
                     
-                    // Срок действия стилизован аналогично
-                    if let expirationDate = certificate.expirationDate {
-                        Text("Срок действия: \(formattedDate(expirationDate))")
+                    if let expDate = certificate.expirationDate {
+                        Text("Срок действия: \(formattedDate(expDate))")
                             .font(.caption)
                             .foregroundColor(.red)
                     } else if let expText = certificate.expirationText {
@@ -70,7 +69,7 @@ struct CertificateCardView: View {
             .cornerRadius(15)
             .shadow(color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.1), radius: 5)
         } else {
-            // Сертификаты, доступные к покупке - без внешнего контейнера и без баланса
+            // Для сертификатов, доступных к покупке
             HStack {
                 certificateImageView()
                     .frame(height: 140)
@@ -98,13 +97,12 @@ struct CertificateCardView: View {
         }
     }
     
-    // Функция для отображения изображения с кэшированием
     @ViewBuilder
     private func certificateImageView() -> some View {
         ZStack {
-            if let imageUrl = certificate.imageUrl {
-                if let image = loadedImage {
-                    Image(uiImage: image)
+            if let imageUrl = certificate.imageUrl, !imageUrl.isEmpty {
+                if let entry = imageCache.cachedImages[imageUrl] {
+                    Image(uiImage: entry.image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } else {
@@ -125,7 +123,6 @@ struct CertificateCardView: View {
         }
     }
     
-    // Форматирование даты на русский язык, как в абонементах
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")

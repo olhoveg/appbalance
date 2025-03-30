@@ -115,6 +115,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Подключаем AppDelegate для BackgroundTasks
         @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
         
+        // Создаем единый кэш изображений
+            @StateObject private var imageCache = ImageCache.shared
+        
+        
         // Инициализация Firebase
         init() {
             FirebaseApp.configure()
@@ -135,6 +139,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         var body: some Scene {
             WindowGroup {
                 SplashScreen() // Ваш основной SwiftUI интерфейс
+                    .environmentObject(imageCache)
+
             }
             .modelContainer(sharedModelContainer)
         }
