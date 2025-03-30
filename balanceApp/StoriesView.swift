@@ -59,7 +59,6 @@ struct StoryIcon: View {
 class StoriesViewModel: ObservableObject {
     @Published var stories: [Story] = []
     
-    // URL базы данных
     private let ref = Database.database(url: "https://balance-ddb48-default-rtdb.europe-west1.firebasedatabase.app").reference()
     
     func fetchStories() {
@@ -91,16 +90,11 @@ class StoriesViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 self.stories = loadedStories
-                if loadedStories.isEmpty {
-                    print("StoriesViewModel: Загрузка сторис завершена, но сторис не найдены.")
-                } else {
-                    print("StoriesViewModel: Загрузка сторис завершена успешно, загружено сторис: \(loadedStories.count)")
-                }
+                print("StoriesViewModel: Загрузка сторис завершена, загружено сторис: \(loadedStories.count)")
             }
         }
     }
 }
-
 
 // MARK: - StoriesView
 
@@ -133,32 +127,40 @@ struct StoriesView: View {
     }
 }
 
-// MARK: - StoryPlayerView
+// MARK: - StoryPlayerView с AVQueuePlayer и асинхронной загрузкой
 
 struct StoryPlayerView: View {
     var story: Story
     var onClose: () -> Void
 
+    @State private var player: AVQueuePlayer = {
+        let player = AVQueuePlayer()
+        // Отключаем ожидание буферизации, чтобы начать быстрее
+        player.automaticallyWaitsToMinimizeStalling = false
+        return player
+    }()
+    @State private var playerItems: [AVPlayerItem] = []
     @State private var currentVideoIndex: Int = 0
-    @State private var player: AVPlayer?
     @State private var currentVideoProgress: Double = 0.0
     @State private var timeObserverToken: Any?
+    @State private var itemEndObserver: NSObjectProtocol?
+    @State private var isPlayerReady: Bool = false
 
     var body: some View {
         ZStack {
-            if let player = player {
+            if isPlayerReady, player.currentItem != nil {
                 VideoPlayer(player: player)
                     .edgesIgnoringSafeArea(.all)
-                    .onAppear { player.play() }
-                    .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { _ in
-                        playNextVideo()
+                    .onAppear {
+                        player.play()
                     }
             } else {
                 Color.black.edgesIgnoringSafeArea(.all)
-                Text("Нет видео")
-                    .foregroundColor(.white)
+                ProgressView()
             }
+            
             VStack {
+                // Прогресс-бар для каждого видео
                 HStack(spacing: 4) {
                     ForEach(0..<story.videos.count, id: \.self) { index in
                         ProgressBarView(progress: progressFor(index: index))
@@ -166,11 +168,14 @@ struct StoryPlayerView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
+                
                 HStack {
                     HStack {
                         AsyncImage(url: URL(string: story.image)) { phase in
                             if let image = phase.image {
-                                image.resizable().aspectRatio(contentMode: .fill)
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
                             } else {
                                 Color.gray
                             }
@@ -188,21 +193,106 @@ struct StoryPlayerView: View {
                             .frame(width: 30, height: 30)
                             .foregroundColor(.white)
                     }
-                    .zIndex(2)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 Spacer()
             }
             .zIndex(1)
+            
+            // Жесты для переключения видео: левая – предыдущее, правая – следующее
             HStack(spacing: 0) {
                 Color.clear.contentShape(Rectangle()).onTapGesture { playPreviousVideo() }
                 Color.clear.contentShape(Rectangle()).onTapGesture { playNextVideo() }
             }
             .zIndex(0)
         }
-        .onAppear { startCurrentVideo() }
-        .onDisappear { closePlayer() }
+        .onAppear {
+            setupPlayer()
+        }
+        .onDisappear {
+            cleanupPlayer()
+        }
+    }
+    
+    /// Асинхронная загрузка первого видео и подготовка очереди плеера
+    func setupPlayer() {
+        // Подготавливаем AVPlayerItem для каждого видео
+        playerItems = story.videos.compactMap { video in
+            if let url = URL(string: video.url) {
+                let asset = AVAsset(url: url)
+                // Устанавливаем небольшой буфер, чтобы плеер быстрее переключался
+                let item = AVPlayerItem(asset: asset)
+                item.preferredForwardBufferDuration = 2
+                return item
+            }
+            return nil
+        }
+        
+        player.removeAllItems()
+        isPlayerReady = false
+        currentVideoIndex = 0
+        currentVideoProgress = 0.0
+        
+        // Загружаем асинхронно первый элемент
+        if let firstItem = playerItems.first {
+            Task {
+                do {
+                    // Асинхронно загружаем, является ли ассет воспроизводимым
+                    let _ : Bool = try await firstItem.asset.load(.isPlayable)
+                    DispatchQueue.main.async {
+                        self.player.replaceCurrentItem(with: firstItem)
+                        for item in self.playerItems.dropFirst() {
+                            self.player.insert(item, after: nil)
+                        }
+                        self.isPlayerReady = true
+                        self.player.play()
+                        self.addObservers()
+                    }
+                } catch {
+                    print("Ошибка загрузки первого видео: \(error)")
+                }
+            }
+        }
+
+    }
+    
+    /// Добавляем наблюдатели для обновления прогресса и перехода к следующему элементу
+    func addObservers() {
+        let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            if let currentItem = player.currentItem,
+               let index = playerItems.firstIndex(of: currentItem) {
+                currentVideoIndex = index
+                let duration = currentItem.duration.seconds
+                if duration > 0 {
+                    currentVideoProgress = time.seconds / duration
+                } else {
+                    currentVideoProgress = 0.0
+                }
+            }
+        }
+        
+        itemEndObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { notification in
+            if let finishedItem = notification.object as? AVPlayerItem,
+               finishedItem == player.currentItem {
+                playNextVideo()
+            }
+        }
+    }
+    
+    /// Убираем наблюдатели и останавливаем плеер
+    func cleanupPlayer() {
+        player.pause()
+        if let token = timeObserverToken {
+            player.removeTimeObserver(token)
+            timeObserverToken = nil
+        }
+        if let observer = itemEndObserver {
+            NotificationCenter.default.removeObserver(observer)
+            itemEndObserver = nil
+        }
+        player.removeAllItems()
     }
     
     func progressFor(index: Int) -> Double {
@@ -215,34 +305,11 @@ struct StoryPlayerView: View {
         }
     }
     
-    func startCurrentVideo() {
-        guard currentVideoIndex < story.videos.count else { closePlayer(); return }
-        if let player = player {
-            player.pause()
-            if let token = timeObserverToken {
-                player.removeTimeObserver(token)
-                timeObserverToken = nil
-            }
-        }
-        currentVideoProgress = 0.0
-        let videoUrlString = story.videos[currentVideoIndex].url
-        if let url = URL(string: videoUrlString) {
-            let newPlayer = AVPlayer(url: url)
-            newPlayer.play()
-            player = newPlayer
-            let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-            timeObserverToken = newPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-                if let duration = newPlayer.currentItem?.duration.seconds, duration > 0 {
-                    currentVideoProgress = time.seconds / duration
-                }
-            }
-        }
-    }
-    
     func playNextVideo() {
-        currentVideoIndex += 1
-        if currentVideoIndex < story.videos.count {
-            startCurrentVideo()
+        if currentVideoIndex < playerItems.count - 1 {
+            player.advanceToNextItem()
+            currentVideoIndex += 1
+            currentVideoProgress = 0.0
         } else {
             closePlayer()
         }
@@ -251,19 +318,24 @@ struct StoryPlayerView: View {
     func playPreviousVideo() {
         if currentVideoIndex > 0 {
             currentVideoIndex -= 1
-            startCurrentVideo()
+            currentVideoProgress = 0.0
+            player.pause()
+            player.removeAllItems()
+            for i in currentVideoIndex..<playerItems.count {
+                player.insert(playerItems[i], after: nil)
+            }
+            player.currentItem?.seek(to: .zero, completionHandler: nil)
+            player.play()
         }
     }
     
     func closePlayer() {
-        player?.pause()
-        if let token = timeObserverToken, let player = player {
-            player.removeTimeObserver(token)
-            timeObserverToken = nil
-        }
+        cleanupPlayer()
         onClose()
     }
 }
+
+// MARK: - ProgressBarView
 
 struct ProgressBarView: View {
     var progress: Double

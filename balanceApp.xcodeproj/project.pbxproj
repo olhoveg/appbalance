@@ -818,8 +818,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/OneSignal/OneSignal-iOS-SDK.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 5.2.10;
+				kind = exactVersion;
+				version = "5.3.0-beta-01";
 			};
 		};
 		0AD443312D5DED6B0063ECEF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {

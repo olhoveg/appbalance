@@ -102,28 +102,32 @@ class OneSignalManager: NSObject, OSPushSubscriptionObserver {
             return
         }
         isInitialized = true
-        
+
         // Устанавливаем уровень логирования OneSignal
         OneSignal.Debug.setLogLevel(.LL_VERBOSE)
         
-        // Инициализируем OneSignal с вашим App ID
-        OneSignal.initialize("61e511f4-5929-448d-85f4-e5bf171f0764", withLaunchOptions: nil)
-        
-        // Запрос разрешения на уведомления
-        OneSignal.Notifications.requestPermission({ accepted in
-            print("User accepted notifications: \(accepted)")
-        }, fallbackToSettings: true)
-        
-        // Подписываемся на изменения pushSubscription
-        OneSignal.User.pushSubscription.addObserver(self)
-        
-        // Получаем текущий playerId (если доступен)
-        if let playerId = OneSignal.User.pushSubscription.id {
-            self.savePlayerId(playerId)
+        // Обеспечиваем выполнение на главном потоке
+        DispatchQueue.main.async {
+            // Инициализируем OneSignal с вашим App ID на главном потоке
+            OneSignal.initialize("61e511f4-5929-448d-85f4-e5bf171f0764", withLaunchOptions: nil)
+            
+            // Запрос разрешения на уведомления
+            OneSignal.Notifications.requestPermission({ accepted in
+                print("User accepted notifications: \(accepted)")
+            }, fallbackToSettings: true)
+            
+            // Подписываемся на изменения pushSubscription
+            OneSignal.User.pushSubscription.addObserver(self)
+            
+            // Получаем текущий playerId (если доступен)
+            if let playerId = OneSignal.User.pushSubscription.id {
+                self.savePlayerId(playerId)
+            }
+            
+            print("OneSignal успешно инициализирован")
         }
-        
-        print("OneSignal успешно инициализирован")
     }
+
     
     // MARK: - OSPushSubscriptionObserver
     func onPushSubscriptionDidChange(state: OSPushSubscriptionChangedState) {
