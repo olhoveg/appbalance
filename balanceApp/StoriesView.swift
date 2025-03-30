@@ -33,7 +33,6 @@ struct StoryIcon: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     } else if phase.error != nil {
-                        // Вместо красного цвета выводим placeholder
                         Image(systemName: "person.crop.circle.fill")
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -55,98 +54,82 @@ struct StoryIcon: View {
     }
 }
 
-// MARK: - StoriesView
+// MARK: - StoriesViewModel
 
-struct StoriesView: View {
-    @State private var stories: [Story] = []
-    @State private var selectedStory: Story? = nil
+class StoriesViewModel: ObservableObject {
+    @Published var stories: [Story] = []
     
-    // Явно указываем URL базы данных
+    // URL базы данных
     private let ref = Database.database(url: "https://balance-ddb48-default-rtdb.europe-west1.firebasedatabase.app").reference()
-
-    var body: some View {
-        VStack {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack {
-                    ForEach(stories) { story in
-                        StoryIcon(imageUrl: story.image, name: story.name) {
-                            selectedStory = story
-                        }
-                    }
-                }
-                .padding(.horizontal)
-            }
-        }
-        .onAppear {
-            print("StoriesView onAppear. Начинаем fetchStories().")
-            fetchStories()
-        }
-        .fullScreenCover(item: $selectedStory) { story in
-            StoryPlayerView(story: story) {
-                selectedStory = nil
-            }
-        }
-    }
     
     func fetchStories() {
-        print("fetchStories: обращаемся к базе данных по пути stories/stories")
+        print("StoriesViewModel: Начинаем загрузку сторис.")
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
-            print("Снимок базы (snapshot): \(snapshot)")
-            print("Снимок value: \(String(describing: snapshot.value))")
-
             var loadedStories: [Story] = []
-            
             if let storiesArray = snapshot.value as? [[String: Any]] {
-                print("Получен массив сторис, количество элементов: \(storiesArray.count)")
-                
                 for (index, storyDict) in storiesArray.enumerated() {
                     let rawId = storyDict["id"] ?? ""
                     let id = "\(index)_\(rawId)"
-                    
                     let name = storyDict["name"] as? String ?? "Без имени"
                     let image = storyDict["image"] as? String ?? ""
                     
                     var videos: [StoryVideo] = []
                     if let videosArray = storyDict["videos"] as? [[String: Any]] {
-                        for (videoIndex, videoData) in videosArray.enumerated() {
+                        for videoData in videosArray {
                             if let url = videoData["url"] as? String {
-                                print("Видео \(videoIndex): \(url)")
                                 videos.append(StoryVideo(url: url))
                             }
                         }
                     }
                     
                     let story = Story(id: id, name: name, image: image, videos: videos)
-                    print("Story создан: \(story)")
                     loadedStories.append(story)
                 }
             } else {
-                print("Не удалось преобразовать snapshot.value в массив.")
+                print("StoriesViewModel: Не удалось преобразовать snapshot.value в массив сторис.")
             }
             
-            self.stories = loadedStories
-            print("Итоговое количество сторис: \(loadedStories.count)")
+            DispatchQueue.main.async {
+                self.stories = loadedStories
+                if loadedStories.isEmpty {
+                    print("StoriesViewModel: Загрузка сторис завершена, но сторис не найдены.")
+                } else {
+                    print("StoriesViewModel: Загрузка сторис завершена успешно, загружено сторис: \(loadedStories.count)")
+                }
+            }
         }
     }
 }
 
-// MARK: - Простой ProgressBarView для пагинатора
 
-struct ProgressBarView: View {
-    var progress: Double // от 0.0 до 1.0
-    
+// MARK: - StoriesView
+
+struct StoriesView: View {
+    @ObservedObject var viewModel: StoriesViewModel
+    @State private var selectedStory: Story? = nil
+
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.3))
-                Rectangle()
-                    .fill(Color.white)
-                    .frame(width: geo.size.width * CGFloat(progress))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(viewModel.stories) { story in
+                    StoryIcon(imageUrl: story.image, name: story.name) {
+                        selectedStory = story
+                    }
+                }
             }
-            .cornerRadius(1)
+            .padding(.horizontal)
         }
-        .frame(height: 3)
+        .refreshable {
+            viewModel.fetchStories()
+        }
+        .onAppear {
+            viewModel.fetchStories()
+        }
+        .fullScreenCover(item: $selectedStory) { story in
+            StoryPlayerView(story: story) {
+                selectedStory = nil
+            }
+        }
     }
 }
 
@@ -163,13 +146,10 @@ struct StoryPlayerView: View {
 
     var body: some View {
         ZStack {
-            // Видео
             if let player = player {
                 VideoPlayer(player: player)
                     .edgesIgnoringSafeArea(.all)
-                    .onAppear {
-                        player.play()
-                    }
+                    .onAppear { player.play() }
                     .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { _ in
                         playNextVideo()
                     }
@@ -178,8 +158,6 @@ struct StoryPlayerView: View {
                 Text("Нет видео")
                     .foregroundColor(.white)
             }
-
-            // Верхний оверлей: пагинатор и информация
             VStack {
                 HStack(spacing: 4) {
                     ForEach(0..<story.videos.count, id: \.self) { index in
@@ -188,67 +166,45 @@ struct StoryPlayerView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
-
                 HStack {
                     HStack {
                         AsyncImage(url: URL(string: story.image)) { phase in
                             if let image = phase.image {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
+                                image.resizable().aspectRatio(contentMode: .fill)
                             } else {
                                 Color.gray
                             }
                         }
                         .frame(width: 40, height: 40)
                         .clipShape(Circle())
-
                         Text(story.name)
                             .foregroundColor(.white)
                             .font(.headline)
                     }
                     Spacer()
-                    Button(action: {
-                        closePlayer()
-                    }) {
+                    Button(action: { closePlayer() }) {
                         Image(systemName: "xmark.circle.fill")
                             .resizable()
                             .frame(width: 30, height: 30)
                             .foregroundColor(.white)
                     }
-                    // Повышаем zIndex для кнопки закрытия
                     .zIndex(2)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
-
                 Spacer()
             }
-            .zIndex(1) // оверлей информации
-
-            // Тап-зоны для переключения видео
+            .zIndex(1)
             HStack(spacing: 0) {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        playPreviousVideo()
-                    }
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        playNextVideo()
-                    }
+                Color.clear.contentShape(Rectangle()).onTapGesture { playPreviousVideo() }
+                Color.clear.contentShape(Rectangle()).onTapGesture { playNextVideo() }
             }
-            .zIndex(0) // нижний слой
+            .zIndex(0)
         }
-        .onAppear {
-            startCurrentVideo()
-        }
-        .onDisappear {
-            closePlayer()
-        }
+        .onAppear { startCurrentVideo() }
+        .onDisappear { closePlayer() }
     }
-
+    
     func progressFor(index: Int) -> Double {
         if index < currentVideoIndex {
             return 1.0
@@ -258,13 +214,9 @@ struct StoryPlayerView: View {
             return currentVideoProgress
         }
     }
-
+    
     func startCurrentVideo() {
-        guard currentVideoIndex < story.videos.count else {
-            closePlayer()
-            return
-        }
-        // Останавливаем предыдущий плеер
+        guard currentVideoIndex < story.videos.count else { closePlayer(); return }
         if let player = player {
             player.pause()
             if let token = timeObserverToken {
@@ -278,7 +230,6 @@ struct StoryPlayerView: View {
             let newPlayer = AVPlayer(url: url)
             newPlayer.play()
             player = newPlayer
-
             let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
             timeObserverToken = newPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
                 if let duration = newPlayer.currentItem?.duration.seconds, duration > 0 {
@@ -287,7 +238,7 @@ struct StoryPlayerView: View {
             }
         }
     }
-
+    
     func playNextVideo() {
         currentVideoIndex += 1
         if currentVideoIndex < story.videos.count {
@@ -296,14 +247,14 @@ struct StoryPlayerView: View {
             closePlayer()
         }
     }
-
+    
     func playPreviousVideo() {
         if currentVideoIndex > 0 {
             currentVideoIndex -= 1
             startCurrentVideo()
         }
     }
-
+    
     func closePlayer() {
         player?.pause()
         if let token = timeObserverToken, let player = player {
@@ -314,26 +265,23 @@ struct StoryPlayerView: View {
     }
 }
 
-
-    
-   
-
-// MARK: - HomeContentView
-
-struct HomeContentView: View {
+struct ProgressBarView: View {
+    var progress: Double
     var body: some View {
-        NavigationView {
-            VStack {
-                StoriesView()
-                Spacer()
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle().fill(Color.white.opacity(0.3))
+                Rectangle().fill(Color.white)
+                    .frame(width: geo.size.width * CGFloat(progress))
             }
-            .navigationBarHidden(true)
+            .cornerRadius(1)
         }
+        .frame(height: 3)
     }
 }
 
-struct HomeContentView_Previews: PreviewProvider {
+struct StoriesView_Previews: PreviewProvider {
     static var previews: some View {
-        HomeContentView()
+        StoriesView(viewModel: StoriesViewModel())
     }
 }

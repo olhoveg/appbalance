@@ -11,10 +11,12 @@ import OneSignalFramework
 struct MainView: View {
     @Binding var selectedTab: Tab
     @StateObject var recordViewModel = RecordViewModel.sharedInstance
-    @StateObject var bonusCardVM = LoyaltyBonusCardViewModel()      // аналогичный принцип для бонусных карт
-    @StateObject var abonementVM = LoyaltyAbonementViewModel()          // создаём экземпляр для абонементов
-    @StateObject var certificateVM = LoyaltyCertificateViewModel()      // и для сертификатов
+    @StateObject var bonusCardVM = LoyaltyBonusCardViewModel()      // для бонусных карт
+    @StateObject var abonementVM = LoyaltyAbonementViewModel()        // для абонементов
+    @StateObject var certificateVM = LoyaltyCertificateViewModel()    // для сертификатов
     @AppStorage("userPhone") var userPhone: String = ""
+    // Создаем единый viewModel для сторис
+    @StateObject var storiesVM = StoriesViewModel()
     
     var body: some View {
         NavigationView {
@@ -23,7 +25,8 @@ struct MainView: View {
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
-                        StoriesView()
+                        // Передаем внешний viewModel в StoriesView
+                        StoriesView(viewModel: storiesVM)
                         
                         Button(action: {
                             selectedTab = .solarium
@@ -39,7 +42,6 @@ struct MainView: View {
                         
                         RecordView(viewModel: recordViewModel)
                         Divider()
-                        // Передаем viewModel как параметр в дочерние представления
                         BalanceBlockView()
                         Divider()
                         LoyaltyBonusCardMainView(viewModel: bonusCardVM)
@@ -58,20 +60,21 @@ struct MainView: View {
                 }
                 .ignoresSafeArea(edges: .horizontal)
                 .refreshable {
+                    print("MainView: Refreshable вызван – обновляем данные всех блоков.")
                     recordViewModel.refreshData()
                     if !userPhone.isEmpty {
                         bonusCardVM.fetchBonusCards(phone: userPhone)
                         abonementVM.fetchAbonements(phone: userPhone)
                         certificateVM.fetchCertificates(phone: userPhone)
+                        // Обновляем сторис
+                        storiesVM.fetchStories()
                     }
                 }
             }
             .navigationBarHidden(true)
         }
         .onAppear {
-            Task {
-                await initializeOneSignalAsync()
-            }
+            Task { await initializeOneSignalAsync() }
         }
     }
 }
