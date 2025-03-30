@@ -109,9 +109,18 @@ struct ProfileView: View {
                             .padding(.horizontal)
                             
                             Spacer()
-                        }
-                    }
-                } else {
+                            
+                            // Отображение версии приложения в самом низу
+                                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                                            Text("Версия: \(version)")
+                                                .font(.footnote)
+                                                .foregroundColor(.gray)
+                                                .padding(.bottom, 10)
+                                        }
+                                    }
+                                    .padding(.vertical)
+                                }
+                            } else {
                     // Если не авторизован – кнопка входа
                     NavigationLink(destination: LoginScreen()) {
                         Text("Войти")
