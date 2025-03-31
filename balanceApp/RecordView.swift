@@ -219,6 +219,11 @@ class RecordViewModel: ObservableObject {
     // MARK: - Обновление данных
     func refreshData() {
         getPhoneNumber()
+        if self.phone.isEmpty {
+            log("Номер телефона пуст. Обновление данных не выполняется.")
+            return
+        }
+        
         log("Начало обновления данных")
         
         // Удаляем «битые» записи, где notificationId = ""
@@ -945,6 +950,8 @@ struct UpcomingRecordBlock: View {
         .cornerRadius(10)
     }
 }
+
+
 
 // MARK: - Окно для отладки логов
 

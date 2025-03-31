@@ -80,7 +80,7 @@ struct BalanceBlockView: View {
         Group {
             if viewModel.balanceLoaded {
                 HStack(alignment: .center) {
-                    Image("map_icon") // Предполагается, что изображение добавлено в Assets.xcassets
+                    Image(systemName: "creditcard.fill")
                         .resizable()
                         .frame(width: 24, height: 24)
                         .padding(.trailing, 8)
