@@ -10,8 +10,7 @@ extension Record {
         return length ?? 600  // Если length отсутствует, используем значение по умолчанию
     }
     
-    // Используем уже существующий тип Staff из другого модуля/файла
-    var staff: Staff? { return nil }
+    var staff: Staff? { return nil }  // Если Staff у вас находится в другом месте
     
     var asRecordModal: RecordModal {
         return RecordModal(
@@ -75,17 +74,10 @@ struct ClientsData: Codable {
     let meta: [String]?
 }
 
-// Если необходимо, убедитесь, что тип Staff импортируется из другого места и не определяется здесь.
-// Например, удалите или закомментируйте следующее:
-// struct Staff: Codable {
-//     let name: String
-// }
-
-// MARK: - RecordViewModel с логикой уведомлений и обновлением
-
 @MainActor
 class RecordViewModel: ObservableObject {
     static let sharedInstance = RecordViewModel()
+    
     @Published var phone: String = ""
     @Published var clients: [Client] = []
     @Published var recordsByCompany: [String: [Record]] = [:]
@@ -97,6 +89,11 @@ class RecordViewModel: ObservableObject {
 
     // Счётчик запросов для клиентов, чтобы понять, когда все записи загружены
     private var pendingClientRequests: Int = 0
+    // Флаг для фиксации любой ошибки во время загрузки
+    private var fetchHadError: Bool = false
+
+    // Временное хранилище для записей (используется только во время одного обновления)
+    private var tempRecordsByCompany: [String: [Record]] = [:]
 
     // Словарь для сохранения mapping: [external_id: oneSignalNotificationID]
     var scheduledNotificationMapping: [String: String] {
@@ -131,7 +128,6 @@ class RecordViewModel: ObservableObject {
     
     // MARK: - Логирование
     func log(_ message: String) {
-        // Обновляем Published-свойство на главном потоке
         debugLogs.append(message)
         print(message)
     }
@@ -172,9 +168,11 @@ class RecordViewModel: ObservableObject {
         var mapping = getExternalIdMapping()
         let recordKey = "\(record.id)"
         if let entry = mapping[recordKey] {
+            // Если last_change_date совпадает, возвращаем старый externalId
             if entry.lastChangeDate == record.last_change_date {
                 return entry.externalId
             } else {
+                // Иначе генерируем новый externalId
                 let newExternalId = UUID().uuidString
                 mapping[recordKey] = (externalId: newExternalId, lastChangeDate: record.last_change_date)
                 setExternalIdMapping(mapping)
@@ -189,7 +187,6 @@ class RecordViewModel: ObservableObject {
     }
     
     // MARK: - Проверка, есть ли действительно запланированное уведомление
-    /// Возвращает true, только если есть корректный (непустой) notificationId в scheduledNotificationMapping
     func isNotificationScheduled(for externalId: String) -> Bool {
         guard let storedId = self.scheduledNotificationMapping[externalId] else {
             return false
@@ -219,6 +216,8 @@ class RecordViewModel: ObservableObject {
     // MARK: - Обновление данных
     func refreshData() {
         getPhoneNumber()
+        
+        // Если нет телефона, выходим
         if self.phone.isEmpty {
             log("Номер телефона пуст. Обновление данных не выполняется.")
             return
@@ -226,18 +225,24 @@ class RecordViewModel: ObservableObject {
         
         log("Начало обновления данных")
         
-        // Удаляем «битые» записи, где notificationId = ""
+        // Очищаем «битые» записи (пустые notificationId)
         cleanupEmptyNotifications()
         
-        // Очищаем записи, но сохраняем externalIdMapping
-        self.recordsByCompany.removeAll()
-        self.fetchClients()
+        // Сбрасываем флаг ошибки
+        fetchHadError = false
+        
+        // Очищаем временное хранилище (но НЕ трогаем ещё старые recordsByCompany)
+        tempRecordsByCompany.removeAll()
+        
+        // Начинаем загрузку клиентов
+        fetchClients()
     }
     
     // MARK: - Запрос клиентов
     func fetchClients() {
         guard !self.phone.isEmpty else {
             log("Номер телефона пустой, невозможно получить клиентов")
+            fetchHadError = true
             return
         }
         self.isLoading = true
@@ -247,6 +252,7 @@ class RecordViewModel: ObservableObject {
         guard let url = URL(string: "\(baseApiUrl)?phone=\(self.phone)") else {
             log("Неверный URL для клиентов")
             self.isLoading = false
+            fetchHadError = true
             return
         }
         log("Сформированный URL для клиентов: \(url.absoluteString)")
@@ -255,6 +261,7 @@ class RecordViewModel: ObservableObject {
         request.httpMethod = "GET"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
@@ -264,10 +271,12 @@ class RecordViewModel: ObservableObject {
                 self.isLoading = false
                 if let error = error {
                     self.log("Ошибка получения клиентов: \(error.localizedDescription)")
+                    self.fetchHadError = true
                     return
                 }
                 guard let data = data else {
                     self.log("Данные клиентов не получены")
+                    self.fetchHadError = true
                     return
                 }
                 
@@ -286,14 +295,19 @@ class RecordViewModel: ObservableObject {
                     self.pendingClientRequests = self.clients.count
                     if self.pendingClientRequests == 0 {
                         self.log("Нет клиентов, проверяем удалённые записи сразу.")
-                        self.checkForDeletedRecords()
+                        // Здесь нет клиентов, но это может быть нормально. Считаем что данных нет
+                        // Если действительно нет клиентов, это не ошибка — но тогда записей ноль
+                        // Если хотите, можно отдельно обрабатывать ситуацию
+                        self.finishFetchingRecords()
                     } else {
+                        // Загружаем записи по каждому клиенту
                         for client in self.clients {
                             self.fetchClientRecords(companyId: client.company_id, clientId: client.id)
                         }
                     }
                 } catch {
                     self.log("Ошибка декодирования клиентов: \(error.localizedDescription)")
+                    self.fetchHadError = true
                 }
             }
         }.resume()
@@ -302,17 +316,25 @@ class RecordViewModel: ObservableObject {
     func fetchClientRecords(companyId: Int, clientId: Int) {
         self.isLoading = true
         log("Начало запроса записей для companyId: \(companyId), clientId: \(clientId)")
+        
         guard let url = URL(string: "https://api.yclients.com/api/v1/records/\(companyId)?client_id=\(clientId)") else {
             log("Неверный URL для записей")
             self.isLoading = false
+            fetchHadError = true
+            self.pendingClientRequests -= 1
+            if self.pendingClientRequests == 0 {
+                self.finishFetchingRecords()
+            }
             return
         }
+        
         log("Сформированный URL для записей: \(url.absoluteString)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
@@ -322,17 +344,19 @@ class RecordViewModel: ObservableObject {
                 self.isLoading = false
                 if let error = error {
                     self.log("Ошибка получения записей: \(error.localizedDescription)")
+                    self.fetchHadError = true
                     self.pendingClientRequests -= 1
                     if self.pendingClientRequests == 0 {
-                        self.checkForDeletedRecords()
+                        self.finishFetchingRecords()
                     }
                     return
                 }
                 guard let data = data else {
                     self.log("Данные записей не получены")
+                    self.fetchHadError = true
                     self.pendingClientRequests -= 1
                     if self.pendingClientRequests == 0 {
-                        self.checkForDeletedRecords()
+                        self.finishFetchingRecords()
                     }
                     return
                 }
@@ -351,31 +375,57 @@ class RecordViewModel: ObservableObject {
                 do {
                     let decoded = try JSONDecoder().decode(RecordsResponse.self, from: data)
                     let records = decoded.data ?? []
-                    self.recordsByCompany["\(companyId)"] = records
+                    
+                    // Сохраняем записи во ВРЕМЕННОЕ хранилище, а не сразу в recordsByCompany.
+                    self.tempRecordsByCompany["\(companyId)"] = records
                     self.log("Получены записи для companyId \(companyId): \(records.map { String($0.id) }.joined(separator: ", "))")
                     
+                    // Планируем уведомления (опционально это можно сделать ПОСЛЕ копирования в recordsByCompany,
+                    // но тогда, если запрос прошёл криво, не будут насоздаваться уведомления. Решайте по логике.
                     self.scheduleNotificationsForRecords(records: records)
                     
-                    self.pendingClientRequests -= 1
-                    if self.pendingClientRequests == 0 {
-                        self.checkForDeletedRecords()
-                    }
                 } catch {
                     self.log("Ошибка декодирования записей: \(error.localizedDescription)")
-                    self.pendingClientRequests -= 1
-                    if self.pendingClientRequests == 0 {
-                        self.checkForDeletedRecords()
-                    }
+                    self.fetchHadError = true
+                }
+                
+                self.pendingClientRequests -= 1
+                if self.pendingClientRequests == 0 {
+                    self.finishFetchingRecords()
                 }
             }
         }.resume()
     }
     
+    /// Вызывается, когда все запросы (clients, records) завершены (или произошла ошибка).
+    private func finishFetchingRecords() {
+        log("finishFetchingRecords: все запросы завершены. fetchHadError = \(fetchHadError)")
+        
+        // Если во время загрузки не было ошибок, обновляем основное хранилище.
+        // Тогда checkForDeletedRecords() удалит действительно неактуальные записи.
+        if !fetchHadError {
+            self.log("Загрузка прошла без ошибок. Обновляем recordsByCompany и проверяем удалённые записи.")
+            
+            // Перезаписываем старые записи новыми
+            self.recordsByCompany = tempRecordsByCompany
+            
+            // Теперь, когда recordsByCompany обновлены, проверяем, не были ли какие-то записи удалены
+            self.checkForDeletedRecords()
+        } else {
+            // Если есть ошибки, НЕ стираем старые данные,
+            // чтобы избежать "фантомного удаления" и отмены уведомлений.
+            self.log("Во время загрузки были ошибки. Сохраняем старые данные.")
+            // tempRecordsByCompany = [:] // (можно очистить, если нужно)
+        }
+    }
+    
     // MARK: - Проверка и отмена уведомлений для удалённых записей
     func checkForDeletedRecords() {
         log("Проверка на удалённые записи (сравниваем externalIdMapping с актуальным списком)")
+        
         let allRecords = self.recordsByCompany.values.flatMap { $0 }
         let currentRecordIds = Set(allRecords.map { "\($0.id)" })
+        
         let existingMapping = self.getExternalIdMapping()
         var updatedMapping = existingMapping
         
@@ -394,16 +444,12 @@ class RecordViewModel: ObservableObject {
         log("Проверка удалённых записей завершена.")
     }
     
-    // MARK: - Вспомогательная функция для форматирования даты для send_after
-    func formattedSendAfter(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss 'GMT'Z"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(abbreviation: "GMT")
-        return formatter.string(from: date)
+    // MARK: - Запланированные уведомления и их управление
+    
+    func notificationId(for externalId: String) -> String? {
+        self.scheduledNotificationMapping[externalId]
     }
     
-    // MARK: - Методы работы с запланированными уведомлениями
     func saveScheduledNotification(notificationId: String, for externalId: String) {
         var mapping = self.scheduledNotificationMapping
         mapping[externalId] = notificationId
@@ -416,11 +462,6 @@ class RecordViewModel: ObservableObject {
         self.scheduledNotificationMapping = mapping
     }
     
-    func notificationId(for externalId: String) -> String? {
-        return self.scheduledNotificationMapping[externalId]
-    }
-    
-    // MARK: - Отмена уведомлений (при изменении или удалении записи)
     func cancelExistingNotification(for record: Record) {
         let recordId = "\(record.id)"
         let mapping = getExternalIdMapping()
@@ -461,7 +502,7 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
     
-    // MARK: - Планирование уведомлений для записей
+    // MARK: - Планирование уведомлений
     func scheduleNotificationsForRecords(records: [Record]) {
         log("Начало планирования уведомлений для \(records.count) записей")
         let now = Date()
@@ -488,7 +529,6 @@ class RecordViewModel: ObservableObject {
                         let sendAfter = formattedSendAfter(from: oneHourBefore)
                         log("Планирование уведомления для записи id \(record.id) с send_after: \(sendAfter)")
                         
-                        // Уведомление будет сохранено только при успешном ответе от OneSignal.
                         sendNotification(date: record.date,
                                          address: address,
                                          playerId: self.playerId,
@@ -508,9 +548,9 @@ class RecordViewModel: ObservableObject {
         log("Завершено планирование уведомлений для записей")
     }
     
-    // MARK: - Отправка уведомления
+    // MARK: - Отправка уведомления в OneSignal
     func sendNotification(date: String, address: String, playerId: String, formattedTime: String, sendAfter: String, externalId: String) {
-        let notificationContent = "У Вас запись 111 на \(address) в \(formattedTime)"
+        let notificationContent = "У Вас запись 555 на \(address) в \(formattedTime)"
         log("Подготовка уведомления: \(notificationContent) для playerId: \(playerId)")
         
         guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {
@@ -575,7 +615,7 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
     
-    // MARK: - Вспомогательные методы для работы с датами
+    // MARK: - Вспомогательные методы для дат
     func recordDate(from dateString: String) -> Date? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -590,7 +630,15 @@ class RecordViewModel: ObservableObject {
         return formatter.string(from: date)
     }
     
-    // MARK: - Методы для интерфейса
+    func formattedSendAfter(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss 'GMT'Z"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(abbreviation: "GMT")
+        return formatter.string(from: date)
+    }
+    
+    // MARK: - Методы для интерфейса (списки записей и т. п.)
     func upcomingTenRecords() -> [Record] {
         var upcoming: [Record] = []
         let now = Date()
@@ -637,7 +685,7 @@ class RecordViewModel: ObservableObject {
         return (address, formattedDate)
     }
     
-    // MARK: - Методы для подтверждения и удаления записей
+    // MARK: - Методы для подтверждения и удаления
     func confirmRecord(_ record: Record) {
         guard let url = URL(string: "https://api.yclients.com/api/v1/confirmRecord/\(record.id)") else {
             log("Неверный URL для подтверждения записи")
@@ -686,6 +734,7 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
 }
+
 
 // MARK: - Основной SwiftUI интерфейс
 
