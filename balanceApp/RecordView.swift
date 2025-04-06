@@ -426,7 +426,7 @@ class RecordViewModel: ObservableObject {
         }
 
         // Можно сформировать любой текст, например:
-        let notificationContent = "Расписание изменилось. Пожалуйста, обновите экран."
+        let notificationContent = "Ваше расписание изменилось."
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
