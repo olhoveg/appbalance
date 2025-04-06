@@ -1,5 +1,3 @@
-//BonusBlockView.swift
-
 import SwiftUI
 import FirebaseDatabase
 
@@ -12,12 +10,17 @@ struct BonusBlockView: View {
     @State private var phoneNumber: String = ""
     
     var body: some View {
-        NavigationView {
+        // Убираем NavigationView, так как родительские вкладки (TabView) уже могут иметь свою NavigationView
+        ZStack {
+            // Явно задаём фон (не даём ему быть прозрачным)
+            Color(UIColor.systemBackground)
+                .ignoresSafeArea()
+            
             ScrollView {
                 VStack(spacing: 20) {
                     if !phoneNumber.isEmpty {
-                        // Если номер найден, отображаем бонусные карты в контейнере фиксированной высоты
                         if isLoading {
+                            // Скелетон
                             TabView {
                                 ForEach(0..<3, id: \.self) { _ in
                                     SkeletonBonusBlockCardView()
@@ -45,7 +48,7 @@ struct BonusBlockView: View {
                             .animation(.easeInOut, value: activeIndex)
                         }
                     } else {
-                        // Если номер телефона отсутствует – сразу показываем сообщение
+                        // Нет номера телефона
                         Text("Бонусные карты недоступны. Пожалуйста, авторизуйтесь.")
                             .font(.title2)
                             .fontWeight(.semibold)
@@ -56,15 +59,15 @@ struct BonusBlockView: View {
                 }
                 .padding(.vertical, 20)
             }
-            .onAppear {
-                if let phone = UserDefaults.standard.string(forKey: "userPhone") {
-                    phoneNumber = phone
-                    fetchBonusCards()
-                }
-            }
-            .refreshable {
+        }
+        .onAppear {
+            if let phone = UserDefaults.standard.string(forKey: "userPhone") {
+                phoneNumber = phone
                 fetchBonusCards()
             }
+        }
+        .refreshable {
+            fetchBonusCards()
         }
     }
     
@@ -107,6 +110,8 @@ struct BonusBlockView: View {
         }.resume()
     }
 }
+
+
 
 
 struct PaginationView: View {
