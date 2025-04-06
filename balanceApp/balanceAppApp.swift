@@ -10,24 +10,31 @@ import Firebase
 import SwiftData
 import BackgroundTasks
 import os
+import UserNotifications  // Добавляем для работы с уведомлениями
 
-// MARK: - AppDelegate с использованием BGAppRefreshTask
+// MARK: - AppDelegate с использованием BGAppRefreshTask и UNUserNotificationCenterDelegate
 
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        // Логируем запуск приложения
         os_log("Приложение запущено. Регистрация фоновой задачи...", log: OSLog.default, type: .info)
+        
+        // Настраиваем делегат для уведомлений
+        UNUserNotificationCenter.current().delegate = self
+        
+        // Запрашиваем разрешение на уведомления
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            os_log("🔐 Разрешение на уведомления: %@", log: OSLog.default, type: .info, granted ? "разрешено" : "отказано")
+        }
         
         // Регистрируем фоновую задачу с вашим уникальным идентификатором
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.yourcompany.balanceApp.refresh", using: nil) { task in
             self.handleAppRefresh(task: task as! BGAppRefreshTask)
         }
         
-        // Планируем первое выполнение задачи
+        // Планируем первое выполнение фоновой задачи
         scheduleAppRefresh()
-        
-        
         
         return true
     }
@@ -69,7 +76,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         OperationQueue().addOperation(operation)
     }
     
-    /// Операция для обновления данных через RecordDataManager
+    /// Фоновая операция для обновления данных через RecordDataManager
     final class RefreshOperation: Operation, @unchecked Sendable {
         override func main() {
             os_log("Фоновая операция обновления данных началась.", log: OSLog.default, type: .info)
@@ -82,11 +89,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 semaphore.signal()
             }
             
-            _ = semaphore.wait(timeout: .now() + 25)
+            // Увеличил таймаут ожидания до 45 секунд (при необходимости можно увеличить)
+            _ = semaphore.wait(timeout: .now() + 45)
             os_log("Фоновая операция завершена.", log: OSLog.default, type: .info)
         }
     }
-    
     
     // MARK: - RecordDataManager для обновления данных записей пользователей
     class RecordDataManager {
@@ -106,43 +113,50 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
     
-    // MARK: - Основное приложение
-    
-    @main
-    @MainActor
-    
-    struct balanceAppApp: App {
-        // Подключаем AppDelegate для BackgroundTasks
-        @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-        
-        // Создаем единый кэш изображений
-            @StateObject private var imageCache = ImageCache.shared
-        
-        
-        // Инициализация Firebase
-        init() {
-            FirebaseApp.configure()
-        }
-        
-        var sharedModelContainer: ModelContainer = {
-            let schema = Schema([
-                Item.self,
-            ])
-            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            do {
-                return try ModelContainer(for: schema, configurations: [modelConfiguration])
-            } catch {
-                fatalError("Could not create ModelContainer: \(error)")
-            }
-        }()
-        
-        var body: some Scene {
-            WindowGroup {
-                SplashScreen() // Ваш основной SwiftUI интерфейс
-                    .environmentObject(imageCache)
+    // MARK: - UNUserNotificationCenterDelegate
+    // Этот метод будет вызван, когда уведомление получено, пока приложение активно (foreground)
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        print("🔔 [Foreground Push] Уведомление получено: \(notification.request.content.userInfo)")
+        // Показываем баннер, звук и значок
+        completionHandler([.banner, .sound, .badge])
+    }
+}
 
-            }
-            .modelContainer(sharedModelContainer)
+// MARK: - Основное приложение
+
+@main
+@MainActor
+struct balanceAppApp: App {
+    // Подключаем AppDelegate для BackgroundTasks и уведомлений
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
+    // Создаем единый кэш изображений
+    @StateObject private var imageCache = ImageCache.shared
+    
+    // Инициализация Firebase
+    init() {
+        FirebaseApp.configure()
+    }
+    
+    var sharedModelContainer: ModelContainer = {
+        let schema = Schema([
+            Item.self,
+        ])
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        do {
+            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
         }
+    }()
+    
+    var body: some Scene {
+        WindowGroup {
+            SplashScreen() // Ваш основной SwiftUI интерфейс
+                .environmentObject(imageCache)
+        }
+        .modelContainer(sharedModelContainer)
     }
 }
