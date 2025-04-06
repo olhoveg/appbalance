@@ -3,7 +3,7 @@ import Firebase
 import FirebaseDatabase
 import AVKit
 
-// MARK: - Модели данных
+// MARK: - Модель Story
 
 struct Story: Identifiable {
     var id: String
@@ -17,61 +17,84 @@ struct StoryVideo: Identifiable {
     var url: String
 }
 
-// MARK: - StoryIcon
+// MARK: - StoryIcon (с кастомной загрузкой)
 
 struct StoryIcon: View {
-    var imageUrl: String
-    var name: String
-    var onPress: () -> Void
+    var story: Story
+    let onPress: () -> Void
+
+    // Подключаемся к нашему кэшу
+    @ObservedObject var imageCache = ImageCache.shared
+
+    @State private var uiImage: UIImage? = nil
+    @State private var isLoading = false
 
     var body: some View {
         Button(action: onPress) {
             VStack {
-                AsyncImage(url: URL(string: imageUrl)) { phase in
-                    if let image = phase.image {
-                        image
+                ZStack {
+                    if let image = uiImage {
+                        // Есть готовая картинка
+                        Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                    } else if phase.error != nil {
+                    } else if isLoading {
+                        // Показываем загрузку
+                        ProgressView()
+                    } else {
+                        // Какой-нибудь placeholder
                         Image(systemName: "person.crop.circle.fill")
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .foregroundColor(.gray)
-                    } else {
-                        ProgressView()
                     }
                 }
                 .frame(width: 64, height: 64)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color.gray, lineWidth: 1))
-                
-                Text(name)
+
+                Text(story.name)
                     .font(.caption)
                     .foregroundColor(.primary)
             }
             .padding(.horizontal, 5)
         }
+        .onAppear {
+            loadIcon()
+        }
+    }
+
+    private func loadIcon() {
+        guard !story.image.isEmpty else { return }
+        // Если уже есть в кэше – будем возвращены мгновенно
+        isLoading = true
+        imageCache.loadImage(from: story.image) { loaded in
+            isLoading = false
+            uiImage = loaded
+        }
     }
 }
 
-// MARK: - StoriesViewModel
+// MARK: - ViewModel
 
 class StoriesViewModel: ObservableObject {
     @Published var stories: [Story] = []
-    
-    private let ref = Database.database(url: "https://balance-ddb48-default-rtdb.europe-west1.firebasedatabase.app").reference()
-    
+
+    private let ref = Database.database(
+      url: "https://balance-ddb48-default-rtdb.europe-west1.firebasedatabase.app"
+    ).reference()
+
     func fetchStories() {
-        print("StoriesViewModel: Начинаем загрузку сторис.")
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
             var loadedStories: [Story] = []
+
             if let storiesArray = snapshot.value as? [[String: Any]] {
                 for (index, storyDict) in storiesArray.enumerated() {
                     let rawId = storyDict["id"] ?? ""
                     let id = "\(index)_\(rawId)"
                     let name = storyDict["name"] as? String ?? "Без имени"
                     let image = storyDict["image"] as? String ?? ""
-                    
+
                     var videos: [StoryVideo] = []
                     if let videosArray = storyDict["videos"] as? [[String: Any]] {
                         for videoData in videosArray {
@@ -80,17 +103,15 @@ class StoriesViewModel: ObservableObject {
                             }
                         }
                     }
-                    
-                    let story = Story(id: id, name: name, image: image, videos: videos)
-                    loadedStories.append(story)
+
+                    loadedStories.append(
+                        Story(id: id, name: name, image: image, videos: videos)
+                    )
                 }
-            } else {
-                print("StoriesViewModel: Не удалось преобразовать snapshot.value в массив сторис.")
             }
-            
+
             DispatchQueue.main.async {
                 self.stories = loadedStories
-                print("StoriesViewModel: Загрузка сторис завершена, загружено сторис: \(loadedStories.count)")
             }
         }
     }
@@ -102,23 +123,43 @@ struct StoriesView: View {
     @ObservedObject var viewModel: StoriesViewModel
     @State private var selectedStory: Story? = nil
 
+    // Для scenePhase, чтобы обновлять сторис при возврате
+    @Environment(\.scenePhase) var scenePhase
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack {
-                ForEach(viewModel.stories) { story in
-                    StoryIcon(imageUrl: story.image, name: story.name) {
-                        selectedStory = story
+            if viewModel.stories.isEmpty {
+                Text("Сторис недоступны. Пожалуйста, обновите экран.")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                    .padding()
+            } else {
+                HStack {
+                    ForEach(viewModel.stories) { story in
+                        StoryIcon(story: story) {
+                            selectedStory = story
+                        }
                     }
                 }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
+        // Потянув вниз в списке, заново загрузим сторис
         .refreshable {
             viewModel.fetchStories()
         }
+        // Если View появился на экране
         .onAppear {
             viewModel.fetchStories()
         }
+        // Если пользователь вернулся в активное состояние (приложение / вкладка)
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                // Повторяем fetchStories, чтобы удостовериться, что все загрузится
+                viewModel.fetchStories()
+            }
+        }
+        // При нажатии на иконку – полноэкранный режим
         .fullScreenCover(item: $selectedStory) { story in
             StoryPlayerView(story: story) {
                 selectedStory = nil
@@ -127,24 +168,19 @@ struct StoriesView: View {
     }
 }
 
-// MARK: - StoryPlayerView с AVQueuePlayer и асинхронной загрузкой
+// MARK: - StoryPlayerView
 
 struct StoryPlayerView: View {
     var story: Story
     var onClose: () -> Void
 
-    @State private var player: AVQueuePlayer = {
-        let player = AVQueuePlayer()
-        // Отключаем ожидание буферизации, чтобы начать быстрее
-        player.automaticallyWaitsToMinimizeStalling = false
-        return player
-    }()
+    @State private var player = AVQueuePlayer()
     @State private var playerItems: [AVPlayerItem] = []
     @State private var currentVideoIndex: Int = 0
     @State private var currentVideoProgress: Double = 0.0
     @State private var timeObserverToken: Any?
     @State private var itemEndObserver: NSObjectProtocol?
-    @State private var isPlayerReady: Bool = false
+    @State private var isPlayerReady = false
 
     var body: some View {
         ZStack {
@@ -158,9 +194,9 @@ struct StoryPlayerView: View {
                 Color.black.edgesIgnoringSafeArea(.all)
                 ProgressView()
             }
-            
+
             VStack {
-                // Прогресс-бар для каждого видео
+                // Прогресс-бар
                 HStack(spacing: 4) {
                     ForEach(0..<story.videos.count, id: \.self) { index in
                         ProgressBarView(progress: progressFor(index: index))
@@ -168,7 +204,7 @@ struct StoryPlayerView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
-                
+
                 HStack {
                     HStack {
                         AsyncImage(url: URL(string: story.image)) { phase in
@@ -182,6 +218,7 @@ struct StoryPlayerView: View {
                         }
                         .frame(width: 40, height: 40)
                         .clipShape(Circle())
+
                         Text(story.name)
                             .foregroundColor(.white)
                             .font(.headline)
@@ -199,11 +236,13 @@ struct StoryPlayerView: View {
                 Spacer()
             }
             .zIndex(1)
-            
-            // Жесты для переключения видео: левая – предыдущее, правая – следующее
+
+            // Жесты на экране
             HStack(spacing: 0) {
-                Color.clear.contentShape(Rectangle()).onTapGesture { playPreviousVideo() }
-                Color.clear.contentShape(Rectangle()).onTapGesture { playNextVideo() }
+                Color.clear.contentShape(Rectangle())
+                    .onTapGesture { playPreviousVideo() }
+                Color.clear.contentShape(Rectangle())
+                    .onTapGesture { playNextVideo() }
             }
             .zIndex(0)
         }
@@ -214,75 +253,64 @@ struct StoryPlayerView: View {
             cleanupPlayer()
         }
     }
-    
-    /// Асинхронная загрузка первого видео и подготовка очереди плеера
-    func setupPlayer() {
-        // Подготавливаем AVPlayerItem для каждого видео
+
+    private func setupPlayer() {
         playerItems = story.videos.compactMap { video in
-            if let url = URL(string: video.url) {
-                let asset = AVAsset(url: url)
-                // Устанавливаем небольшой буфер, чтобы плеер быстрее переключался
-                let item = AVPlayerItem(asset: asset)
-                item.preferredForwardBufferDuration = 2
-                return item
-            }
-            return nil
+            guard let url = URL(string: video.url) else { return nil }
+            let asset = AVAsset(url: url)
+            let item = AVPlayerItem(asset: asset)
+            item.preferredForwardBufferDuration = 2
+            return item
         }
-        
+
         player.removeAllItems()
         isPlayerReady = false
         currentVideoIndex = 0
         currentVideoProgress = 0.0
-        
-        // Загружаем асинхронно первый элемент
+
         if let firstItem = playerItems.first {
             Task {
                 do {
-                    // Асинхронно загружаем, является ли ассет воспроизводимым
                     let _ : Bool = try await firstItem.asset.load(.isPlayable)
                     DispatchQueue.main.async {
-                        self.player.replaceCurrentItem(with: firstItem)
-                        for item in self.playerItems.dropFirst() {
-                            self.player.insert(item, after: nil)
+                        player.replaceCurrentItem(with: firstItem)
+                        for item in playerItems.dropFirst() {
+                            player.insert(item, after: nil)
                         }
-                        self.isPlayerReady = true
-                        self.player.play()
-                        self.addObservers()
+                        isPlayerReady = true
+                        player.play()
+                        addObservers()
                     }
                 } catch {
                     print("Ошибка загрузки первого видео: \(error)")
                 }
             }
         }
-
     }
-    
-    /// Добавляем наблюдатели для обновления прогресса и перехода к следующему элементу
-    func addObservers() {
+
+    private func addObservers() {
         let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
             if let currentItem = player.currentItem,
                let index = playerItems.firstIndex(of: currentItem) {
                 currentVideoIndex = index
                 let duration = currentItem.duration.seconds
-                if duration > 0 {
-                    currentVideoProgress = time.seconds / duration
-                } else {
-                    currentVideoProgress = 0.0
-                }
+                currentVideoProgress = (duration > 0) ? (time.seconds / duration) : 0
             }
         }
-        
-        itemEndObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { notification in
+
+        itemEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: nil, queue: .main
+        ) { notification in
             if let finishedItem = notification.object as? AVPlayerItem,
                finishedItem == player.currentItem {
                 playNextVideo()
             }
         }
     }
-    
-    /// Убираем наблюдатели и останавливаем плеер
-    func cleanupPlayer() {
+
+    private func cleanupPlayer() {
         player.pause()
         if let token = timeObserverToken {
             player.removeTimeObserver(token)
@@ -293,9 +321,10 @@ struct StoryPlayerView: View {
             itemEndObserver = nil
         }
         player.removeAllItems()
+        player.replaceCurrentItem(with: nil)
     }
-    
-    func progressFor(index: Int) -> Double {
+
+    private func progressFor(index: Int) -> Double {
         if index < currentVideoIndex {
             return 1.0
         } else if index > currentVideoIndex {
@@ -304,8 +333,8 @@ struct StoryPlayerView: View {
             return currentVideoProgress
         }
     }
-    
-    func playNextVideo() {
+
+    private func playNextVideo() {
         if currentVideoIndex < playerItems.count - 1 {
             player.advanceToNextItem()
             currentVideoIndex += 1
@@ -314,8 +343,8 @@ struct StoryPlayerView: View {
             closePlayer()
         }
     }
-    
-    func playPreviousVideo() {
+
+    private func playPreviousVideo() {
         if currentVideoIndex > 0 {
             currentVideoIndex -= 1
             currentVideoProgress = 0.0
@@ -328,14 +357,12 @@ struct StoryPlayerView: View {
             player.play()
         }
     }
-    
-    func closePlayer() {
+
+    private func closePlayer() {
         cleanupPlayer()
         onClose()
     }
 }
-
-// MARK: - ProgressBarView
 
 struct ProgressBarView: View {
     var progress: Double
@@ -351,6 +378,7 @@ struct ProgressBarView: View {
         .frame(height: 3)
     }
 }
+
 
 struct StoriesView_Previews: PreviewProvider {
     static var previews: some View {
