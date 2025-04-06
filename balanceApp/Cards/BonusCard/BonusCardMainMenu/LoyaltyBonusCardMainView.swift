@@ -184,8 +184,14 @@ struct LoyaltyBonusCardMainView: View {
             if viewModel.isLoading {
                 ProgressView("Загрузка бонусных карт...")
             } else if viewModel.bonusCards.isEmpty {
-                Text(userPhone.isEmpty ? "Номер клиента не найден" : "Бонусные карты отсутствуют")
-                    .foregroundColor(.secondary)
+                if userPhone.isEmpty {
+                    Text("Авторизуйтесь, чтобы увидеть бонусные карты")
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("У вас нет бонусных карт")
+                        .foregroundColor(.secondary)
+                }
+            
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {

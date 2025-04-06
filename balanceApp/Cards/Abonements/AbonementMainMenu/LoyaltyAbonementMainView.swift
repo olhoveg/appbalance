@@ -240,15 +240,20 @@ struct LoyaltyAbonementMainView: View {
                 if viewModel.isLoading {
                     ProgressView("Загрузка абонементов...")
                 } else if viewModel.abonements.isEmpty {
-                    Text(userPhone.isEmpty ? "Номер клиента не найден" : "Абонементы отсутствуют")
-                        .foregroundColor(.secondary)
+                    if userPhone.isEmpty {
+                        Text("Авторизуйтесь, чтобы увидеть абонементы")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("У вас нет активных абонементов")
+                            .foregroundColor(.secondary)
+                    }
                 } else {
-                    // Горизонтальный скролл с карточками
+                    // Отображение карточек абонементов
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
                             ForEach(viewModel.abonements) { abonement in
                                 LoyaltyAbonementCardView(abonement: abonement)
-                                    .frame(width: min(UIScreen.main.bounds.width * 0.9, 400)) // ✅ Ограничиваем максимальную ширину
+                                    .frame(width: min(UIScreen.main.bounds.width * 0.9, 400))
                             }
                         }
                         .padding(.horizontal, 16)

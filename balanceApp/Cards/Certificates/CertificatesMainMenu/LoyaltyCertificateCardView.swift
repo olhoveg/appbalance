@@ -189,8 +189,14 @@ struct LoyaltyCertificateMainView: View {
                 if viewModel.isLoading {
                     ProgressView("Загрузка сертификатов...")
                 } else if viewModel.certificates.isEmpty {
-                    Text(userPhone.isEmpty ? "Номер клиента не найден" : "Сертификаты отсутствуют")
-                        .foregroundColor(.secondary)
+                    if userPhone.isEmpty {
+                        Text("Авторизуйтесь, чтобы увидеть сертификаты")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("У вас нет активных сертификатов")
+                            .foregroundColor(.secondary)
+                    }
+                
                 } else {
                     // Горизонтальный скролл с карточками
                     ScrollView(.horizontal, showsIndicators: false) {

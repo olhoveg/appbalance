@@ -95,8 +95,14 @@ struct BalanceBlockView: View {
                 .padding(.top, 10)
                 .padding(.horizontal, 10)
             } else {
-                // Здесь можно разместить индикатор загрузки
-                EmptyView()
+                if viewModel.phone == nil {
+                    Text("Авторизуйтесь, чтобы посмотреть баланс")
+                        .foregroundColor(.secondary)
+                        .padding(.top, 10)
+                } else {
+                    ProgressView("Загрузка баланса...")
+                        .padding(.top, 10)
+                }
             }
         }
         .onAppear {

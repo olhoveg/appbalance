@@ -58,10 +58,10 @@ struct BonusBlockCardView: View {
                 Spacer()
                 VStack(spacing: 4) {
                     Text("Баланс")
-                        .font(.caption)
+                        .font(.title2) // замените на .title2 или другой нужный стиль
                         .foregroundColor(.secondary)
                     Text("\(String(format: "%.2f", bonusCard.balance)) ₽")
-                        .font(.title2)
+                        .font(.title2) // используем тот же размер шрифта, что и в других блоках
                         .bold()
                         .foregroundColor(.blue)
                 }

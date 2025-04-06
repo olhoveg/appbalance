@@ -13,56 +13,75 @@ struct CertificatesView: View {
             return viewModel.ownedCertificates.count
         }
     }
+    
+    private func getUserPhoneNumber() -> String? {
+        UserDefaults.standard.string(forKey: "userPhone")
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Фиксированная область для отображения купленных сертификатов
-                ZStack {
-                    Color.clear.frame(height: 350)
-                    
-                    if !hasLoaded || viewModel.isLoading {
-                        // Пока данные загружаются – показываем TabView с skeleton‑версией
-                        TabView {
-                            ForEach(0..<3, id: \.self) { index in
-                                SkeletonCertificateCardView()
+                if let phone = getUserPhoneNumber(), !phone.isEmpty {
+                    // Если номер телефона найден, отображаем купленные сертификаты в контейнере фиксированной высоты
+                    ZStack {
+                        Color.clear.frame(height: 350)
+                        
+                        if !hasLoaded || viewModel.isLoading {
+                            // Пока данные загружаются – показываем skeleton‑версии
+                            TabView {
+                                ForEach(0..<3, id: \.self) { index in
+                                    SkeletonCertificateCardView()
+                                        .padding(.horizontal)
+                                        .tag(index)
+                                }
+                            }
+                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                            .frame(height: 350)
+                        } else if !viewModel.ownedCertificates.isEmpty {
+                            // Если данные загружены и сертификаты есть – показываем реальные карточки
+                            TabView(selection: $activeIndex) {
+                                ForEach(viewModel.ownedCertificates.indices, id: \.self) { index in
+                                    CertificateCardContainerView(
+                                        certificate: viewModel.ownedCertificates[index],
+                                        isOwned: true,
+                                        isLoading: viewModel.isLoading
+                                    )
                                     .padding(.horizontal)
                                     .tag(index)
+                                }
                             }
+                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                            .frame(height: 350)
+                        } else {
+                            // Если загрузка завершена и массив пуст – оставляем контейнер пустым
+                            Color.clear.frame(height: 350)
                         }
-                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                        .frame(height: 350)
-                    } else if !viewModel.ownedCertificates.isEmpty {
-                        // Если данные загружены и сертификаты есть – показываем реальные карточки
-                        TabView(selection: $activeIndex) {
-                            ForEach(viewModel.ownedCertificates.indices, id: \.self) { index in
-                                CertificateCardContainerView(
-                                    certificate: viewModel.ownedCertificates[index],
-                                    isOwned: true,
-                                    isLoading: viewModel.isLoading
-                                )
-                                .padding(.horizontal)
-                                .tag(index)
-                            }
-                        }
-                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never)) // <-- Ставим .never
-                        .frame(height: 350)
-                    } else {
-                        // Если загрузка завершена и массив пуст – оставляем область пустой
-                        Color.clear.frame(height: 350)
                     }
-                }
-                
-                // Единственный пагинатор, который всегда отображается под фиксированной областью
-                PaginationView1(dots: dotCount, activeIndex: activeIndex)
-                
-                // Если загрузка завершена, но купленных сертификатов нет – выводим сообщение
-                if hasLoaded && viewModel.ownedCertificates.isEmpty {
-                    Text("Нет сертификатов")
+                    
+                    // Пагинатор для купленных сертификатов
+                    if !hasLoaded {
+                        PaginationView1(dots: 3, activeIndex: activeIndex)
+                    } else if !viewModel.ownedCertificates.isEmpty {
+                        PaginationView1(dots: viewModel.ownedCertificates.count, activeIndex: activeIndex)
+                    }
+                    
+                    // Если данные загружены, но сертификатов нет, выводим сообщение
+                    if hasLoaded && viewModel.ownedCertificates.isEmpty {
+                        Text("У вас нет сертификатов")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.gray)
+                            .padding(.top, 16)
+                            .multilineTextAlignment(.center)
+                    }
+                } else {
+                    // Если номер телефона не найден – сразу показываем сообщение без пустого пространства
+                    Text("Сертификаты недоступны. Пожалуйста, авторизуйтесь.")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(.gray)
-                        .padding(.top, 16)
+                        .multilineTextAlignment(.center)
+                        .padding()
                 }
                 
                 // Секция доступных сертификатов для покупки

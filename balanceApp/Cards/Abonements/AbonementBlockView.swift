@@ -10,56 +10,66 @@ struct AbonementBlockView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Фиксированная область для отображения карточек (высота = 400)
-                    ZStack {
-                        Color.clear.frame(height: 400)
-                        
-                        if !hasLoaded || isLoading {
-                            // Пока данные ещё не получены – показываем TabView с skeleton‑версиями
-                            TabView {
-                                ForEach(0..<3, id: \.self) { _ in
-                                    SkeletonAbonementCardView()
-                                        .padding(.horizontal)
-                                }
-                            }
-                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                            .frame(height: 400)
-                        } else if !abonements.isEmpty {
-                            // Если данные загружены и массив не пуст – показываем реальные карточки
-                            TabView(selection: $activeIndex) {
-                                ForEach(abonements.indices, id: \.self) { index in
-                                    AbonementCardContainerView(
-                                        abonement: abonements[index],
-                                        phoneNumber: getUserPhoneNumber() ?? "",
-                                        isLoading: false
-                                    )
-                                    .padding(.horizontal)
-                                    .tag(index)
-                                }
-                            }
-                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                            .frame(height: 400)
-                        } else {
-                            // Если загрузка завершена и массив пуст – показываем пустой контейнер (без надписи)
-                            // Чтобы избежать мерцания, оставляем область пустой (цвет фона наследуется)
+                    if let phone = getUserPhoneNumber(), !phone.isEmpty {
+                        // Если номер найден, отображаем карточки или скелеты с фиксированной высотой
+                        ZStack {
                             Color.clear.frame(height: 400)
+                            
+                            if !hasLoaded || isLoading {
+                                TabView {
+                                    ForEach(0..<3, id: \.self) { _ in
+                                        SkeletonAbonementCardView()
+                                            .padding(.horizontal)
+                                    }
+                                }
+                                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                                .frame(height: 400)
+                            } else if !abonements.isEmpty {
+                                TabView(selection: $activeIndex) {
+                                    ForEach(abonements.indices, id: \.self) { index in
+                                        AbonementCardContainerView(
+                                            abonement: abonements[index],
+                                            phoneNumber: phone,
+                                            isLoading: false
+                                        )
+                                        .padding(.horizontal)
+                                        .tag(index)
+                                    }
+                                }
+                                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                                .frame(height: 400)
+                            } else {
+                                // Если загрузка завершена и массив пуст – оставляем пустой контейнер
+                                Color.clear.frame(height: 400)
+                            }
+                        }
+                    } else {
+                        // Если пользователь не авторизован, сразу показываем сообщение без пустого пространства
+                        Text("Абонементы недоступны. Пожалуйста, авторизуйтесь.")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                    }
+                    
+                    // Пагинатор – отображается только если пользователь авторизован и есть карточки/скелеты
+                    if let phone = getUserPhoneNumber(), !phone.isEmpty {
+                        if !hasLoaded {
+                            PaginationView(dots: 3, activeIndex: activeIndex)
+                        } else if !abonements.isEmpty {
+                            PaginationView(dots: abonements.count, activeIndex: activeIndex)
                         }
                     }
                     
-                    // Пагинатор – отображается всегда, если область абонементов отрисована
-                    if !hasLoaded {
-                        // Пока данные ещё не загружены – показываем пагинатор с 3 точками
-                        PaginationView(dots: 3, activeIndex: activeIndex)
-                    } else if !abonements.isEmpty {
-                        PaginationView(dots: abonements.count, activeIndex: activeIndex)
-                    }
-                    // Если данные загружены, но массив пуст, выводим сообщение вне области карточек
-                    if hasLoaded && abonements.isEmpty {
-                        Text("Нет абонементов")
+                    // Если данные загружены, но массив пуст, выводим сообщение (для авторизованных пользователей)
+                    if hasLoaded && abonements.isEmpty, let phone = getUserPhoneNumber(), !phone.isEmpty {
+                        Text("У вас нет активных абонементов")
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(.gray)
                             .padding(.top, 16)
+                            .multilineTextAlignment(.center)
                     }
                     
                     // Блок покупки абонементов – всегда отрисовывается ниже
@@ -81,7 +91,13 @@ struct AbonementBlockView: View {
     }
     
     private func fetchAbonements() {
-        guard let phone = getUserPhoneNumber() else { return }
+        guard let phone = getUserPhoneNumber() else {
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.hasLoaded = true  // Устанавливаем, что загрузка завершена, даже если телефон отсутствует
+            }
+            return
+        }
         isLoading = true
         let urlString = "https://api.yclients.com/api/v1/loyalty/abonements/?company_id=433675&phone=\(phone)"
         guard let url = URL(string: urlString) else { return }
@@ -115,6 +131,7 @@ struct AbonementBlockView: View {
             }
         }.resume()
     }
+
     
     private func prefetchAbonementImages() {
         guard let imageCache = ImageCache.shared.cachedImages as? [String: UIImage] else { return }

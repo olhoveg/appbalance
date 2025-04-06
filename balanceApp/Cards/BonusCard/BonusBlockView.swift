@@ -15,33 +15,43 @@ struct BonusBlockView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    if isLoading {
-                        // Пока данные загружаются – показываем несколько скелетонов (например, 3)
-                        TabView {
-                            ForEach(0..<3, id: \.self) { _ in
-                                SkeletonBonusBlockCardView()
-                                    .padding(.horizontal, 20)
+                    if !phoneNumber.isEmpty {
+                        // Если номер найден, отображаем бонусные карты в контейнере фиксированной высоты
+                        if isLoading {
+                            TabView {
+                                ForEach(0..<3, id: \.self) { _ in
+                                    SkeletonBonusBlockCardView()
+                                        .padding(.horizontal, 20)
+                                }
                             }
+                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+                            .frame(height: 300)
+                            .animation(.easeInOut, value: activeIndex)
+                        } else if bonusCards.isEmpty {
+                            Text("У вас нет бонусных карт")
+                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                .foregroundColor(.secondary)
+                                .padding(.top, 20)
+                        } else {
+                            TabView(selection: $activeIndex) {
+                                ForEach(bonusCards) { card in
+                                    BonusBlockCardView(bonusCard: card)
+                                        .padding(.horizontal, 20)
+                                        .tag(card.id)
+                                }
+                            }
+                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+                            .frame(height: 300)
+                            .animation(.easeInOut, value: activeIndex)
                         }
-                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                        .frame(height: 300)
-                        .animation(.easeInOut, value: activeIndex)
-                    } else if bonusCards.isEmpty {
-                        Text("Нет бонусных карт")
-                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                            .foregroundColor(.secondary)
-                            .padding(.top, 50)
                     } else {
-                        TabView(selection: $activeIndex) {
-                            ForEach(bonusCards) { card in
-                                BonusBlockCardView(bonusCard: card)
-                                    .padding(.horizontal, 20)
-                                    .tag(card.id)
-                            }
-                        }
-                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                        .frame(height: 300)
-                        .animation(.easeInOut, value: activeIndex)
+                        // Если номер телефона отсутствует – сразу показываем сообщение
+                        Text("Бонусные карты недоступны. Пожалуйста, авторизуйтесь.")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.gray)
+                            .padding(.top, 16)
+                            .multilineTextAlignment(.center)
                     }
                 }
                 .padding(.vertical, 20)
