@@ -271,6 +271,8 @@ struct ProfileView: View {
         UserDefaults.standard.removeObject(forKey: "userPhone")
         UserDefaults.standard.removeObject(forKey: "userName")
         UserDefaults.standard.removeObject(forKey: "userEmail")
+        // Очищаем кэш расписания
+        RecordViewModel.sharedInstance.clearCachedRecords()
         isLoggedIn = false
     }
 }

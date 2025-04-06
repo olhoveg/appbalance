@@ -119,6 +119,14 @@ class RecordViewModel: ObservableObject {
         print(message)
     }
 
+    func clearCachedRecords() {
+        self.recordsByCompany = [:]
+        self.phone = ""
+        UserDefaults.standard.removeObject(forKey: "savedRecords")
+    }
+
+    
+    
     
     func loadSavedRecords() {
         guard let data = UserDefaults.standard.data(forKey: "savedRecords") else { return }
@@ -330,7 +338,7 @@ class RecordViewModel: ObservableObject {
         }.resume()
     }
 
-    
+   
     
 
     private func finishFetchingRecords() {
