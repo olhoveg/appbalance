@@ -273,34 +273,25 @@ struct LoginScreen: View {
                     self.showingAlert = true
                     return
                 }
-
+                
                 do {
-                    // Пробуем распарсить JSON
                     if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                        let dataObj = json["data"] as? [String: Any] {
                         
-                        // Извлекаем name и email (если они приходят в ответе YClients)
                         let userName = dataObj["name"] as? String ?? "Имя не указано"
                         let userEmail = dataObj["email"] as? String ?? "email@example.com"
                         
-                        // Сохраняем в UserDefaults
                         UserDefaults.standard.set(true, forKey: "isLoggedIn")
                         UserDefaults.standard.set(cleanedPhone, forKey: "userPhone")
                         UserDefaults.standard.set(userName, forKey: "userName")
                         UserDefaults.standard.set(userEmail, forKey: "userEmail")
                         
-                        // Если нужно — параллельно сохраняем в Firestore
-                        // let db = Firestore.firestore()
-                        // db.collection("users").document(cleanedPhone).setData([
-                        //     "name": userName,
-                        //     "email": userEmail
-                        // ], merge: true)
-                        
                         self.alertMessage = "Вход выполнен!"
                         self.showingAlert = true
                         self.shouldNavigate = true
-                        onSuccess?() // ✅ вот это ключ!
-                        RecordViewModel.sharedInstance.getPhoneNumber()  // ✅ Важно!
+                        
+                        onSuccess?()  // Обновляем глобальное состояние авторизации
+                    
                     } else {
                         self.alertMessage = "Ошибка парсинга ответа сервера"
                         self.showingAlert = true

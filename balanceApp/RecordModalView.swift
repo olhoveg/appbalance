@@ -1,6 +1,3 @@
-//RecordModalView.swift
-
-
 import SwiftUI
 import FirebaseDatabase
 
@@ -50,7 +47,8 @@ struct RecordModal: Identifiable, Codable {
 struct RecordModalView: View {
     let record: RecordModal
     @ObservedObject var viewModel: RecordViewModel
-    
+    @EnvironmentObject var authVM: AuthViewModel  // Добавляем для доступа к authVM
+     
     @State private var firebaseSpecialist: FirebaseSpecialist? = nil
     @State private var branchName: String? = nil
     @State private var branchAddress: String? = nil
@@ -63,12 +61,12 @@ struct RecordModalView: View {
     
     @Environment(\.colorScheme) var colorScheme
     
-    // Форматтеры для вывода даты и времени (уже настроены на русский)
+    // Форматтеры для вывода даты и времени
     private var headerDateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.timeZone = TimeZone(identifier: "Europe/Moscow")
-        formatter.dateFormat = "d MMMM"  // например, "7 февраля"
+        formatter.dateFormat = "d MMMM"
         return formatter
     }
     
@@ -76,31 +74,20 @@ struct RecordModalView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.timeZone = TimeZone(identifier: "Europe/Moscow")
-        formatter.dateFormat = "HH:mm"   // 24-часовой формат
+        formatter.dateFormat = "HH:mm"
         return formatter
     }
     
-    // Функция для парсинга даты с логированием
+    // Функция для парсинга даты
     func parseDate(_ dateString: String) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
-        
-        // Попытка с форматом ISO8601
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
         if let date = formatter.date(from: dateString) {
-            print("Parsed date using ISO8601 format: \(date)")
             return date
         }
-        
-        // Фолбэк: формат без символов "T" и "Z"
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        if let date = formatter.date(from: dateString) {
-            print("Parsed date using fallback format: \(date)")
-            return date
-        }
-        
-        print("Failed to parse date: \(dateString)")
-        return nil
+        return formatter.date(from: dateString)
     }
     
     var body: some View {
@@ -111,19 +98,14 @@ struct RecordModalView: View {
                     if let startDate = parseDate(record.date) {
                         let duration = record.length
                         let endDate = calculateEndTime(start: startDate, duration: duration)
-                        
-                        // Форматирование для отображения
                         let dateString = headerDateFormatter.string(from: startDate)
                         let startTimeString = headerTimeFormatter.string(from: startDate)
                         let endTimeString = headerTimeFormatter.string(from: endDate)
-                        
                         HStack(spacing: 8) {
                             Text("\(dateString), \(startTimeString) - \(endTimeString)")
-                            // Используем динамический цвет для основного текста:
                                 .font(.headline)
                                 .foregroundColor(record.attendance == 2 ? .white : .primary)
                             
-                            // Галочка, если запись подтверждена
                             if record.attendance == 2,
                                let checkmarkUrl = checkmarkUrl,
                                let url = URL(string: checkmarkUrl) {
@@ -139,7 +121,6 @@ struct RecordModalView: View {
                     }
                 }
                 .padding()
-                // Для фона можно использовать динамический цвет (например, systemGray6)
                 .background(record.attendance == 2 ? Color.green : Color(UIColor.systemGray5))
                 .cornerRadius(10)
                 .padding(.bottom, 10)
@@ -170,7 +151,6 @@ struct RecordModalView: View {
                                 .truncationMode(.tail)
                         }
                         Spacer()
-                        // 👇 Добавляем отладочный вывод текущего номера телефона
                         Text("📱 Текущий номер: \(viewModel.phone)")
                             .font(.footnote)
                             .foregroundColor(.gray)
@@ -212,22 +192,16 @@ struct RecordModalView: View {
                     .shadow(radius: 2)
                     .padding(.bottom, 10)
                     .onAppear {
-                        print("Record \(record.id) has \(services.count) services")
-                        for service in services {
-                            print("Service id: \(service.id), title: \(service.title), cost: \(service.cost)")
-                        }
+                        // Здесь можно вывести логи, если нужно
                     }
                 } else {
                     Text("Нет услуг для этой записи")
                         .foregroundColor(.secondary)
-                        .onAppear {
-                            print("Record \(record.id) has no services")
-                        }
                 }
                 
                 // Блок локации
                 VStack(alignment: .center, spacing: 8) {
-                    Text(branchName ?? (record.company_id == 433675 ? "BALANCE на Коммунаров 26" : "BALANCE на Свердлова 126"))
+                    Text(branchName ?? (record.company_id == 433675 ? "BALANCE на Коммунаров 26" : "BALANCE на Свердлова, 126"))
                         .font(.headline)
                         .foregroundColor(.primary)
                     if let mapImage = mapImage,
@@ -264,7 +238,7 @@ struct RecordModalView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 10)
                     .alert("Подтверждение записи", isPresented: $showConfirmationAlert) {
-                        Button("Отмена", role: .cancel) {}
+                        Button("Отмена", role: .cancel) { }
                         Button("Подтвердить", role: .none) {
                             confirmRecord()
                         }
@@ -288,7 +262,7 @@ struct RecordModalView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 10)
                 .alert("Удаление записи", isPresented: $showDeleteAlert) {
-                    Button("Отмена", role: .cancel) {}
+                    Button("Отмена", role: .cancel) { }
                     Button("Удалить", role: .destructive) {
                         confirmDelete()
                     }
@@ -340,32 +314,15 @@ struct RecordModalView: View {
             }
             .padding(.bottom, 60)
         }
-        // Используем динамический цвет для подложки модального окна
         .background(Color(UIColor.systemGray6))
         .cornerRadius(20)
         .padding()
         .onAppear {
-            // Вывод отладочной информации
-            print("Record received: \(record)")
-            print("Record length: \(record.length) секунд, что составляет \(record.length / 60) минут")
-            
-            if let startDate = parseDate(record.date) {
-                let duration = record.length > 0 ? record.length : 600
-                let endDate = calculateEndTime(start: startDate, duration: duration)
-                print("Start date: \(startDate)")
-                print("Computed duration: \(duration) секунд (\(duration / 60) минут)")
-                print("Computed end date: \(endDate)")
-                print("Start time (Moscow): \(headerTimeFormatter.string(from: startDate))")
-                print("End time (Moscow): \(headerTimeFormatter.string(from: endDate))")
-            } else {
-                print("Unable to parse date from: \(record.date)")
-            }
             loadFirebaseData()
         }
     }
     
     // MARK: - Firebase загрузка данных
-    
     func loadFirebaseData() {
         loadSpecialistData()
         loadCheckmarkUrl()
@@ -414,7 +371,6 @@ struct RecordModalView: View {
     }
     
     // MARK: - Вспомогательные функции
-    
     func calculateEndTime(start: Date, duration: Int) -> Date {
         return start.addingTimeInterval(TimeInterval(duration))
     }
@@ -425,23 +381,15 @@ struct RecordModalView: View {
         }
     }
     
-    // Функция для подтверждения записи (PUT запрос)
+    // Функция подтверждения записи
     func confirmRecord() {
-        print("Вызов функции confirmRecord() для записи id: \(record.id)")
-        guard let visitId = record.visit_id else {
-            print("visit_id отсутствует для записи id: \(record.id)")
-            return
-        }
+        guard let visitId = record.visit_id else { return }
         let recordId = record.id
         let apiUrl = "https://api.yclients.com/api/v1/visits/\(visitId)/\(recordId)"
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         
-        guard let url = URL(string: apiUrl) else {
-            print("Неверный URL: \(apiUrl)")
-            return
-        }
-        
+        guard let url = URL(string: apiUrl) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
@@ -463,35 +411,22 @@ struct RecordModalView: View {
             "services": servicesArray
         ]
         
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
-            print("Ошибка сериализации body: \(body)")
-            return
-        }
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else { return }
         request.httpBody = jsonData
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
-                if let error = error {
-                    print("Ошибка подтверждения записи: \(error)")
-                    return
-                }
                 if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    print("Запись id \(record.id) успешно подтверждена (HTTP статус 200)")
                     viewModel.showModal = false
-                    // Вместо передачи phone, вызываем refreshData(), который сам должен извлекать номер телефона
-                    viewModel.getPhoneNumber()
+                    // Вместо viewModel.getPhoneNumber(), присваиваем номер из authVM:
+                    viewModel.phone = authVM.phone
                     viewModel.refreshData()
-                } else {
-                    print("Ошибка подтверждения записи: неожиданный статус ответа")
-                    if let data = data, let responseBody = try? JSONSerialization.jsonObject(with: data) {
-                        print("Response body: \(responseBody)")
-                    }
                 }
             }
         }.resume()
     }
     
-    // Функция для удаления записи (DELETE запрос)
+    // Функция удаления записи
     func confirmDelete() {
         let recordId = record.id
         let companyId = record.company_id
@@ -508,19 +443,14 @@ struct RecordModalView: View {
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
-                if let error = error {
-                    print("Ошибка при удалении записи: \(error)")
-                    return
-                }
                 if let httpResponse = response as? HTTPURLResponse,
                    httpResponse.statusCode == 204 || httpResponse.statusCode == 200 {
-                    print("Запись \(record.id) успешно удалена")
                     viewModel.showModal = false
-                    // Вызываем refreshData() без параметров
-                    viewModel.getPhoneNumber()
+                    viewModel.phone = authVM.phone
                     viewModel.refreshData()
                 }
             }
         }.resume()
     }
 }
+

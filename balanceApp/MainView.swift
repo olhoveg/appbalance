@@ -41,6 +41,20 @@ struct MainView: View {
                         }
                         
                         RecordView(viewModel: recordViewModel)
+                        Divider()
+                                                BalanceBlockView()
+                                                Divider()
+                                                LoyaltyBonusCardMainView(viewModel: bonusCardVM)
+                                                Divider()
+                                                LoyaltyAbonementMainView(viewModel: abonementVM)
+                                                Divider()
+                                                LoyaltyCertificateMainView(viewModel: certificateVM)
+                                                Divider()
+                                                RecommendationsBlockView()
+                                                Divider()
+                                                ServicesBlockView()
+                                                Divider()
+                                                ArticlesView()
                        
                     }
                     .padding(.vertical)
@@ -136,10 +150,13 @@ class OneSignalManager: NSObject, OSPushSubscriptionObserver {
 // MARK: - Кастомный NavigationBar
 struct CustomNavigationBar: View {
     @Environment(\.colorScheme) var colorScheme
+    @State private var showProfile = false  // <- состояние перехода
 
     var body: some View {
         HStack {
-            NavigationLink(destination: ProfileView()) {
+            Button(action: {
+                showProfile = true
+            }) {
                 Image(systemName: "person.crop.circle.fill")
                     .resizable()
                     .frame(width: 30, height: 30)
@@ -149,16 +166,22 @@ struct CustomNavigationBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
+            .background(
+                NavigationLink(destination: ProfileScreenRouter(), isActive: $showProfile) {
+                    EmptyView()
+                }
+                .hidden()
+            )
             .zIndex(1)
-            
+
             Spacer()
-            
+
             Text("Главная")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(colorScheme == .dark ? .white : .black)
-            
+
             Spacer()
-            
+
             HStack(spacing: 15) {
                 Button(action: {
                     if let url = URL(string: "https://wa.me/79615805108") {
@@ -170,8 +193,7 @@ struct CustomNavigationBar: View {
                         .frame(width: 24, height: 24)
                         .foregroundColor(.green)
                 }
-                .buttonStyle(PlainButtonStyle())
-                
+
                 Button(action: {
                     if let url = URL(string: "tel://+79615805108") {
                         UIApplication.shared.open(url)
@@ -182,7 +204,6 @@ struct CustomNavigationBar: View {
                         .frame(width: 24, height: 24)
                         .foregroundColor(.blue)
                 }
-                .buttonStyle(PlainButtonStyle())
             }
         }
         .padding(.horizontal, 20)
@@ -191,6 +212,7 @@ struct CustomNavigationBar: View {
         .shadow(color: colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
+
 
 
 

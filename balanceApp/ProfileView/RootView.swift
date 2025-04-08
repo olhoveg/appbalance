@@ -1,31 +1,17 @@
-//
-//  RootView.swift
-//  balanceApp
-//
-//  Created by Olkhov on 08.04.2025.
-//
-
 import SwiftUI
 
 struct RootView: View {
-    @State private var isLoggedIn = UserDefaults.standard.bool(forKey: "isLoggedIn")
-
+    @StateObject var authVM = AuthViewModel()
+    
     var body: some View {
         Group {
-            if isLoggedIn {
+            if authVM.isLoggedIn {
                 ContentView()
             } else {
-                LoginScreen(onSuccess: {
-                    // После успешного логина:
-                    UserDefaults.standard.set(true, forKey: "isLoggedIn")
-                    RecordViewModel.sharedInstance.getPhoneNumber()
-                    isLoggedIn = true
-                })
+                MainView(selectedTab: .constant(.main)) // ✅ всегда на главную
             }
+            
         }
-        .onAppear {
-            // Перезагружаем статус на случай выхода
-            isLoggedIn = UserDefaults.standard.bool(forKey: "isLoggedIn")
-        }
+        .environmentObject(authVM) // Передаем authVM в окружение
     }
 }

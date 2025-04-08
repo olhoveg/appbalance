@@ -9,9 +9,9 @@ extension Record {
     var lengthValue: Int {
         return length ?? 600
     }
-
+    
     var staff: Staff? { return nil }  // Если Staff у вас находится в другом месте
-
+    
     var asRecordModal: RecordModal {
         return RecordModal(
             company_id: self.company_id,
@@ -43,7 +43,7 @@ struct Record: Identifiable, Codable {
     let length: Int?
     let services: [Service]?
     let visit_id: Int?
-
+    
     private enum CodingKeys: String, CodingKey {
         case company_id, date, id, last_change_date, custom_color, attendance, visit_attendance, confirmed, length, services, visit_id
     }
@@ -125,9 +125,6 @@ class RecordViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "savedRecords")
     }
     
-    
-    
-    
     func loadSavedRecords() {
         guard let data = UserDefaults.standard.data(forKey: "savedRecords") else { return }
         if let dict = try? JSONDecoder().decode([String: [Record]].self, from: data) {
@@ -140,7 +137,6 @@ class RecordViewModel: ObservableObject {
             UserDefaults.standard.set(data, forKey: "savedRecords")
         }
     }
-    
     
     func cleanupEmptyNotifications() {
         var mapping = self.scheduledNotificationMapping
@@ -178,7 +174,6 @@ class RecordViewModel: ObservableObject {
         var mapping = getExternalIdMapping()
         let recordKey = "\(record.id)"
         if let entry = mapping[recordKey] {
-            // Проверяем, поменялась ли last_change_date
             if entry.lastChangeDate == record.last_change_date {
                 return entry.externalId
             } else {
@@ -188,7 +183,6 @@ class RecordViewModel: ObservableObject {
                 return newExternalId
             }
         } else {
-            // Совсем новая запись (никогда не видели), создаём externalId
             let newExternalId = UUID().uuidString
             mapping[recordKey] = (externalId: newExternalId, lastChangeDate: record.last_change_date)
             setExternalIdMapping(mapping)
@@ -204,31 +198,26 @@ class RecordViewModel: ObservableObject {
     }
     
     // MARK: - Получение телефона и playerId
-    func getPhoneNumber() {
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "isLoggedIn")
-        if isLoggedIn, let savedPhone = UserDefaults.standard.string(forKey: "userPhone") {
-            self.phone = savedPhone
-            print("✅ PHONE LOADED: \(self.phone)")
-        } else {
-            print("❌ PHONE EMPTY — not logged in")
-        }
+    // Теперь phone не загружается из UserDefaults, а устанавливается из authVM
+    func updatePhone(with newPhone: String) {
+        self.phone = newPhone
+    }
     
-
+    func getPlayerId() {
         if let storedPlayerId = UserDefaults.standard.string(forKey: "OneSignalPlayerID") {
             self.playerId = storedPlayerId
         }
     }
-
+    
     // MARK: - Обновление данных
     func refreshData() {
-        getPhoneNumber()
         if self.phone.isEmpty { return }
         cleanupEmptyNotifications()
         fetchHadError = false
         tempRecordsByCompany.removeAll()
         fetchClients()
     }
-
+    
     // MARK: - Запрос клиентов
     func fetchClients() {
         guard !self.phone.isEmpty else {
@@ -242,7 +231,7 @@ class RecordViewModel: ObservableObject {
             fetchHadError = true
             return
         }
-
+        
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
@@ -250,7 +239,7 @@ class RecordViewModel: ObservableObject {
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
-
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             Task { @MainActor in
                 self.isLoading = false
@@ -262,11 +251,11 @@ class RecordViewModel: ObservableObject {
                     self.fetchHadError = true
                     return
                 }
-
+                
                 do {
                     let decoded = try JSONDecoder().decode(ClientsResponse.self, from: data)
                     self.clients = decoded.data.clients
-
+                    
                     self.pendingClientRequests = self.clients.count
                     if self.pendingClientRequests == 0 {
                         self.finishFetchingRecords()
@@ -281,7 +270,7 @@ class RecordViewModel: ObservableObject {
             }
         }.resume()
     }
-
+    
     func fetchClientRecords(companyId: Int, clientId: Int) {
         self.isLoading = true
         guard let url = URL(string: "https://api.yclients.com/api/v1/records/\(companyId)?client_id=\(clientId)") else {
@@ -293,7 +282,7 @@ class RecordViewModel: ObservableObject {
             }
             return
         }
-
+        
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
@@ -301,7 +290,7 @@ class RecordViewModel: ObservableObject {
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
-
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             Task { @MainActor in
                 self.isLoading = false
@@ -321,19 +310,18 @@ class RecordViewModel: ObservableObject {
                     }
                     return
                 }
-
+                
                 do {
                     let decoded = try JSONDecoder().decode(RecordsResponse.self, from: data)
                     let records = decoded.data ?? []
                     self.tempRecordsByCompany["\(companyId)"] = records
-
-                    // Планируем уведомления "за час" для каждой записи
+                    
                     self.scheduleNotificationsForRecords(records: records)
-
+                    
                 } catch {
                     self.fetchHadError = true
                 }
-
+                
                 self.pendingClientRequests -= 1
                 if self.pendingClientRequests == 0 {
                     self.finishFetchingRecords()
@@ -341,10 +329,7 @@ class RecordViewModel: ObservableObject {
             }
         }.resume()
     }
-
-   
     
-
     private func finishFetchingRecords() {
         if !fetchHadError {
             let oldRecordsByCompany = self.recordsByCompany
@@ -355,219 +340,173 @@ class RecordViewModel: ObservableObject {
                 newRecordsByCompany: newRecordsByCompany
             )
             
+            self.log("🔍 Итог сравнения записей:")
+            self.log("➕ Новые записи: \(added.count)")
+            self.log("✏️ Изменённые записи: \(changed.count)")
+            self.log("🗑 Удалённые записи: \(deleted.count)")
+            
             self.recordsByCompany = newRecordsByCompany
-            self.saveRecords(newRecordsByCompany) // <-- Сохраняем
-
-            cancelNotificationsForDeletedRecords(deleted)
-
+            self.saveRecords(newRecordsByCompany)
+            self.cancelNotificationsForDeletedRecords(deleted)
+            
             if !added.isEmpty || !changed.isEmpty || !deleted.isEmpty {
-                sendScheduleUpdatedNotification()
+                // Проверим, не просто ли замена записей 1-в-1
+                if added.count == deleted.count && changed.isEmpty {
+                    log("⚠️ Пропускаем пуш: количество новых и удалённых совпадает, изменений нет")
+                } else {
+                    log("📣 Обнаружены изменения в расписании, отправляем пуш")
+                    sendScheduleUpdatedNotification()
+                }
+            } else {
+                log("✅ Изменений нет — пуш не отправляется")
             }
         }
     }
 
-    // MARK: - Выявление изменений (добавленные, изменённые, удалённые)
+    
+    // MARK: - Выявление изменений
     private func detectRecordChanges(oldRecordsByCompany: [String: [Record]],
                                      newRecordsByCompany: [String: [Record]])
         -> (added: [Record], changed: [Record], deleted: [String])
     {
         let oldAll = oldRecordsByCompany.values.flatMap { $0 }
         let newAll = newRecordsByCompany.values.flatMap { $0 }
-
-        // по ID собираем старые и новые записи в словари для быстрого доступа
+        
         let oldMap = Dictionary(uniqueKeysWithValues: oldAll.map { ($0.id, $0) })
         let newMap = Dictionary(uniqueKeysWithValues: newAll.map { ($0.id, $0) })
-
+        
         var added = [Record]()
         var changed = [Record]()
         var deletedIds = [String]()
-
-        // 1) Проверим, какие новые записи появились или какие старые изменились
+        
         for newRec in newAll {
             if let oldRec = oldMap[newRec.id] {
-                // Если last_change_date поменялся – значит запись изменилась
                 if oldRec.last_change_date != newRec.last_change_date {
                     changed.append(newRec)
                 }
             } else {
-                // Записи не было, значит она новая
                 added.append(newRec)
             }
         }
-
-        // 2) Проверим, какие записи пропали в новом списке
+        
         for oldRec in oldAll {
             if newMap[oldRec.id] == nil {
                 deletedIds.append("\(oldRec.id)")
             }
         }
-
+        
         return (added, changed, deletedIds)
     }
-
-    // MARK: - Отменяем уведомления для удалённых записей (если были запланированы)
+    
+    // MARK: - Уведомления
     private func cancelNotificationsForDeletedRecords(_ deletedIds: [String]) {
-        // У нас есть externalIdMapping: [recordId -> (externalId, lastChangeDate)]
-        // и есть словарь scheduledNotificationMapping: [externalId -> notificationId].
         var existingMapping = self.getExternalIdMapping()
         for recordId in deletedIds {
             if let tuple = existingMapping[recordId] {
                 let externalId = tuple.externalId
-                self.log("Запись \(recordId) удалена. Отменяем её уведомление (если было).")
-
+                self.log("Запись \(recordId) удалена. Отменяем уведомление.")
                 if let notifId = self.notificationId(for: externalId) {
                     self.cancelNotification(notificationId: notifId, externalId: externalId)
                 }
-                // Убираем запись из externalIdMapping
                 existingMapping.removeValue(forKey: recordId)
             }
         }
         self.setExternalIdMapping(existingMapping)
     }
-
-    // MARK: - Отправляем ОДНО уведомление "Расписание изменилось"
+    
     private func sendScheduleUpdatedNotification() {
-        guard !self.playerId.isEmpty else {
-            log("❌ playerId пуст — невозможно отправить уведомление о том, что расписание изменилось.")
-            return
-        }
-
-        guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {
-            log("❌ Неверный URL для OneSignal API")
-            return
-        }
-
-        // Можно сформировать любой текст, например:
+        guard !self.playerId.isEmpty, let url = URL(string: "https://onesignal.com/api/v1/notifications") else { return }
         let notificationContent = "Ваше расписание изменилось."
-
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Basic \(self.restApiKey)", forHTTPHeaderField: "Authorization")
-
+        
         let body: [String: Any] = [
             "app_id": self.appId,
             "include_player_ids": [self.playerId],
-            "external_id": UUID().uuidString,     // любой уникальный ID
-            "collapse_id": UUID().uuidString,     // любой уникальный ID
+            "external_id": UUID().uuidString,
+            "collapse_id": UUID().uuidString,
             "contents": [
                 "en": notificationContent,
                 "ru": notificationContent
             ],
-            // Если хотите — можно передать в data количество изменений и т.д.
             "data": [
                 "schedule_changed": true
             ]
         ]
-
+        
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        } catch {
-            log("❌ Ошибка сериализации данных: \(error.localizedDescription)")
-            return
-        }
-
+        } catch { return }
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             Task { @MainActor in
-                if let error = error {
-                    self.log("❌ Ошибка при отправке общего пуша: \(error.localizedDescription)")
-                    return
-                }
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    self.log("❌ Нет HTTP-ответа от OneSignal")
-                    return
-                }
-                self.log("✅ Общий пуш «Расписание изменилось» отправлен, код ответа: \(httpResponse.statusCode)")
-
+                guard error == nil, let httpResponse = response as? HTTPURLResponse else { return }
+                self.log("Общий пуш отправлен, код ответа: \(httpResponse.statusCode)")
                 if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                    self.log("📥 Ответ OneSignal: \(responseString)")
+                    self.log("Ответ OneSignal: \(responseString)")
                 }
             }
         }.resume()
     }
-
-    // --- Ниже, при желании, можно оставить или закомментировать старые методы — для наглядности, что они теперь не используются ---
-
-    /*
-    func sendRecordAddedNotification(record: Record) { /* УДАЛЕН или закомментирован */ }
-    func sendRecordChangedNotification(record: Record) { ... }
-    func sendRecordDeletedNotification(recordId: String) { ... }
-    */
-
-    // MARK: - Работа с расписанием уведомлений (за час до записи)
+    
+    // MARK: - Работа с уведомлениями
     func notificationId(for externalId: String) -> String? {
         self.scheduledNotificationMapping[externalId]
     }
-
+    
     func saveScheduledNotification(notificationId: String, for externalId: String) {
         var mapping = self.scheduledNotificationMapping
         mapping[externalId] = notificationId
         self.scheduledNotificationMapping = mapping
     }
-
+    
     func removeScheduledNotification(for externalId: String) {
         var mapping = self.scheduledNotificationMapping
         mapping.removeValue(forKey: externalId)
         self.scheduledNotificationMapping = mapping
     }
-
-    /// Если у записи был старый external_id, отменяем старое уведомление
+    
     func cancelExistingNotification(for record: Record) {
         let recordId = "\(record.id)"
         let mapping = getExternalIdMapping()
         if let storedEntry = mapping[recordId] {
             let currentExternalId = externalIdForRecord(record)
-            if storedEntry.externalId != currentExternalId {
-                self.log("Для записи \(record.id) обнаружено старое уведомление с external_id \(storedEntry.externalId). Отменяем его.")
-                if let notifId = notificationId(for: storedEntry.externalId) {
-                    cancelNotification(notificationId: notifId, externalId: storedEntry.externalId)
-                }
+            if storedEntry.externalId != currentExternalId,
+               let notifId = notificationId(for: storedEntry.externalId) {
+                cancelNotification(notificationId: notifId, externalId: storedEntry.externalId)
             }
         }
     }
-
+    
     func cancelNotification(notificationId: String, externalId: String) {
         let urlString = "https://onesignal.com/api/v1/notifications/\(notificationId)?app_id=\(self.appId)"
-        guard let url = URL(string: urlString) else {
-            self.log("Неверный URL для отмены уведомления")
-            return
-        }
+        guard let url = URL(string: urlString) else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.setValue("Basic \(self.restApiKey)", forHTTPHeaderField: "Authorization")
-
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             Task { @MainActor in
-                if let error = error {
-                    self.log("Ошибка при отмене уведомления: \(error.localizedDescription)")
-                    return
-                }
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    self.log("Не удалось получить ответ от OneSignal при отмене уведомления")
-                    return
-                }
-                self.log("Уведомление (external_id = \(externalId)) отменено. Код ответа: \(httpResponse.statusCode)")
+                guard error == nil, let httpResponse = response as? HTTPURLResponse else { return }
+                self.log("Уведомление (external_id=\(externalId)) отменено, код ответа: \(httpResponse.statusCode)")
                 self.removeScheduledNotification(for: externalId)
             }
         }.resume()
     }
-
-    // Запланировать уведомление «за 1 час» для каждой записи
+    
     func scheduleNotificationsForRecords(records: [Record]) {
         for record in records {
             guard let recordDate = recordDate(from: record.date) else { continue }
-            // Если запись в будущем и подтвердили (например confirmed == 1)
             if recordDate > Date(), (record.confirmed ?? 0) == 1 {
                 cancelExistingNotification(for: record)
                 let externalId = externalIdForRecord(record)
-                if isNotificationScheduled(for: externalId) {
-                    continue
-                }
-
+                if isNotificationScheduled(for: externalId) { continue }
+                
                 if let oneHourBefore = Calendar.current.date(byAdding: .hour, value: -1, to: recordDate),
-                   oneHourBefore > Date(),
-                   !self.playerId.isEmpty
-                {
+                   oneHourBefore > Date(), !self.playerId.isEmpty {
                     let formattedTime = formattedTime(from: recordDate)
                     let address = self.companyIdToAddress["\(record.company_id)"] ?? ""
                     let sendAfter = formattedSendAfter(from: oneHourBefore)
@@ -581,8 +520,7 @@ class RecordViewModel: ObservableObject {
             }
         }
     }
-
-    // Отправка одиночного уведомления «за 1 час до записи»
+    
     func sendNotification(date: String,
                           address: String,
                           playerId: String,
@@ -591,16 +529,13 @@ class RecordViewModel: ObservableObject {
                           externalId: String)
     {
         let notificationContent = "У Вас запись на \(address) в \(formattedTime)"
-        guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else {
-            self.log("Неверный URL для OneSignal API")
-            return
-        }
-
+        guard let url = URL(string: "https://onesignal.com/api/v1/notifications") else { return }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Basic \(self.restApiKey)", forHTTPHeaderField: "Authorization")
-
+        
         let body: [String: Any] = [
             "app_id": self.appId,
             "include_player_ids": [playerId],
@@ -617,58 +552,38 @@ class RecordViewModel: ObservableObject {
                 "formattedTime": formattedTime
             ]
         ]
-
+        
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         } catch {
-            self.log("Ошибка сериализации данных уведомления: \(error.localizedDescription)")
             return
         }
-
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             Task { @MainActor in
-                if let error = error {
-                    self.log("Ошибка при отправке уведомления: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    self.log("Не удалось получить ответ от OneSignal")
-                    return
-                }
-
-                self.log("Уведомление (за час) отправлено. Код ответа: \(httpResponse.statusCode)")
-
-                if let data = data,
-                   let responseString = String(data: data, encoding: .utf8)
-                {
+                guard error == nil, let httpResponse = response as? HTTPURLResponse else { return }
+                self.log("Уведомление (за час) отправлено, код ответа: \(httpResponse.statusCode)")
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
                     self.log("Ответ OneSignal: \(responseString)")
-                    if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                       let notificationId = json["id"] as? String
-                    {
-                        self.log("Сохранён notification_id: \(notificationId) для external_id: \(externalId)")
-                        self.saveScheduledNotification(notificationId: notificationId, for: externalId)
-                    }
                 }
             }
         }.resume()
     }
-
-    // MARK: - Методы для дат
+    
     func recordDate(from dateString: String) -> Date? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter.date(from: dateString)
     }
-
+    
     func formattedTime(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
     }
-
+    
     func formattedSendAfter(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss 'GMT'Z"
@@ -676,8 +591,7 @@ class RecordViewModel: ObservableObject {
         formatter.timeZone = TimeZone(abbreviation: "GMT")
         return formatter.string(from: date)
     }
-
-    // MARK: - Методы для интерфейса
+    
     func upcomingTenRecords() -> [Record] {
         var upcoming: [Record] = []
         let now = Date()
@@ -691,14 +605,12 @@ class RecordViewModel: ObservableObject {
         upcoming.sort {
             guard let d1 = self.recordDate(from: $0.date),
                   let d2 = self.recordDate(from: $1.date)
-            else {
-                return false
-            }
+            else { return false }
             return d1 < d2
         }
         return Array(upcoming.prefix(10))
     }
-
+    
     func closestUpcomingRecord(records: [Record]) -> Record? {
         let now = Date()
         let futureRecords = records.filter {
@@ -713,7 +625,7 @@ class RecordViewModel: ObservableObject {
             return d1 < d2
         }
     }
-
+    
     func displayRecord(record: Record) -> (address: String, dateString: String) {
         let address = self.companyIdToAddress["\(record.company_id)"] ?? ""
         guard let date = self.recordDate(from: record.date) else {
@@ -725,23 +637,21 @@ class RecordViewModel: ObservableObject {
         let formattedDate = formatter.string(from: date)
         return (address, formattedDate)
     }
-
+    
     // MARK: - Пример подтверждения/удаления (если нужно)
     func confirmRecord(_ record: Record) {
         // ...
     }
-
+    
     func deleteRecord(_ record: Record) {
         // ...
     }
-
-    // Сопоставление companyId -> адрес
+    
     let companyIdToAddress: [String: String] = [
         "433675": "Коммунаров 26",
         "672239": "Свердлова 126"
     ]
-
-    // Константы OneSignal
+    
     let appId: String = "61e511f4-5929-448d-85f4-e5bf171f0764"
     let restApiKey: String = "ZjRjZTA1NjgtZDNhMS00ZWNkLWIwZjQtYzkwMWI2MThmOTQ2"
 }
@@ -750,8 +660,48 @@ class RecordViewModel: ObservableObject {
 
 struct RecordView: View {
     @StateObject var viewModel = RecordViewModel.sharedInstance
-
+    @EnvironmentObject var authVM: AuthViewModel
+    @State private var showLogin = false
+        
     var body: some View {
+        VStack {
+            if authVM.isLoggedIn {
+                content
+            } else {
+                VStack(spacing: 12) {
+                    Text("Чтобы просматривать и управлять записями, пожалуйста, авторизуйтесь.")
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Войти") {
+                        showLogin = true
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+            }
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginScreen {
+                authVM.loginSuccessfully()
+                viewModel.phone = authVM.phone
+                viewModel.refreshData()
+            }
+        }
+        .onAppear {
+            if authVM.isLoggedIn {
+                viewModel.phone = authVM.phone
+                viewModel.playerId = UserDefaults.standard.string(forKey: "OneSignalPlayerID") ?? ""
+                print("📲 onAppear: playerId = \(viewModel.playerId)")
+                viewModel.refreshData()
+                viewModel.loadSavedRecords()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    var content: some View {
         VStack(spacing: 14) {
             HStack(spacing: 8) {
                 let companyIds = ["433675", "672239"]
@@ -789,7 +739,7 @@ struct RecordView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 8)
-
+            
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(viewModel.upcomingTenRecords()) { record in
@@ -805,17 +755,16 @@ struct RecordView: View {
                 }
                 .padding(.horizontal)
             }
-
+            
             Spacer()
         }
         .refreshable {
             viewModel.refreshData()
         }
         .onAppear {
-            viewModel.getPhoneNumber()
+            viewModel.phone = authVM.phone
             viewModel.refreshData()
-            viewModel.loadSavedRecords() // вызываем метод у viewModel
-
+            viewModel.loadSavedRecords()
         }
         .sheet(isPresented: $viewModel.showModal) {
             if let record = viewModel.selectedRecord {
@@ -824,6 +773,9 @@ struct RecordView: View {
         }
     }
 }
+
+
+
 // MARK: - Запись с подстановкой специалиста
 
 struct RecordRow: View {
