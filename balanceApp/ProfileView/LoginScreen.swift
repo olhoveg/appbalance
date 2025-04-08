@@ -87,6 +87,7 @@ struct PhoneNumberField: UIViewRepresentable {
 
 
 struct LoginScreen: View {
+    var onSuccess: (() -> Void)? = nil
     @State private var formattedPhone: String = ""
     @State private var smsCode: String = ""
     @State private var codeRequested: Bool = false
@@ -177,9 +178,7 @@ struct LoginScreen: View {
                 checkAuthStatus()
             }
         }
-        .fullScreenCover(isPresented: $shouldNavigate) {
-            ContentView()
-        }
+        
     }
     
     private func cleanPhoneNumber(_ formatted: String) -> String {
@@ -300,6 +299,8 @@ struct LoginScreen: View {
                         self.alertMessage = "Вход выполнен!"
                         self.showingAlert = true
                         self.shouldNavigate = true
+                        onSuccess?() // ✅ вот это ключ!
+                        RecordViewModel.sharedInstance.getPhoneNumber()  // ✅ Важно!
                     } else {
                         self.alertMessage = "Ошибка парсинга ответа сервера"
                         self.showingAlert = true

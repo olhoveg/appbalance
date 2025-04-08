@@ -154,7 +154,7 @@ struct balanceAppApp: App {
     
     var body: some Scene {
         WindowGroup {
-            SplashScreen() // Ваш основной SwiftUI интерфейс
+            RootView() // 👈 вместо ContentView()
                 .environmentObject(imageCache)
         }
         .modelContainer(sharedModelContainer)

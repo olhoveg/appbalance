@@ -41,20 +41,7 @@ struct MainView: View {
                         }
                         
                         RecordView(viewModel: recordViewModel)
-                        Divider()
-                        BalanceBlockView()
-                        Divider()
-                        LoyaltyBonusCardMainView(viewModel: bonusCardVM)
-                        Divider()
-                        LoyaltyAbonementMainView(viewModel: abonementVM)
-                        Divider()
-                        LoyaltyCertificateMainView(viewModel: certificateVM)
-                        Divider()
-                        RecommendationsBlockView()
-                        Divider()
-                        ServicesBlockView()
-                        Divider()
-                        ArticlesView()
+                       
                     }
                     .padding(.vertical)
                 }

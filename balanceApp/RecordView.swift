@@ -77,7 +77,7 @@ struct ClientsData: Codable {
 @MainActor
 class RecordViewModel: ObservableObject {
     static let sharedInstance = RecordViewModel()
-
+    
     @Published var phone: String = ""
     @Published var clients: [Client] = []
     @Published var recordsByCompany: [String: [Record]] = [:]
@@ -86,13 +86,13 @@ class RecordViewModel: ObservableObject {
     @Published var selectedRecord: Record?
     @Published var showModal: Bool = false
     @Published var debugLogs: [String] = []  // Для отладки
-
+    
     private var pendingClientRequests: Int = 0
     private var fetchHadError: Bool = false
-
+    
     // Временное хранилище для записей (используется только во время одного обновления)
     private var tempRecordsByCompany: [String: [Record]] = [:]
-
+    
     // Словарь для сохранения mapping: [external_id: oneSignalNotificationID]
     var scheduledNotificationMapping: [String: String] {
         get {
@@ -102,7 +102,7 @@ class RecordViewModel: ObservableObject {
             UserDefaults.standard.set(newValue, forKey: "scheduledNotificationMapping")
         }
     }
-
+    
     // Словарь для хранения external_id для каждой записи (ключ – record.id как строка)
     var externalIdMapping: [String: String] {
         get {
@@ -112,19 +112,19 @@ class RecordViewModel: ObservableObject {
             UserDefaults.standard.set(newValue, forKey: "externalIdMapping")
         }
     }
-
+    
     // MARK: - Логирование (для отладки)
     func log(_ message: String) {
         debugLogs.append(message)
         print(message)
     }
-
+    
     func clearCachedRecords() {
         self.recordsByCompany = [:]
         self.phone = ""
         UserDefaults.standard.removeObject(forKey: "savedRecords")
     }
-
+    
     
     
     
@@ -134,7 +134,7 @@ class RecordViewModel: ObservableObject {
             self.recordsByCompany = dict
         }
     }
-
+    
     func saveRecords(_ dict: [String: [Record]]) {
         if let data = try? JSONEncoder().encode(dict) {
             UserDefaults.standard.set(data, forKey: "savedRecords")
@@ -151,7 +151,7 @@ class RecordViewModel: ObservableObject {
         }
         self.scheduledNotificationMapping = mapping
     }
-
+    
     // MARK: - Методы externalIdMapping
     func getExternalIdMapping() -> [String: (externalId: String, lastChangeDate: String)] {
         var mapping: [String: (externalId: String, lastChangeDate: String)] = [:]
@@ -163,7 +163,7 @@ class RecordViewModel: ObservableObject {
         }
         return mapping
     }
-
+    
     func setExternalIdMapping(_ mapping: [String: (externalId: String, lastChangeDate: String)]) {
         var dict: [String: String] = [:]
         for (key, tuple) in mapping {
@@ -171,7 +171,7 @@ class RecordViewModel: ObservableObject {
         }
         self.externalIdMapping = dict
     }
-
+    
     /// Возвращает стабильный external_id для записи. Если запись не изменилась (last_change_date не поменялся) – возвращается сохранённое значение.
     /// Если поменялся `last_change_date` — генерируем новое `externalId`.
     func externalIdForRecord(_ record: Record) -> String {
@@ -195,20 +195,24 @@ class RecordViewModel: ObservableObject {
             return newExternalId
         }
     }
-
+    
     func isNotificationScheduled(for externalId: String) -> Bool {
         guard let storedId = self.scheduledNotificationMapping[externalId] else {
             return false
         }
         return !storedId.isEmpty
     }
-
+    
     // MARK: - Получение телефона и playerId
     func getPhoneNumber() {
         let isLoggedIn = UserDefaults.standard.bool(forKey: "isLoggedIn")
         if isLoggedIn, let savedPhone = UserDefaults.standard.string(forKey: "userPhone") {
             self.phone = savedPhone
+            print("✅ PHONE LOADED: \(self.phone)")
+        } else {
+            print("❌ PHONE EMPTY — not logged in")
         }
+    
 
         if let storedPlayerId = UserDefaults.standard.string(forKey: "OneSignalPlayerID") {
             self.playerId = storedPlayerId

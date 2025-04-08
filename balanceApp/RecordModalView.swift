@@ -170,6 +170,11 @@ struct RecordModalView: View {
                                 .truncationMode(.tail)
                         }
                         Spacer()
+                        // 👇 Добавляем отладочный вывод текущего номера телефона
+                        Text("📱 Текущий номер: \(viewModel.phone)")
+                            .font(.footnote)
+                            .foregroundColor(.gray)
+                            .padding(.bottom, 10)
                     }
                     .padding()
                 } else {
@@ -474,6 +479,7 @@ struct RecordModalView: View {
                     print("Запись id \(record.id) успешно подтверждена (HTTP статус 200)")
                     viewModel.showModal = false
                     // Вместо передачи phone, вызываем refreshData(), который сам должен извлекать номер телефона
+                    viewModel.getPhoneNumber()
                     viewModel.refreshData()
                 } else {
                     print("Ошибка подтверждения записи: неожиданный статус ответа")
@@ -511,6 +517,7 @@ struct RecordModalView: View {
                     print("Запись \(record.id) успешно удалена")
                     viewModel.showModal = false
                     // Вызываем refreshData() без параметров
+                    viewModel.getPhoneNumber()
                     viewModel.refreshData()
                 }
             }

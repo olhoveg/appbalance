@@ -18,161 +18,142 @@ struct ProfileView: View {
     @State private var isShowingImagePicker = false
 
     var body: some View {
-        NavigationView {
-            VStack {
-                if isLoggedIn {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            
-                            // Аватар и имя пользователя
-                            VStack(spacing: 12) {
-                                if let image = profileImage {
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 120, height: 120)
-                                        .clipShape(Circle())
-                                        .overlay(Circle().stroke(Color.blue, lineWidth: 3))
-                                } else if let url = profileImageURL {
-                                    AsyncImage(url: url) { image in
-                                        image.resizable()
+            NavigationView {
+                VStack {
+                    if isLoggedIn {
+                        ScrollView {
+                            VStack(spacing: 20) {
+                                VStack(spacing: 12) {
+                                    if let image = profileImage {
+                                        Image(uiImage: image)
+                                            .resizable()
                                             .aspectRatio(contentMode: .fill)
                                             .frame(width: 120, height: 120)
                                             .clipShape(Circle())
                                             .overlay(Circle().stroke(Color.blue, lineWidth: 3))
-                                    } placeholder: {
-                                        ProgressView()
-                                            .frame(width: 120, height: 120)
-                                    }
-                                } else {
-                                    Image(systemName: "person.circle.fill")
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 120, height: 120)
-                                        .foregroundColor(.blue)
-                                        .background(Color.white)
-                                        .clipShape(Circle())
-                                        .overlay(Circle().stroke(Color.blue, lineWidth: 3))
-                                }
-                                
-                                // Кнопка для выбора/смены фото
-                                Button(action: {
-                                    isShowingImagePicker = true
-                                }) {
-                                    Text("Изменить фото")
-                                        .foregroundColor(.blue)
-                                }
-                                .padding(.top, 8)
-                                
-                                Text(clientName)
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.primary)
-                            }
-                            .padding(.top, 30)
-                            
-                            // Контактная информация
-                            VStack(spacing: 15) {
-                                ProfileInfoRow(icon: "phone.fill", text: clientPhone)
-                                ProfileInfoRow(icon: "envelope.fill", text: clientEmail)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(12)
-                            .padding(.horizontal)
-                            
-                            // Кнопки действий
-                            VStack(spacing: 15) {
-                                Button(action: handleLogout) {
-                                    Text("Выйти из аккаунта")
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.red)
-                                        .cornerRadius(10)
-                                }
-                                
-                                Button(action: {
-                                    showDeleteConfirmation = true
-                                }) {
-                                    Text("Удалить аккаунт")
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.black)
-                                        .cornerRadius(10)
-                                }
-                            }
-                            .padding(.horizontal)
-                            
-                            Spacer()
-                            
-                            // Отображение версии приложения в самом низу
-                                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                                            Text("Версия: \(version)")
-                                                .font(.footnote)
-                                                .foregroundColor(.gray)
-                                                .padding(.bottom, 10)
+                                    } else if let url = profileImageURL {
+                                        AsyncImage(url: url) { image in
+                                            image.resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 120, height: 120)
+                                                .clipShape(Circle())
+                                                .overlay(Circle().stroke(Color.blue, lineWidth: 3))
+                                        } placeholder: {
+                                            ProgressView()
+                                                .frame(width: 120, height: 120)
                                         }
+                                    } else {
+                                        Image(systemName: "person.circle.fill")
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 120, height: 120)
+                                            .foregroundColor(.blue)
+                                            .background(Color.white)
+                                            .clipShape(Circle())
+                                            .overlay(Circle().stroke(Color.blue, lineWidth: 3))
                                     }
-                                    .padding(.vertical)
+
+                                    Button(action: {
+                                        isShowingImagePicker = true
+                                    }) {
+                                        Text("Изменить фото")
+                                            .foregroundColor(.blue)
+                                    }
+                                    .padding(.top, 8)
+
+                                    Text(clientName)
+                                        .font(.title)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.primary)
                                 }
-                            } else {
-                    // Если не авторизован – кнопка входа
-                    NavigationLink(destination: LoginScreen()) {
-                        Text("Войти")
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(10)
+                                .padding(.top, 30)
+
+                                VStack(spacing: 15) {
+                                    ProfileInfoRow(icon: "phone.fill", text: clientPhone)
+                                    ProfileInfoRow(icon: "envelope.fill", text: clientEmail)
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(12)
+                                .padding(.horizontal)
+
+                                VStack(spacing: 15) {
+                                    Button(action: handleLogout) {
+                                        Text("Выйти из аккаунта")
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white)
+                                            .frame(maxWidth: .infinity)
+                                            .padding()
+                                            .background(Color.red)
+                                            .cornerRadius(10)
+                                    }
+
+                                    Button(action: {
+                                        showDeleteConfirmation = true
+                                    }) {
+                                        Text("Удалить аккаунт")
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white)
+                                            .frame(maxWidth: .infinity)
+                                            .padding()
+                                            .background(Color.black)
+                                            .cornerRadius(10)
+                                    }
+                                }
+                                .padding(.horizontal)
+
+                                Spacer()
+
+                                if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                                    Text("Версия: \(version)")
+                                        .font(.footnote)
+                                        .foregroundColor(.gray)
+                                        .padding(.bottom, 10)
+                                }
+                            }
+                            .padding(.vertical)
+                        }
+                    } else {
+                        // Сразу показываем экран авторизации
+                        LoginScreen()
                     }
-                    .padding()
                 }
-            }
-            .navigationTitle("Профиль")
-            .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                checkAuthStatus()
-                if isLoggedIn {
-                    // 1. Достаем из UserDefaults
-                    clientPhone = UserDefaults.standard.string(forKey: "userPhone") ?? "Нет номера"
-                    clientName  = UserDefaults.standard.string(forKey: "userName")  ?? "Имя пользователя"
-                    clientEmail = UserDefaults.standard.string(forKey: "userEmail") ?? "email@example.com"
-                    
-                    // 2. Если у вас есть Firestore – подгружаем из него (если надо)
-                    loadUserDataFromFirestore()
-                    loadProfileImage()
+                .navigationTitle("Профиль")
+                .navigationBarTitleDisplayMode(.inline)
+                .onAppear {
+                    checkAuthStatus()
+                    if isLoggedIn {
+                        clientPhone = UserDefaults.standard.string(forKey: "userPhone") ?? "Нет номера"
+                        clientName  = UserDefaults.standard.string(forKey: "userName")  ?? "Имя пользователя"
+                        clientEmail = UserDefaults.standard.string(forKey: "userEmail") ?? "email@example.com"
+                        loadUserDataFromFirestore()
+                        loadProfileImage()
+                    }
                 }
-            }
-            .fullScreenCover(isPresented: $shouldNavigateToMain) {
-                ContentView()
-            }
-            .alert(isPresented: $showDeleteConfirmation) {
-                Alert(
-                    title: Text("Удаление аккаунта"),
-                    message: Text("Вы уверены, что хотите удалить аккаунт? Это действие нельзя отменить."),
-                    primaryButton: .destructive(Text("Удалить")) {
-                        handleDeleteAccount()
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
-            // Открытие ImagePicker для выбора фото
-            .sheet(isPresented: $isShowingImagePicker) {
-                ImagePicker(selectedImage: $profileImage)
-            }
-            // При выборе нового изображения выполняем его загрузку
-            .onChange(of: profileImage) { newImage, _ in
-                if newImage != nil {
-                    uploadPhoto()
+                .fullScreenCover(isPresented: $shouldNavigateToMain) {
+                    ContentView()
+                }
+                .alert(isPresented: $showDeleteConfirmation) {
+                    Alert(
+                        title: Text("Удаление аккаунта"),
+                        message: Text("Вы уверены, что хотите удалить аккаунт? Это действие нельзя отменить."),
+                        primaryButton: .destructive(Text("Удалить")) {
+                            handleDeleteAccount()
+                        },
+                        secondaryButton: .cancel()
+                    )
+                }
+                .sheet(isPresented: $isShowingImagePicker) {
+                    ImagePicker(selectedImage: $profileImage)
+                }
+                .onChange(of: profileImage) { newImage, _ in
+                    if newImage != nil {
+                        uploadPhoto()
+                    }
                 }
             }
         }
-    }
     
     // Чтение данных из UserDefaults
     private func checkAuthStatus() {
