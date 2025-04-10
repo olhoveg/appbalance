@@ -132,8 +132,14 @@ struct balanceAppApp: App {
     // Подключаем AppDelegate для BackgroundTasks и уведомлений
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    @StateObject private var authViewModel = AuthViewModel()
+    
+    
     // Создаем единый кэш изображений
     @StateObject private var imageCache = ImageCache.shared
+    
+    @State private var selectedTab: Tab = .main
+
     
     // Инициализация Firebase
     init() {
@@ -154,9 +160,16 @@ struct balanceAppApp: App {
     
     var body: some Scene {
         WindowGroup {
-            SplashScreen() // Ваш основной SwiftUI интерфейс
-                .environmentObject(imageCache)
+            if authViewModel.isLoggedIn {
+                ContentView()
+                    .environmentObject(authViewModel)
+                    .environmentObject(imageCache)
+            } else {
+                MainView(selectedTab: $selectedTab)
+                    .environmentObject(authViewModel)
+                    .environmentObject(imageCache)
+            }
         }
-        .modelContainer(sharedModelContainer)
     }
 }
+
