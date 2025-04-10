@@ -1,3 +1,4 @@
+
 import SwiftUI
 import Combine
 import FirebaseDatabase
@@ -746,6 +747,7 @@ class RecordViewModel: ObservableObject {
 
 struct RecordView: View {
     @StateObject var viewModel = RecordViewModel.sharedInstance
+    @EnvironmentObject var auth: AuthViewModel  // 👈 добавь это
 
     var body: some View {
         VStack(spacing: 14) {
@@ -810,8 +812,17 @@ struct RecordView: View {
         .onAppear {
             viewModel.getPhoneNumber()
             viewModel.refreshData()
-            viewModel.loadSavedRecords() // вызываем метод у viewModel
 
+            if auth.isLoggedIn {
+                viewModel.loadSavedRecords()
+            }
+        }
+        .onChange(of: auth.isLoggedIn) { isLoggedIn in
+            if !isLoggedIn {
+                viewModel.clearCachedRecords()
+            } else {
+                viewModel.loadSavedRecords()
+            }
         }
         .sheet(isPresented: $viewModel.showModal) {
             if let record = viewModel.selectedRecord {

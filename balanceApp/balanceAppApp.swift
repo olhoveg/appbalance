@@ -132,6 +132,12 @@ struct balanceAppApp: App {
     // Подключаем AppDelegate для BackgroundTasks и уведомлений
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    
+    @StateObject private var authViewModel = AuthViewModel()
+    @State private var selectedTab: Tab = .main
+    @State private var isSplashFinished: Bool = false
+
+    
     // Создаем единый кэш изображений
     @StateObject private var imageCache = ImageCache.shared
     
@@ -153,10 +159,29 @@ struct balanceAppApp: App {
     }()
     
     var body: some Scene {
-        WindowGroup {
-            SplashScreen() // Ваш основной SwiftUI интерфейс
-                .environmentObject(imageCache)
+            WindowGroup {
+                if !isSplashFinished {
+                    SplashScreen()
+                        .onAppear {
+                            // Ждем 2 секунды, затем скрываем SplashScreen
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                self.isSplashFinished = true
+                            }
+                        }
+                        .environmentObject(authViewModel)
+                        .environmentObject(imageCache)
+                } else {
+                    if authViewModel.isLoggedIn {
+                        ContentView()
+                            .environmentObject(authViewModel)
+                            .environmentObject(imageCache)
+                    } else {
+                        MainView(selectedTab: $selectedTab)
+                            .environmentObject(authViewModel)
+                            .environmentObject(imageCache)
+                    }
+                }
+            }
+            .modelContainer(sharedModelContainer)
         }
-        .modelContainer(sharedModelContainer)
     }
-}

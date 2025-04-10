@@ -87,6 +87,7 @@ struct PhoneNumberField: UIViewRepresentable {
 
 
 struct LoginScreen: View {
+    @EnvironmentObject var auth: AuthViewModel
     @State private var formattedPhone: String = ""
     @State private var smsCode: String = ""
     @State private var codeRequested: Bool = false
@@ -95,6 +96,7 @@ struct LoginScreen: View {
     @State private var alertMessage: String = ""
     @State private var showingAlert: Bool = false
     @State private var shouldNavigate: Bool = false
+    
     
     var body: some View {
         NavigationView {
@@ -285,10 +287,12 @@ struct LoginScreen: View {
                         let userEmail = dataObj["email"] as? String ?? "email@example.com"
                         
                         // Сохраняем в UserDefaults
-                        UserDefaults.standard.set(true, forKey: "isLoggedIn")
                         UserDefaults.standard.set(cleanedPhone, forKey: "userPhone")
                         UserDefaults.standard.set(userName, forKey: "userName")
                         UserDefaults.standard.set(userEmail, forKey: "userEmail")
+                        
+                        auth.loginSuccess()  // <<< ключевой момент
+
                         
                         // Если нужно — параллельно сохраняем в Firestore
                         // let db = Firestore.firestore()
@@ -299,7 +303,6 @@ struct LoginScreen: View {
                         
                         self.alertMessage = "Вход выполнен!"
                         self.showingAlert = true
-                        self.shouldNavigate = true
                     } else {
                         self.alertMessage = "Ошибка парсинга ответа сервера"
                         self.showingAlert = true
@@ -318,4 +321,3 @@ struct LoginScreen: View {
             LoginScreen()
         }
     }
-
