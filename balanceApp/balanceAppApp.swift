@@ -11,6 +11,7 @@ import SwiftData
 import BackgroundTasks
 import os
 import UserNotifications  // Добавляем для работы с уведомлениями
+import OneSignalFramework
 
 // MARK: - AppDelegate с использованием BGAppRefreshTask и UNUserNotificationCenterDelegate
 
@@ -144,6 +145,9 @@ struct balanceAppApp: App {
     // Инициализация Firebase
     init() {
         FirebaseApp.configure()
+        // Инициализируем OneSignal сразу при запуске приложения
+        OneSignalService.shared.initialize()
+
     }
     
     var sharedModelContainer: ModelContainer = {

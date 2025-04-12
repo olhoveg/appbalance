@@ -74,77 +74,23 @@ struct MainView: View {
             .navigationBarHidden(true)
         }
         .onAppear {
-            Task { await initializeOneSignalAsync() }
-        }
-    }
-}
-
-
-    func initializeOneSignalAsync() async {
-        // Перемещаем тяжелые операции в фоновую задачу, чтобы не блокировать UI
-        await withCheckedContinuation { continuation in
-            OneSignalManager.shared.initializeOneSignal()
-            continuation.resume()
-        }
-    }
-    
-    
-    
-// MARK: - OneSignalManager (синглтон)
-class OneSignalManager: NSObject, OSPushSubscriptionObserver {
-    static let shared = OneSignalManager()
-    private var isInitialized = false
-    private override init() {}
-    
-    func initializeOneSignal() {
-        guard !isInitialized else {
-            print("OneSignal уже инициализирован")
-            return
-        }
-        isInitialized = true
-
-        // Устанавливаем уровень логирования OneSignal
-        OneSignal.Debug.setLogLevel(.LL_VERBOSE)
-        
-        // Обеспечиваем выполнение на главном потоке
-        DispatchQueue.main.async {
-            // Инициализируем OneSignal с вашим App ID на главном потоке
-            OneSignal.initialize("61e511f4-5929-448d-85f4-e5bf171f0764", withLaunchOptions: nil)
-            
-            // Запрос разрешения на уведомления
-            OneSignal.Notifications.requestPermission({ accepted in
-                print("User accepted notifications: \(accepted)")
-            }, fallbackToSettings: true)
-            
-            // Подписываемся на изменения pushSubscription
-            OneSignal.User.pushSubscription.addObserver(self)
-            
-            // Получаем текущий playerId (если доступен)
-            if let playerId = OneSignal.User.pushSubscription.id {
-                self.savePlayerId(playerId)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                OneSignalService.shared.requestPermissionIfNeeded()
+                
+                if !userPhone.isEmpty {
+                    OneSignalService.shared.setExternalUserId(userPhone)
+                }
             }
-            
-            print("OneSignal успешно инициализирован")
         }
-    }
-
-    
-    // MARK: - OSPushSubscriptionObserver
-    func onPushSubscriptionDidChange(state: OSPushSubscriptionChangedState) {
-        if let playerId = state.current.id {
-            self.savePlayerId(playerId)
-        }
-    }
-    
-    private func savePlayerId(_ playerId: String) {
-        UserDefaults.standard.set(playerId, forKey: "OneSignalPlayerID")
-        print("PlayerID сохранен: \(playerId)")
-    }
-    
-    func getPlayerId() -> String? {
-        return UserDefaults.standard.string(forKey: "OneSignalPlayerID")
     }
 }
+
+
+    
+    
+    
+
+
 
 // MARK: - Кастомный NavigationBar
 struct CustomNavigationBar: View {
