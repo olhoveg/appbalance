@@ -180,7 +180,7 @@ struct balanceAppApp: App {
                             .environmentObject(authViewModel)
                             .environmentObject(imageCache)
                     } else {
-                        MainView(selectedTab: $selectedTab)
+                        ContentView()
                             .environmentObject(authViewModel)
                             .environmentObject(imageCache)
                     }

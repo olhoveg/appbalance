@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Модели данных для декодирования JSON-ответа
+// MARK: - Модели данных
 struct DepositResponse: Codable {
     let data: [DepositItem]
 }
@@ -13,50 +13,59 @@ struct Deposit: Codable {
     let balance: Int
 }
 
-// ViewModel для управления состоянием
+// MARK: - ViewModel
 class BalanceBlockViewModel: ObservableObject {
-    @Published var phone: String? = nil
+    @AppStorage("userPhone") private var storedPhone: String?
+
     @Published var balance: Int = 0
     @Published var balanceLoaded: Bool = false
 
+    var phone: String? {
+        storedPhone
+    }
+
     init() {
-        loadPhone()
+        fetchData()
     }
 
-    // Загрузка номера телефона из UserDefaults (аналог AsyncStorage)
-    func loadPhone() {
-        // Используем ключ "userPhone"
-        self.phone = UserDefaults.standard.string(forKey: "userPhone")
-        if phone != nil {
-            fetchData()
-        }
-    }
-
-    // Основной метод для получения данных
     func fetchData() {
-        guard let phone = phone else { return }
+        guard let phone = storedPhone else {
+            balance = 0
+            balanceLoaded = false
+            return
+        }
+
         let companyId = "415038"
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
+
         Task {
             do {
-                let totalBalance = try await fetchBalance(chainId: companyId, phone: phone, accessToken: accessToken, accessUserToken: accessUserToken)
-                // Обновляем UI на главном потоке
+                let total = try await fetchBalance(
+                    chainId: companyId,
+                    phone: phone,
+                    accessToken: accessToken,
+                    accessUserToken: accessUserToken
+                )
                 await MainActor.run {
-                    self.balance = totalBalance
+                    self.balance = total
                     self.balanceLoaded = true
                 }
             } catch {
-                print("Error fetching balance: \(error)")
+                await MainActor.run {
+                    self.balance = 0
+                    self.balanceLoaded = false
+                }
+                print("Ошибка при получении баланса: \(error.localizedDescription)")
             }
         }
     }
 
-    // Функция для выполнения запроса и расчёта баланса
-    func fetchBalance(chainId: String, phone: String, accessToken: String, accessUserToken: String) async throws -> Int {
+    private func fetchBalance(chainId: String, phone: String, accessToken: String, accessUserToken: String) async throws -> Int {
         guard let url = URL(string: "https://api.yclients.com/api/v1/deposits/chain/\(chainId)/phone/\(phone)") else {
             throw URLError(.badURL)
         }
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
@@ -66,19 +75,24 @@ class BalanceBlockViewModel: ObservableObject {
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
+
         let decodedResponse = try JSONDecoder().decode(DepositResponse.self, from: data)
         let totalBalance = decodedResponse.data.reduce(0) { $0 + $1.deposit.balance }
         return totalBalance
     }
 }
 
-// SwiftUI View для отображения баланса
+// MARK: - Основное View
 struct BalanceBlockView: View {
     @StateObject private var viewModel = BalanceBlockViewModel()
 
     var body: some View {
         Group {
-            if viewModel.balanceLoaded {
+            if viewModel.phone == nil {
+                Text("Авторизуйтесь, чтобы посмотреть баланс")
+                    .foregroundColor(.secondary)
+                    .padding(.top, 10)
+            } else if viewModel.balanceLoaded {
                 HStack(alignment: .center) {
                     Image(systemName: "creditcard.fill")
                         .resizable()
@@ -95,24 +109,17 @@ struct BalanceBlockView: View {
                 .padding(.top, 10)
                 .padding(.horizontal, 10)
             } else {
-                if viewModel.phone == nil {
-                    Text("Авторизуйтесь, чтобы посмотреть баланс")
-                        .foregroundColor(.secondary)
-                        .padding(.top, 10)
-                } else {
-                    ProgressView("Загрузка баланса...")
-                        .padding(.top, 10)
-                }
+                ProgressView("Загрузка баланса...")
+                    .padding(.top, 10)
             }
         }
         .onAppear {
-            // Можно вызвать обновление данных извне, если требуется
             viewModel.fetchData()
         }
     }
 }
 
-// Пример предварительного просмотра
+// MARK: - Превью
 struct BalanceBlockView_Previews: PreviewProvider {
     static var previews: some View {
         BalanceBlockView()

@@ -22,5 +22,6 @@ class AuthViewModel: ObservableObject {
     func logout() {
         isLoggedIn = false
         UserDefaults.standard.set(false, forKey: "isLoggedIn")
+        UserDefaults.standard.removeObject(forKey: "userPhone") // 🔑 Вот это важно!
     }
 }
