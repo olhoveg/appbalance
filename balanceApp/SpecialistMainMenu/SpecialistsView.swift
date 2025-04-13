@@ -4,6 +4,34 @@ import Firebase
 
 // MARK: - Модели данных
 
+struct CachedImageView: View {
+    let url: String
+    var placeholder: AnyView?
+    
+    @State private var uiImage: UIImage?
+    @StateObject private var cache = ImageCache.shared
+
+    var body: some View {
+        Group {
+            if let image = uiImage {
+                Image(uiImage: image)
+                    .resizable()
+            } else {
+                placeholder ?? AnyView(Color.gray)
+            }
+        }
+        .onAppear {
+            cache.loadImage(from: url) { image in
+                self.uiImage = image
+            }
+        }
+    }
+}
+
+
+
+
+
 struct Expert: Identifiable, Equatable {
     var id: String
     var name: String
@@ -246,18 +274,16 @@ struct SpecialistsView: View {
                 LazyVStack(spacing: 16) {
                     ForEach(viewModel.experts) { expert in
                         HStack(spacing: 16) {
-                            AsyncImage(url: URL(string: expert.photoUrl)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 80, height: 80, alignment: .top)
-                                    .clipped()
-                                    .clipShape(Circle())
-                            } placeholder: {
+                            CachedImageView(url: expert.photoUrl, placeholder: AnyView(
                                 Circle()
                                     .fill(Color.gray)
                                     .frame(width: 80, height: 80)
-                            }
+                            ))
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 80, height: 80, alignment: .top)
+                            .clipped()
+                            .clipShape(Circle())
+                            
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(expert.name)
                                     .font(.headline)
@@ -285,262 +311,254 @@ struct SpecialistsView: View {
             }
         }
     }
-}
-
-// MARK: - Детальное представление специалиста
-
-struct SpecialistsDetailView: View {
-    var expert: Expert
-    @ObservedObject var viewModel: SpecialistsViewModel
-    @Environment(\.dismiss) var dismiss
-
-    // Локальное состояние для техники и дипломов
-    @State private var selectedTechnique: Technique?
-    @State private var selectedCertificate: ExpertCertificate?
     
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Фотография с наложением информации (ФИО, опыт)
-                    ZStack(alignment: .bottomLeading) {
-                        AsyncImage(url: URL(string: expert.photoUrl)) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(height: 300, alignment: .top)
-                                .clipped()
-                        } placeholder: {
-                            Color.gray.frame(height: 300)
-                        }
-                        LinearGradient(gradient: Gradient(colors: [Color.black.opacity(0.0), Color.black.opacity(0.6)]),
-                                       startPoint: .center,
-                                       endPoint: .bottom)
+    
+    // MARK: - Детальное представление специалиста
+    
+    struct SpecialistsDetailView: View {
+        var expert: Expert
+        @ObservedObject var viewModel: SpecialistsViewModel
+        @Environment(\.dismiss) var dismiss
+        
+        // Локальное состояние для техники и дипломов
+        @State private var selectedTechnique: Technique?
+        @State private var selectedCertificate: ExpertCertificate?
+        
+        var body: some View {
+            NavigationView {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Фотография с наложением информации (ФИО, опыт)
+                        ZStack(alignment: .bottomLeading) {
+                            CachedImageView(url: expert.photoUrl, placeholder: AnyView(
+                                Color.gray.frame(height: 300)
+                            ))
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 300, alignment: .top)
+                            .clipped()
+                            LinearGradient(gradient: Gradient(colors: [Color.black.opacity(0.0), Color.black.opacity(0.6)]),
+                                           startPoint: .center,
+                                           endPoint: .bottom)
                             .frame(height: 120)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(expert.name)
-                                .font(.title)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                            Text("\(viewModel.titles["experienceSection"] ?? "Опыт работы"): \(expert.experience)")
-                                .font(.subheadline)
-                                .foregroundColor(.white)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(expert.name)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                Text("\(viewModel.titles["experienceSection"] ?? "Опыт работы"): \(expert.experience)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.white)
+                            }
+                            .padding()
                         }
-                        .padding()
-                    }
-                    
-                    // Остальной контент: описание, техники, скиллы, дипломы
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text(expert.description)
-                            .padding(.horizontal)
                         
-                        // Техники массажа
-                        if let techniques = expert.techniques {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(viewModel.titles["techniquesSection"] ?? "Техники массажа")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                ForEach(Array(techniques.keys), id: \.self) { key in
-                                    HStack {
-                                        Text("• \(techniques[key] ?? "")")
-                                        Spacer()
-                                        Button {
-                                            viewModel.fetchTechnique(techniqueKey: key) { technique in
-                                                if let technique = technique {
-                                                    selectedTechnique = technique
+                        // Остальной контент: описание, техники, скиллы, дипломы
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(expert.description)
+                                .padding(.horizontal)
+                            
+                            // Техники массажа
+                            if let techniques = expert.techniques {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(viewModel.titles["techniquesSection"] ?? "Техники массажа")
+                                        .font(.headline)
+                                        .padding(.horizontal)
+                                    ForEach(Array(techniques.keys), id: \.self) { key in
+                                        HStack {
+                                            Text("• \(techniques[key] ?? "")")
+                                            Spacer()
+                                            Button {
+                                                viewModel.fetchTechnique(techniqueKey: key) { technique in
+                                                    if let technique = technique {
+                                                        selectedTechnique = technique
+                                                    }
                                                 }
+                                            } label: {
+                                                Image(systemName: "info.circle")
                                             }
-                                        } label: {
-                                            Image(systemName: "info.circle")
                                         }
-                                    }
-                                    .padding(.horizontal)
-                                }
-                            }
-                        }
-                        
-                        // Скиллы
-                        Text(viewModel.titles["skillsSection"] ?? "Скилы")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        if let skills = expert.skills {
-                            SkillBarView(skillName: viewModel.titles["massageTechnique"] ?? "Массаж", value: skills.massageTechnique ?? 0)
-                            SkillBarView(skillName: viewModel.titles["anatomyKnowledge"] ?? "Анатомия", value: skills.anatomyKnowledge ?? 0)
-                            SkillBarView(skillName: viewModel.titles["clientCommunication"] ?? "Коммуникация", value: skills.clientCommunication ?? 0)
-                            SkillBarView(skillName: viewModel.titles["handStrength"] ?? "Сила рук", value: skills.handStrength ?? 0)
-                            SkillBarView(skillName: viewModel.titles["attentionToDetail"] ?? "Внимание к деталям", value: skills.attentionToDetail ?? 0)
-                            SkillBarView(skillName: viewModel.titles["clinicalThinking"] ?? "Клиническое мышление", value: skills.clinicalThinking ?? 0)
-                        }
-                        
-                        // Дипломы
-                        Text(viewModel.titles["certificatesSection"] ?? "Дипломы")
-                            .font(.headline)
-                            .padding(.horizontal)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                if let certificates = expert.certificates {
-                                    ForEach(certificates) { certificate in
-                                        VStack {
-                                            AsyncImage(url: URL(string: certificate.imageUrl)) { image in
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                                    .frame(width: 200, height: 150)
-                                                    .clipped()
-                                                    .cornerRadius(10)
-                                            } placeholder: {
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .fill(Color.gray.opacity(0.3))
-                                                    .frame(width: 200, height: 150)
-                                                    .shimmer()
-                                            }
-                                            Text(certificate.title)
-                                                .multilineTextAlignment(.center)
-                                        }
-                                        .onTapGesture {
-                                            selectedCertificate = certificate
-                                        }
+                                        .padding(.horizontal)
                                     }
                                 }
                             }
-                            .padding(.horizontal)
-                        }
-                        
-                        // Кнопка "Оставить чаевые"
-                        if let tipUrl = expert.tipUrl, let url = URL(string: tipUrl) {
-                            Button("Оставить чаевые") {
-                                UIApplication.shared.open(url)
+                            
+                            // Скиллы
+                            Text(viewModel.titles["skillsSection"] ?? "Скилы")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            if let skills = expert.skills {
+                                SkillBarView(skillName: viewModel.titles["massageTechnique"] ?? "Массаж", value: skills.massageTechnique ?? 0)
+                                SkillBarView(skillName: viewModel.titles["anatomyKnowledge"] ?? "Анатомия", value: skills.anatomyKnowledge ?? 0)
+                                SkillBarView(skillName: viewModel.titles["clientCommunication"] ?? "Коммуникация", value: skills.clientCommunication ?? 0)
+                                SkillBarView(skillName: viewModel.titles["handStrength"] ?? "Сила рук", value: skills.handStrength ?? 0)
+                                SkillBarView(skillName: viewModel.titles["attentionToDetail"] ?? "Внимание к деталям", value: skills.attentionToDetail ?? 0)
+                                SkillBarView(skillName: viewModel.titles["clinicalThinking"] ?? "Клиническое мышление", value: skills.clinicalThinking ?? 0)
                             }
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(5)
-                            .padding(.horizontal)
+                            
+                            // Дипломы
+                            Text(viewModel.titles["certificatesSection"] ?? "Дипломы")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    if let certificates = expert.certificates {
+                                        ForEach(certificates) { certificate in
+                                            VStack {
+                                                CachedImageView(url: certificate.imageUrl, placeholder: AnyView(
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .fill(Color.gray.opacity(0.3))
+                                                        .frame(width: 200, height: 150)
+                                                        .shimmer()
+                                                ))
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 200, height: 150)
+                                                .clipped()
+                                                .cornerRadius(10)
+                                                Text(certificate.title)
+                                                    .multilineTextAlignment(.center)
+                                            }
+                                            .onTapGesture {
+                                                selectedCertificate = certificate
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            
+                            // Кнопка "Оставить чаевые"
+                            if let tipUrl = expert.tipUrl, let url = URL(string: tipUrl) {
+                                Button("Оставить чаевые") {
+                                    UIApplication.shared.open(url)
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(5)
+                                .padding(.horizontal)
+                            }
+                        }
+                        Spacer().frame(height: 40)
+                    }
+                }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Закрыть") {
+                            dismiss()
                         }
                     }
-                    Spacer().frame(height: 40)
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Закрыть") {
-                        dismiss()
-                    }
+                .sheet(item: $selectedTechnique) { technique in
+                    TechniqueModalView(technique: technique)
                 }
-            }
-            .sheet(item: $selectedTechnique) { technique in
-                TechniqueModalView(technique: technique)
-            }
-            .sheet(item: $selectedCertificate) { certificate in
-                CertificateModalView(certificate: certificate)
+                .sheet(item: $selectedCertificate) { certificate in
+                    CertificateModalView(certificate: certificate)
+                }
             }
         }
     }
-}
-
-// MARK: - Дополнительные представления
-
-struct SkillBarView: View {
-    var skillName: String
-    var value: Double
     
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text(skillName)
-            ProgressView(value: value, total: 100)
-                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+    // MARK: - Дополнительные представления
+    
+    struct SkillBarView: View {
+        var skillName: String
+        var value: Double
+        
+        var body: some View {
+            VStack(alignment: .leading) {
+                Text(skillName)
+                ProgressView(value: value, total: 100)
+                    .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+            }
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
     }
-}
-
-// Модальное окно для диплома с использованием ZoomableScrollView
-struct CertificateModalView: View, Identifiable {
-    let id = UUID()
-    var certificate: ExpertCertificate
-    @Environment(\.dismiss) var dismiss
-
-    var body: some View {
-        NavigationView {
-            VStack {
-                Text(certificate.title)
-                    .font(.title)
+    
+    // Модальное окно для диплома с использованием ZoomableScrollView
+    struct CertificateModalView: View, Identifiable {
+        let id = UUID()
+        var certificate: ExpertCertificate
+        @Environment(\.dismiss) var dismiss
+        
+        var body: some View {
+            NavigationView {
+                VStack {
+                    Text(certificate.title)
+                        .font(.title)
+                        .padding()
+                    ZoomableScrollView {
+                        CachedImageView(url: certificate.imageUrl, placeholder: AnyView(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.gray.opacity(0.3))
+                                .shimmer()
+                        ))
+                        .aspectRatio(contentMode: .fit)
+                    }
+                }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Закрыть") {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    struct TechniqueModalView: View, Identifiable {
+        let id = UUID()
+        var technique: Technique
+        @Environment(\.dismiss) var dismiss
+        
+        var body: some View {
+            NavigationView {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(technique.title)
+                            .font(.largeTitle)
+                            .bold()
+                        
+                        Text(technique.description)
+                            .font(.body)
+                        
+                        if let details = technique.details {
+                            ForEach(details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                                let cleanedKey = key.replacingOccurrences(of: #"^\d+_"#, with: "", options: .regularExpression)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(cleanedKey)
+                                        .font(.headline)
+                                    Text(value)
+                                        .font(.body)
+                                }
+                                .padding()
+                                .background(Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(8)
+                            }
+                        }
+                    }
                     .padding()
-                ZoomableScrollView {
-                    AsyncImage(url: URL(string: certificate.imageUrl)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.gray.opacity(0.3))
-                            .shimmer()
-                    }
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Закрыть") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct TechniqueModalView: View, Identifiable {
-    let id = UUID()
-    var technique: Technique
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(technique.title)
-                        .font(.largeTitle)
-                        .bold()
-                    
-                    Text(technique.description)
-                        .font(.body)
-                    
-                    if let details = technique.details {
-                        ForEach(details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                            let cleanedKey = key.replacingOccurrences(of: #"^\d+_"#, with: "", options: .regularExpression)
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(cleanedKey)
-                                    .font(.headline)
-                                Text(value)
-                                    .font(.body)
-                            }
-                            .padding()
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(8)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Закрыть") {
+                            dismiss()
                         }
                     }
                 }
-                .padding()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Закрыть") {
-                        dismiss()
-                    }
-                }
             }
         }
     }
-}
-
-// MARK: - Previews
-
-struct SpecialistsView_Previews: PreviewProvider {
-    static var previews: some View {
-        SpecialistsView()
+    
+    // MARK: - Previews
+    
+    struct SpecialistsView_Previews: PreviewProvider {
+        static var previews: some View {
+            SpecialistsView()
+        }
     }
 }
