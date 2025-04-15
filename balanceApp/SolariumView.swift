@@ -492,82 +492,102 @@ struct SolariumView: View {
     private var startScreen: some View {
         ScrollView {
             VStack(spacing: 20) {
-                Button(action: { viewModel.selectedType = .horizontal }) {
-                    HStack {
-                        Text("Горизонтальный солярий")
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
-                        Spacer()
-                        AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/solarium/gorizontal-solary.png")) { phase in
-                            if let image = phase.image {
-                                image.resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                            } else {
-                                ProgressView().frame(width: 100, height: 100)
+                        Button(action: { viewModel.selectedType = .horizontal }) {
+                            GeometryReader { geometry in
+                                HStack(spacing: 0) {
+                                    Text("Горизонтальный солярий")
+                                        .foregroundColor(colorScheme == .dark ? .white : .black)
+                                        .padding()
+                                    Spacer()
+                                    AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/solarium/gorizontal-solary.png")) { phase in
+                                        if let image = phase.image {
+                                            image.resizable()
+                                                .scaledToFill()
+                                                .frame(width: 130, height: geometry.size.height)
+                                                .clipped()
+                                        } else {
+                                            ProgressView()
+                                                .frame(width: 130, height: geometry.size.height)
+                                        }
+                                    }
+                                }
                             }
+                            .frame(height: 100)
+                            .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
+                            .cornerRadius(20)
                         }
-                    }
-                    .padding()
-                    .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
-                    .cornerRadius(20)
-                }
                 
-                Button(action: { viewModel.selectedType = .vertical }) {
-                    HStack {
-                        Text("Вертикальный солярий")
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
-                        Spacer()
-                        AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/solarium/vertical-solariy.png")) { phase in
-                            if let image = phase.image {
-                                image.resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                            } else {
-                                ProgressView().frame(width: 100, height: 100)
+                        Button(action: { viewModel.selectedType = .vertical }) {
+                            GeometryReader { geometry in
+                                HStack(spacing: 0) {
+                                    Text("Вертикальный солярий")
+                                        .foregroundColor(colorScheme == .dark ? .white : .black)
+                                        .padding()
+                                    Spacer()
+                                    AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/solarium/vertical-solariy.png")) { phase in
+                                        if let image = phase.image {
+                                            image.resizable()
+                                                .scaledToFill()
+                                                .frame(width: 90, height: geometry.size.height)
+                                                .clipped()
+                                        } else {
+                                            ProgressView()
+                                                .frame(width: 90, height: geometry.size.height)
+                                        }
+                                    }
+                                }
                             }
+                            .frame(height: 100)
+                            .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
+                            .cornerRadius(20)
                         }
-                    }
-                    .padding()
-                    .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
-                    .cornerRadius(20)
-                }
                 
                 Button(action: { viewModel.selectedType = .cab }) {
-                    HStack {
-                        Text("Массаж на Свердлова 126")
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
-                        Spacer()
-                        AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/market/Foto_massage126_1.png")) { phase in
-                            if let image = phase.image {
-                                image.resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                            } else {
-                                ProgressView().frame(width: 100, height: 100)
+                    GeometryReader { geometry in
+                        HStack(spacing: 0) {
+                            Text("Массаж на Свердлова 126")
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
+                                .padding()
+                            Spacer()
+                            AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/market/Foto_massage126_1.png")) { phase in
+                                if let image = phase.image {
+                                    image.resizable()
+                                        .scaledToFill()
+                                        .frame(width: 120, height: geometry.size.height)
+                                        .clipped()
+                                } else {
+                                    ProgressView()
+                                        .frame(width: 120, height: geometry.size.height)
+                                }
                             }
                         }
                     }
-                    .padding()
+                    .frame(height: 100)
                     .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
                     .cornerRadius(20)
                 }
                 
                 Button(action: { viewModel.selectedType = .cab5 }) {
-                    HStack {
-                        Text("Массаж на Коммунаров 26")
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
-                        Spacer()
-                        AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/market/Foto_massage26_2.png")) { phase in
-                            if let image = phase.image {
-                                image.resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                            } else {
-                                ProgressView().frame(width: 100, height: 100)
+                    GeometryReader { geometry in
+                        HStack(spacing: 0) {
+                            Text("Массаж на Коммунаров 26")
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
+                                .padding()
+                            Spacer()
+                            AsyncImage(url: URL(string: "https://24balance.hb.ru-msk.vkcs.cloud/market/Foto_massage26_2.png")) { phase in
+                                if let image = phase.image {
+                                    image.resizable()
+                                        .scaledToFill()
+                                        .frame(width: 120, height: geometry.size.height)
+                                        .clipped()
+                                } else {
+                                    ProgressView()
+                                        .frame(width: 120, height: geometry.size.height)
+                                }
                             }
                         }
                     }
-                    .padding()
+                    .frame(height: 100)
                     .background(colorScheme == .dark ? Color.black : Color.blue.opacity(0.2))
                     .cornerRadius(20)
                 }
@@ -717,9 +737,9 @@ struct SolariumView: View {
         case .vertical:
             return "Вертикальный солярий"
         case .cab:
-            return "Свердлова 126"
+            return "Массаж на Свердлова 126"
         case .cab5:
-            return "Коммунаров 26"
+            return "Массаж на Коммунаров 26"
         default:
             return ""
         }
