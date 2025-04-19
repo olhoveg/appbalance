@@ -258,6 +258,8 @@ struct VerticalServiceDetailsView: View {
     @State private var detailImageUrl: String?
     @State private var loadedImage: UIImage? = nil
     @State private var isLoadingImage = false
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var showBackButton = false
     
     @Environment(\.colorScheme) var colorScheme
 
@@ -294,61 +296,110 @@ struct VerticalServiceDetailsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Зона для изображения
-                ZStack {
-                    if let image = loadedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: cardWidth, height: 250)
-                            .clipped()
-                    } else if isLoadingImage {
-                        ProgressView()
-                            .frame(width: cardWidth, height: 250)
-                    } else {
-                        Color.gray.opacity(0.2)
-                            .frame(width: cardWidth, height: 250)
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Зона для изображения
+                    ZStack {
+                        if let image = loadedImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: cardWidth, height: 250)
+                                .clipped()
+                        } else if isLoadingImage {
+                            ProgressView()
+                                .frame(width: cardWidth, height: 250)
+                        } else {
+                            Color.gray.opacity(0.2)
+                                .frame(width: cardWidth, height: 250)
+                        }
                     }
-                }
-                .frame(width: cardWidth, height: 250)
-                .clipped()
+                    .frame(width: cardWidth, height: 250)
+                    .clipped()
+                    .padding(.leading, 16)
  
-                HStack {
-                    if let priceStr = formattedPrice {
-                        Text("Цена: \(priceStr)")
+                    // Цена и время
+                    HStack {
+                        if let priceStr = formattedPrice {
+                            Text("Цена: \(priceStr)")
+                        }
+                        Spacer()
+                        if let duration = service.duration {
+                            Text("Время: \(formattedDuration(duration))")
+                        }
                     }
+                    .font(.headline)
+                    .foregroundColor(colorScheme == .dark ? .white : .primary)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color(UIColor.systemGray6))
+                    )
+                    .frame(width: cardWidth)
+                    .padding(.leading, 16)
+ 
+                    // Комментарий
+                    if let comment = service.comment, !comment.isEmpty {
+                        Text(comment)
+                            .font(.body)
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+                            .frame(width: cardWidth, alignment: .leading)
+                            .padding(.leading, 16)
+                    }
+ 
                     Spacer()
-                    if let duration = service.duration {
-                        Text("Время: \(formattedDuration(duration))")
-                    }
-                }
-                .font(.headline)
-                .foregroundColor(colorScheme == .dark ? .white : .primary)
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color(UIColor.systemGray6))
-                )
-                .frame(width: cardWidth)
  
-                if let comment = service.comment, !comment.isEmpty {
-                    Text(comment)
-                        .font(.body)
-                        .foregroundColor(colorScheme == .dark ? .white : .black)
-                        .frame(width: cardWidth, alignment: .leading)
+                    // Detection area: shows back button when reached
+                    Color.clear
+                        .frame(height: 1)
+                        .background(
+                            GeometryReader { proxy in
+                                let minY = proxy.frame(in: .named("scroll")).minY
+                                Color.clear
+                                    .onChange(of: minY) { newY in
+                                        // Compare to viewport height
+                                        let viewportHeight = UIScreen.main.bounds.height
+                                        if newY < viewportHeight {
+                                            withAnimation(.easeInOut) { showBackButton = true }
+                                        } else {
+                                            withAnimation(.easeInOut) { showBackButton = false }
+                                        }
+                                    }
+                            }
+                        )
                 }
- 
-                Spacer()
+                    .padding(EdgeInsets(
+                        top: 16,
+                        leading: 0,
+                        bottom: showBackButton ? 80 : 12,
+                        trailing: 0
+                    ))
             }
-            .padding(.top, 16)
+            .coordinateSpace(name: "scroll")
+            .scrollIndicators(.hidden)
+ 
+            // Back button overlay
+            if showBackButton {
+                Button(action: {
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    Text("Назад")
+                        .font(.headline)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        .padding()
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
-        .scrollIndicators(.hidden)
-        .navigationTitle(service.title)        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(service.title)
+        .navigationBarTitleDisplayMode(.inline)
         .background(Color(UIColor.systemBackground))
         .onAppear {
-            // Если detailImageUrl отсутствует или пустой, пробуем получить его
             if detailImageUrl == nil || detailImageUrl?.isEmpty == true {
                 Task {
                     let url = await verticalGetImageByServiceTitle(service.title)
@@ -364,7 +415,6 @@ struct VerticalServiceDetailsView: View {
         .onChange(of: detailImageUrl) { _ in
             loadImageIfNeeded()
         }
-        .animation(nil, value: loadedImage) // Отключаем implicit-анимацию для устранения мерцания
     }
 
     private func loadImageIfNeeded() {
