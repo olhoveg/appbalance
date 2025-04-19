@@ -437,8 +437,58 @@ struct VerticalServicesView: View {
     }
 
     private var filteredAndSortedServices: [VerticalServiceBlockModel] {
-        let filtered = viewModel.services.filter {
-            searchText.isEmpty || $0.title.localizedCaseInsensitiveContains(searchText)
+        let filtered = viewModel.services.filter { service in
+            guard !searchText.isEmpty else { return true }
+            
+            let lowercasedSearch = searchText.lowercased()
+            let titleMatches = service.title.lowercased().contains(lowercasedSearch)
+ 
+            let priceMatches: Bool
+            if let price = service.price_max {
+                priceMatches = "\(Int(price))".contains(lowercasedSearch)
+            } else {
+                priceMatches = false
+            }
+ 
+            let durationMatches: Bool
+            if let duration = service.duration {
+                let minutes = duration / 60
+                let normalizedSearch = lowercasedSearch
+                    .replacingOccurrences(of: ",", with: ".")
+                    .replacingOccurrences(of: "минут", with: "мин")
+                    .replacingOccurrences(of: "минута", with: "мин")
+                    .replacingOccurrences(of: "мин", with: "м")
+                    .replacingOccurrences(of: "часов", with: "ч")
+                    .replacingOccurrences(of: "часа", with: "ч")
+                    .replacingOccurrences(of: "час", with: "ч")
+                    .replacingOccurrences(of: " ", with: "")
+
+                let hourRegex = try? NSRegularExpression(pattern: #"(\d+(?:[.,]?\d*)?)ч"#)
+                let minRegex = try? NSRegularExpression(pattern: #"(\d+)м"#)
+                
+                var totalSearchMinutes = 0
+                
+                if let hourMatch = hourRegex?.firstMatch(in: normalizedSearch, range: NSRange(location: 0, length: normalizedSearch.utf16.count)),
+                   let hourRange = Range(hourMatch.range(at: 1), in: normalizedSearch) {
+                    let hourStr = String(normalizedSearch[hourRange]).replacingOccurrences(of: ",", with: ".")
+                    if let hourValue = Double(hourStr) {
+                        totalSearchMinutes += Int(hourValue * 60)
+                    }
+                }
+                
+                if let minMatch = minRegex?.firstMatch(in: normalizedSearch, range: NSRange(location: 0, length: normalizedSearch.utf16.count)),
+                   let minRange = Range(minMatch.range(at: 1), in: normalizedSearch) {
+                    if let minValue = Int(normalizedSearch[minRange]) {
+                        totalSearchMinutes += minValue
+                    }
+                }
+
+                durationMatches = totalSearchMinutes == minutes
+            } else {
+                durationMatches = false
+            }
+ 
+            return titleMatches || priceMatches || durationMatches
         }
         switch selectedSortOption {
         case .price:
