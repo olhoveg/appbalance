@@ -258,6 +258,7 @@ struct VerticalServiceDetailsView: View {
     @State private var detailImageUrl: String?
     @State private var loadedImage: UIImage? = nil
     @State private var isLoadingImage = false
+    
     @Environment(\.colorScheme) var colorScheme
 
     init(service: VerticalServiceBlockModel, preloadedImage: UIImage? = nil) {
@@ -313,40 +314,38 @@ struct VerticalServiceDetailsView: View {
                 }
                 .frame(width: cardWidth, height: 250)
                 .clipped()
-
-                Text(service.title)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(colorScheme == .dark ? .white : .black)
-                    .frame(width: cardWidth, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 8) {
+ 
+                HStack {
                     if let priceStr = formattedPrice {
                         Text("Цена: \(priceStr)")
-                            .font(.headline)
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
                     }
+                    Spacer()
                     if let duration = service.duration {
                         Text("Время: \(formattedDuration(duration))")
-                            .font(.headline)
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
                     }
                 }
-                .frame(width: cardWidth, alignment: .leading)
-
+                .font(.headline)
+                .foregroundColor(colorScheme == .dark ? .white : .primary)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color(UIColor.systemGray6))
+                )
+                .frame(width: cardWidth)
+ 
                 if let comment = service.comment, !comment.isEmpty {
                     Text(comment)
                         .font(.body)
                         .foregroundColor(colorScheme == .dark ? .white : .black)
                         .frame(width: cardWidth, alignment: .leading)
                 }
-
+ 
                 Spacer()
             }
             .padding(.top, 16)
         }
-        .navigationTitle("Услуга")
-        .navigationBarTitleDisplayMode(.inline)
+        .scrollIndicators(.hidden)
+        .navigationTitle(service.title)        .navigationBarTitleDisplayMode(.inline)
         .background(Color(UIColor.systemBackground))
         .onAppear {
             // Если detailImageUrl отсутствует или пустой, пробуем получить его
@@ -387,30 +386,67 @@ struct VerticalServiceDetailsView: View {
 }
 
 // MARK: - Основной экран с перечнем услуг
+enum SortOption: String, CaseIterable, Identifiable {
+    case none = "Без сортировки"
+    case price = "По цене"
+    case duration = "По времени"
+
+    var id: String { self.rawValue }
+}
+
 struct VerticalServicesView: View {
     @StateObject private var viewModel = VerticalServicesViewModel()
     @State private var searchText = ""
+    @State private var selectedSortOption: SortOption = .none
+    @State private var isSearchPresented = false
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                LazyVStack {
-                    ForEach(viewModel.services.filter {
-                        searchText.isEmpty || $0.title.localizedCaseInsensitiveContains(searchText)
-                    }) { service in
-                        VerticalServiceCardView(service: service)
+            List {
+                // Сегментированный контроль сортировки
+                if isSearchPresented {
+                    Picker("Сортировка", selection: $selectedSortOption) {
+                        ForEach(SortOption.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets())
                 }
-                .padding(.top, 8)
+                
+                // Сами услуги
+                ForEach(filteredAndSortedServices) { service in
+                    VerticalServiceCardView(service: service)
+                }
             }
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+            .listStyle(.plain)
             .navigationTitle("Услуги")
+            .searchable(
+                text: $searchText,
+                isPresented: $isSearchPresented,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Поиск услуг"
+            )
             .refreshable {
                 await viewModel.refresh()
             }
             .task {
                 await viewModel.fetchServices()
             }
+        }
+    }
+
+    private var filteredAndSortedServices: [VerticalServiceBlockModel] {
+        let filtered = viewModel.services.filter {
+            searchText.isEmpty || $0.title.localizedCaseInsensitiveContains(searchText)
+        }
+        switch selectedSortOption {
+        case .price:
+            return filtered.sorted { ($0.price_max ?? 0) < ($1.price_max ?? 0) }
+        case .duration:
+            return filtered.sorted { ($0.duration ?? 0) < ($1.duration ?? 0) }
+        case .none:
+            return filtered
         }
     }
 }
