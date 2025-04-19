@@ -65,7 +65,7 @@ struct AbonementPurchaseListView: View {
                         Text("\(purchase.price) ₽")
                             .font(.footnote)
                             .fontWeight(.bold)
-                            .foregroundColor(.black)
+                            .foregroundColor(Color.primary)
                     }
                     .frame(width: UIScreen.main.bounds.width * 0.2) // 20% ширины экрана
                 }

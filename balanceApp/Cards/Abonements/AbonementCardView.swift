@@ -28,12 +28,12 @@ struct AbonementCardView: View {
                         Image(uiImage: entry.image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(height: 180)
+                            .frame(height: 200)
                             .clipped()
                     } else {
                         // Если изображения ещё нет в кэше – показываем placeholder и запускаем загрузку
                         Color.gray.opacity(0.3)
-                            .frame(height: 180)
+                            .frame(height: 200)
                             .overlay(ProgressView())
                             .onAppear {
                                 // Загрузка из глобального кэша (если ещё не загружено)
@@ -48,7 +48,7 @@ struct AbonementCardView: View {
                             .foregroundColor(.white)
                             .font(.headline)
                     }
-                    .frame(height: 180)
+                    .frame(height: 200)
                 }
                 
                 Text("№ \(abonement.number)")

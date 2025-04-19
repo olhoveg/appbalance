@@ -13,7 +13,7 @@ struct AbonementBlockView: View {
                     if let phone = getUserPhoneNumber(), !phone.isEmpty {
                         // Если номер найден, отображаем карточки или скелеты с фиксированной высотой
                         ZStack {
-                            Color.clear.frame(height: 400)
+                            Color.clear.frame(height: 380)
                             
                             if !hasLoaded || isLoading {
                                 TabView {
@@ -23,7 +23,7 @@ struct AbonementBlockView: View {
                                     }
                                 }
                                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                                .frame(height: 400)
+                                .frame(height: 380)
                             } else if !abonements.isEmpty {
                                 TabView(selection: $activeIndex) {
                                     ForEach(abonements.indices, id: \.self) { index in
@@ -37,10 +37,10 @@ struct AbonementBlockView: View {
                                     }
                                 }
                                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                                .frame(height: 400)
+                                .frame(height: 380)
                             } else {
                                 // Если загрузка завершена и массив пуст – оставляем пустой контейнер
-                                Color.clear.frame(height: 400)
+                                Color.clear.frame(height: 380)
                             }
                         }
                     } else {

@@ -389,17 +389,21 @@ struct VerticalServiceDetailsView: View {
 // MARK: - Основной экран с перечнем услуг
 struct VerticalServicesView: View {
     @StateObject private var viewModel = VerticalServicesViewModel()
+    @State private var searchText = ""
 
     var body: some View {
         NavigationView {
             ScrollView {
                 LazyVStack {
-                    ForEach(viewModel.services) { service in
+                    ForEach(viewModel.services.filter {
+                        searchText.isEmpty || $0.title.localizedCaseInsensitiveContains(searchText)
+                    }) { service in
                         VerticalServiceCardView(service: service)
                     }
                 }
                 .padding(.top, 8)
             }
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
             .navigationTitle("Услуги")
             .refreshable {
                 await viewModel.refresh()

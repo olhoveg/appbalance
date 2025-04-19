@@ -72,7 +72,7 @@ struct CertificateCardView: View {
             // Для сертификатов, доступных к покупке
             HStack {
                 certificateImageView()
-                    .frame(height: 140)
+                    .frame(height: 180)
                     .cornerRadius(15)
                     .clipped()
                     .overlay(

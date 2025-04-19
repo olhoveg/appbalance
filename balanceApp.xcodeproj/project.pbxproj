@@ -310,11 +310,12 @@
 				};
 			};
 			buildConfigurationList = 0A56843D2D5CDBE200F299AA /* Build configuration list for PBXProject "balanceApp" */;
-			developmentRegion = en;
+			developmentRegion = ru;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				ru,
 			);
 			mainGroup = 0A5684392D5CDBE200F299AA;
 			minimizedProjectReferenceProxies = 1;

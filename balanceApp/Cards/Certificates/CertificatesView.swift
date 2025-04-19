@@ -24,7 +24,7 @@ struct CertificatesView: View {
                 if let phone = getUserPhoneNumber(), !phone.isEmpty {
                     // Если номер телефона найден, отображаем купленные сертификаты в контейнере фиксированной высоты
                     ZStack {
-                        Color.clear.frame(height: 350)
+                        Color.clear.frame(height: 380)
                         
                         if !hasLoaded || viewModel.isLoading {
                             // Пока данные загружаются – показываем skeleton‑версии
@@ -36,7 +36,7 @@ struct CertificatesView: View {
                                 }
                             }
                             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                            .frame(height: 350)
+                            .frame(height: 380)
                         } else if !viewModel.ownedCertificates.isEmpty {
                             // Если данные загружены и сертификаты есть – показываем реальные карточки
                             TabView(selection: $activeIndex) {
@@ -51,10 +51,10 @@ struct CertificatesView: View {
                                 }
                             }
                             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                            .frame(height: 350)
+                            .frame(height: 380)
                         } else {
                             // Если загрузка завершена и массив пуст – оставляем контейнер пустым
-                            Color.clear.frame(height: 350)
+                            Color.clear.frame(height: 380)
                         }
                     }
                     
@@ -71,7 +71,7 @@ struct CertificatesView: View {
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(.gray)
-                            .padding(.top, 16)
+                            .padding(.top, 20)
                             .multilineTextAlignment(.center)
                     }
                 } else {
