@@ -69,28 +69,39 @@ struct CertificateCardView: View {
             .cornerRadius(15)
             .shadow(color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.1), radius: 5)
         } else {
-            // Для сертификатов, доступных к покупке
+            // Для сертификатов, доступных к покупке — оформление как у абонементов
             HStack {
                 certificateImageView()
-                    .frame(height: 180)
-                    .cornerRadius(15)
+                    .frame(width: 220, height: 140)
+                    .cornerRadius(12)
                     .clipped()
                     .overlay(
-                        RoundedRectangle(cornerRadius: 15)
-                            .stroke(Color.gray.opacity(0.5), lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
-                
-                if let buyUrl = certificate.buyUrl, let url = URL(string: buyUrl) {
-                    Button(action: {
-                        UIApplication.shared.open(url)
-                    }) {
-                        Text("Купить")
-                            .font(.headline)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    if let buyUrl = certificate.buyUrl, let url = URL(string: buyUrl) {
+                        Button(action: {
+                            UIApplication.shared.open(url)
+                        }) {
+                            Text("Купить")
+                                .font(.subheadline)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                    }
+
+                    if let price = certificate.defaultBalance {
+                        Text("\(price) ₽")
+                            .font(.footnote)
+                            .fontWeight(.bold)
+                            .foregroundColor(colorScheme == .dark ? .white : .primary)
                     }
                 }
             }
