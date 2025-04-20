@@ -22,42 +22,39 @@ struct CertificatesView: View {
         ScrollView {
             VStack(spacing: 20) {
                 if let phone = getUserPhoneNumber(), !phone.isEmpty {
-                    // Если номер телефона найден, отображаем купленные сертификаты в контейнере фиксированной высоты
-                    ZStack {
-                        Color.clear.frame(height: 380)
-                        
-                        if !hasLoaded || viewModel.isLoading {
-                            // Пока данные загружаются – показываем skeleton‑версии
-                            TabView {
-                                ForEach(0..<3, id: \.self) { index in
-                                    SkeletonCertificateCardView()
+                    // Показываем skeleton или карточки только во время загрузки или при наличии сертификатов
+                    if !hasLoaded || viewModel.isLoading || !viewModel.ownedCertificates.isEmpty {
+                        ZStack {
+                            Color.clear.frame(height: 380)
+                            if !hasLoaded || viewModel.isLoading {
+                                // skeleton
+                                TabView {
+                                    ForEach(0..<3, id: \.self) { index in
+                                        SkeletonCertificateCardView()
+                                            .padding(.horizontal)
+                                            .tag(index)
+                                    }
+                                }
+                                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                                .frame(height: 380)
+                            } else {
+                                // реальные карточки
+                                TabView(selection: $activeIndex) {
+                                    ForEach(viewModel.ownedCertificates.indices, id: \.self) { index in
+                                        CertificateCardContainerView(
+                                            certificate: viewModel.ownedCertificates[index],
+                                            isOwned: true,
+                                            isLoading: viewModel.isLoading
+                                        )
                                         .padding(.horizontal)
                                         .tag(index)
+                                    }
                                 }
+                                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                                .frame(height: 380)
                             }
-                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                            .frame(height: 380)
-                        } else if !viewModel.ownedCertificates.isEmpty {
-                            // Если данные загружены и сертификаты есть – показываем реальные карточки
-                            TabView(selection: $activeIndex) {
-                                ForEach(viewModel.ownedCertificates.indices, id: \.self) { index in
-                                    CertificateCardContainerView(
-                                        certificate: viewModel.ownedCertificates[index],
-                                        isOwned: true,
-                                        isLoading: viewModel.isLoading
-                                    )
-                                    .padding(.horizontal)
-                                    .tag(index)
-                                }
-                            }
-                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                            .frame(height: 380)
-                        } else {
-                            // Если загрузка завершена и массив пуст – оставляем контейнер пустым
-                            Color.clear.frame(height: 380)
                         }
                     }
-                    
                     // Пагинатор для купленных сертификатов
                     if !hasLoaded {
                         PaginationView1(dots: 3, activeIndex: activeIndex)
@@ -71,7 +68,8 @@ struct CertificatesView: View {
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(.gray)
-                            .padding(.top, 20)
+                            .padding(.top, 0)    // Убрали большой отступ сверху
+                            .padding(.bottom, 16)
                             .multilineTextAlignment(.center)
                     }
                 } else {

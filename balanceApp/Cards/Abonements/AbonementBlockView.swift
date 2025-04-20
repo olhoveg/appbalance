@@ -11,36 +11,34 @@ struct AbonementBlockView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     if let phone = getUserPhoneNumber(), !phone.isEmpty {
-                        // Если номер найден, отображаем карточки или скелеты с фиксированной высотой
-                        ZStack {
-                            Color.clear.frame(height: 380)
-                            
-                            if !hasLoaded || isLoading {
-                                TabView {
-                                    ForEach(0..<3, id: \.self) { _ in
-                                        SkeletonAbonementCardView()
-                                            .padding(.horizontal)
-                                    }
-                                }
-                                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                                .frame(height: 380)
-                            } else if !abonements.isEmpty {
-                                TabView(selection: $activeIndex) {
-                                    ForEach(abonements.indices, id: \.self) { index in
-                                        AbonementCardContainerView(
-                                            abonement: abonements[index],
-                                            phoneNumber: phone,
-                                            isLoading: false
-                                        )
-                                        .padding(.horizontal)
-                                        .tag(index)
-                                    }
-                                }
-                                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                                .frame(height: 380)
-                            } else {
-                                // Если загрузка завершена и массив пуст – оставляем пустой контейнер
+                        // Показываем skeleton или карточки только во время загрузки или при наличии абонементов
+                        if !hasLoaded || isLoading || !abonements.isEmpty {
+                            ZStack {
                                 Color.clear.frame(height: 380)
+                                if !hasLoaded || isLoading {
+                                    TabView {
+                                        ForEach(0..<3, id: \.self) { _ in
+                                            SkeletonAbonementCardView()
+                                                .padding(.horizontal)
+                                        }
+                                    }
+                                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                                    .frame(height: 380)
+                                } else {
+                                    TabView(selection: $activeIndex) {
+                                        ForEach(abonements.indices, id: \.self) { index in
+                                            AbonementCardContainerView(
+                                                abonement: abonements[index],
+                                                phoneNumber: phone,
+                                                isLoading: false
+                                            )
+                                            .padding(.horizontal)
+                                            .tag(index)
+                                        }
+                                    }
+                                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                                    .frame(height: 380)
+                                }
                             }
                         }
                     } else {
@@ -65,12 +63,11 @@ struct AbonementBlockView: View {
                     // Если данные загружены, но массив пуст, выводим сообщение (для авторизованных пользователей)
                     if hasLoaded && abonements.isEmpty, let phone = getUserPhoneNumber(), !phone.isEmpty {
                         Text("У вас нет активных абонементов")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.gray)
-                            .padding(.top, 16)
-                            .multilineTextAlignment(.center)
-                    }
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 0)     // теперь нет верхнего отступа
+                                    .padding(.bottom, 16) // небольшой отступ снизу, если нужен
+                            }
                     
                     // Блок покупки абонементов – всегда отрисовывается ниже
                     AbonementPurchaseListView()

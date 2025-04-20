@@ -169,6 +169,41 @@ struct LoyaltyBonusCardView: View {
     }
 }
 
+// MARK: - Skeleton для бонусных карт
+struct SkeletonBonusCardView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    var body: some View {
+        GeometryReader { geometry in
+            let width = min(geometry.size.width, 400)
+            let height = width * 0.4
+            HStack(spacing: 12) {
+                // Заглушка для изображения
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: width * 0.35, height: height * 0.9)
+                // Заглушки для текста
+                VStack(alignment: .leading, spacing: 8) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: width * 0.4, height: 16)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: width * 0.3, height: 14)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: width * 0.35, height: 14)
+                }
+                Spacer()
+            }
+            .padding()
+            .background(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white)
+            .cornerRadius(15)
+            .shadow(color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.1), radius: 5)
+        }
+        .frame(height: 160)
+        .padding(.horizontal, 16)
+    }
+}
 
 // MARK: - Основной View бонусных карт
 
@@ -182,7 +217,15 @@ struct LoyaltyBonusCardMainView: View {
                 .ignoresSafeArea()
             
             if viewModel.isLoading {
-                ProgressView("Загрузка бонусных карт...")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            SkeletonBonusCardView()
+                                .frame(width: min(UIScreen.main.bounds.width * 0.9, 400), height: 160)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
             } else if viewModel.bonusCards.isEmpty {
                 if userPhone.isEmpty {
                     Text("Авторизуйтесь, чтобы увидеть бонусные карты")
