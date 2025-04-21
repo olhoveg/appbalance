@@ -25,30 +25,49 @@ struct MainView: View {
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
-                        // Передаем внешний viewModel в StoriesView
+                        // Stories остаются всегда
                         StoriesView(viewModel: storiesVM)
                         
-                        Button(action: {
-                            selectedTab = .solarium
-                        }) {
-                            Text("Записаться")
-                                .font(.headline)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
+                        // Если пользователь не авторизован — показываем кнопку «Войти» и пропускаем блоки личного кабинета
+                        if userPhone.isEmpty {
+                            NavigationLink(destination: ProfileView()) {
+                                Text("Войти")
+                                    .font(.headline)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.accentColor)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                            }
+                            .padding(.horizontal)
+                        } else {
+                            // Запись на солярий
+                            Button(action: {
+                                selectedTab = .solarium
+                            }) {
+                                Text("Записаться")
+                                    .font(.headline)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                            }
+                            .padding(.horizontal)
+                            
+                            // Личный блок
+                            RecordView(viewModel: recordViewModel)
+                            Divider()
+                            BalanceBlockView()
+                            Divider()
+                            LoyaltyBonusCardMainView(viewModel: bonusCardVM)
+                            Divider()
+                            LoyaltyAbonementMainView(viewModel: abonementVM)
+                            Divider()
+                            LoyaltyCertificateMainView(viewModel: certificateVM)
                         }
                         
-                        RecordView(viewModel: recordViewModel)
-                        Divider()
-                        BalanceBlockView()
-                        Divider()
-                        LoyaltyBonusCardMainView(viewModel: bonusCardVM)
-                        Divider()
-                        LoyaltyAbonementMainView(viewModel: abonementVM)
-                        Divider()
-                        LoyaltyCertificateMainView(viewModel: certificateVM)
+                        // Рекомендации, услуги и статьи отображаются всегда
                         Divider()
                         RecommendationsBlockView()
                         Divider()
