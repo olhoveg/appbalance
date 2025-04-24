@@ -144,10 +144,7 @@ struct StoriesView: View {
                 .padding(.horizontal)
             }
         }
-        // Потянув вниз в списке, заново загрузим сторис
-        .refreshable {
-            viewModel.fetchStories()
-        }
+        // Возможность обновления потягиванием вниз отключена
         // Если View появился на экране
         .onAppear {
             viewModel.fetchStories()

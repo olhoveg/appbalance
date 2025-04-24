@@ -70,10 +70,6 @@ struct MainView: View {
                         // Рекомендации, услуги и статьи отображаются всегда
                         Divider()
                         RecommendationsBlockView()
-                        Divider()
-                        ServicesBlockView()
-                        Divider()
-                        ArticlesView()
                     }
                     .padding(.vertical)
                 }
