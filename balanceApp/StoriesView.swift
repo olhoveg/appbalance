@@ -86,7 +86,7 @@ struct StoryIcon: View {
 
 class StoriesViewModel: ObservableObject {
     @Published var stories: [Story] = []
-
+    
     /// Флаг администратора – определяется по сохранённому телефону в UserDefaults (или FirebaseAuth при наличии)
     var isAdmin: Bool {
         // Проверяем телефон, который сохранили после авторизации вашим методом
@@ -101,11 +101,11 @@ class StoriesViewModel: ObservableObject {
 #endif
         return false
     }
-
+    
     private let ref = Database.database(
-      url: "https://balance-ddb48-default-rtdb.europe-west1.firebasedatabase.app"
+        url: "https://balance-ddb48-default-rtdb.europe-west1.firebasedatabase.app"
     ).reference()
-
+    
     /// Поменять порядок самих сторис
     func moveStory(fromIndex: Int, toIndex: Int) {
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
@@ -123,7 +123,7 @@ class StoriesViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// Удалить сторис по индексу в массиве базы
     func deleteStory(at index: Int) {
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
@@ -139,18 +139,18 @@ class StoriesViewModel: ObservableObject {
             }
         }
     }
-
+    
     func fetchStories() {
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
             var loadedStories: [Story] = []
-
+            
             if let storiesArray = snapshot.value as? [[String: Any]] {
                 for (index, storyDict) in storiesArray.enumerated() {
                     let rawId = storyDict["id"] ?? ""
                     let id = "\(index)_\(rawId)"
                     let name = storyDict["name"] as? String ?? "Без имени"
                     let image = storyDict["image"] as? String ?? ""
-
+                    
                     var videos: [StoryVideo] = []
                     if let videosArray = storyDict["videos"] as? [[String: Any]] {
                         for videoData in videosArray {
@@ -159,13 +159,13 @@ class StoriesViewModel: ObservableObject {
                             }
                         }
                     }
-
+                    
                     loadedStories.append(
                         Story(id: id, name: name, image: image, videos: videos)
                     )
                 }
             }
-
+            
             DispatchQueue.main.async {
                 self.stories = loadedStories
                 print("DEBUG: fetchStories loaded stories IDs: \(loadedStories.map { $0.id })")
@@ -175,27 +175,27 @@ class StoriesViewModel: ObservableObject {
             }
         }
     }
-
+    
     // MARK: - Admin helpers
-
+    
     /// Удалить конкретный сторис
     func deleteStory(_ story: Story) {
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
             guard var storiesArray = snapshot.value as? [[String: Any]] else { return }
             storiesArray.removeAll { ($0["id"] as? String) == story.id }
             snapshot.ref.setValue(storiesArray)
-
+            
             DispatchQueue.main.async {
                 self.stories.removeAll { $0.id == story.id }
             }
         }
     }
-
+    
     /// Полностью удалить специалиста (в текущей структуре «Story» == «Specialist»)
     func deleteSpecialist(_ story: Story) {
         deleteStory(story)
     }
-
+    
     /// Удалить все сторис полностью
     func deleteAllStories() {
         ref.child("stories/stories").setValue([]) // Очищаем массив в БД
@@ -203,7 +203,7 @@ class StoriesViewModel: ObservableObject {
             self.stories.removeAll() // Очищаем локальный массив
         }
     }
-
+    
     /// Добавить нового специалиста со стартовым роликом
     func addSpecialist(name: String, image: String, videoUrl: String) {
         let newId = UUID().uuidString
@@ -213,12 +213,12 @@ class StoriesViewModel: ObservableObject {
             "image": image,
             "videos": [["url": videoUrl]]
         ]
-
+        
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
             var storiesArray = snapshot.value as? [[String: Any]] ?? []
             storiesArray.append(newStoryDict)
             snapshot.ref.setValue(storiesArray)
-
+            
             DispatchQueue.main.async {
                 let newStory = Story(
                     id: newId,
@@ -230,28 +230,44 @@ class StoriesViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// Ссылка на videos внутри конкретного сторис по индексу в базе
     private func videosRef(for story: Story) -> DatabaseReference {
         // story.id имеет вид "index_rawId"
         let indexPart = story.id.components(separatedBy: "_").first ?? "0"
         return ref.child("stories/stories").child(indexPart).child("videos")
     }
-
+    
     /// Удалить конкретное видео из сторис
     func deleteVideo(from story: Story, video: StoryVideo) {
         let vRef = videosRef(for: story)
-        vRef.observeSingleEvent(of: .value) { snap in
-            guard var arr = snap.value as? [[String: Any]] else { return }
+        vRef.observeSingleEvent(of: .value, with: { snapshot in
+            guard var arr = snapshot.value as? [[String: Any]] else { return }
             arr.removeAll { ($0["url"] as? String) == video.url }
-            vRef.setValue(arr) { err, _ in
-                if err == nil {
-                    DispatchQueue.main.async { self.fetchStories() }
+            vRef.setValue(arr, withCompletionBlock: { error, _ in
+                if let error = error {
+                    print("DEBUG: deleteVideo error \(error)")
                 } else {
-                    print("DEBUG: deleteVideo error \(err!)")
+                    // Удаление файла из облака
+                    if let url = URL(string: video.url) {
+                        let key = url.path.dropFirst()
+                        VKCloudUploader.shared.delete(fileName: String(key)) { result in
+                            switch result {
+                            case .success:
+                                print("DEBUG: deleted remote file \(key)")
+                            case .failure(let err):
+                                print("DEBUG: cloud delete error: \(err)")
+                            }
+                            DispatchQueue.main.async {
+                                self.fetchStories()
+                            }
+                        }
+                    } else {
+                        DispatchQueue.main.async { self.fetchStories() }
+                    }
                 }
-            }
-        }
+            })
+        })
     }
 
     /// Добавить видео в существующий сторис
@@ -270,49 +286,43 @@ class StoriesViewModel: ObservableObject {
         }
     }
 
-    /// Загрузить локальный видеофайл в Firebase Storage и вернуть URL с прогрессом
-    func uploadVideo(fileURL: URL, progress: @escaping (Double) -> Void, completion: @escaping (Result<String, Error>) -> Void) {
-        let storageRef = Storage.storage().reference()
-            .child("videos/\(UUID().uuidString).mov")
-        let uploadTask = storageRef.putFile(from: fileURL, metadata: nil)
-        uploadTask.observe(.progress) { snapshot in
-            let completed = snapshot.progress?.completedUnitCount ?? 0
-            let total = snapshot.progress?.totalUnitCount ?? 1
-            progress(Double(completed) / Double(total))
-        }
-        uploadTask.observe(.success) { _ in
-            storageRef.downloadURL { url, error in
-                if let error = error {
+    /// Загрузить локальный видеофайл в VK Cloud и вернуть URL с прогрессом
+    func uploadVideo(
+        fileURL: URL,
+        progress: @escaping (Double) -> Void,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        VKCloudUploader.shared.upload(
+            fileURL: fileURL,
+            fileName: "videos/\(UUID().uuidString).mov",
+            progress: progress,
+            completion: { result in
+                switch result {
+                case .success(let url):
+                    completion(.success(url.absoluteString))
+                case .failure(let error):
                     completion(.failure(error))
-                } else if let urlString = url?.absoluteString {
-                    completion(.success(urlString))
                 }
             }
-        }
-        uploadTask.observe(.failure) { snapshot in
-            if let error = snapshot.error {
-                completion(.failure(error))
-            }
-        }
+        )
     }
 
-    /// Загрузить локальный файл изображения в Firebase Storage и вернуть URL
+    /// Загрузить локальный файл изображения в VK Cloud и вернуть URL
+    /// Загрузить локальный файл изображения в VK Cloud и вернуть URL
     func uploadImage(fileURL: URL, completion: @escaping (Result<String, Error>) -> Void) {
-        let storageRef = Storage.storage().reference()
-            .child("images/\(UUID().uuidString).jpg")
-        storageRef.putFile(from: fileURL, metadata: nil) { _, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            storageRef.downloadURL { url, error in
-                if let error = error {
+        VKCloudUploader.shared.upload(
+            fileURL: fileURL,
+            fileName: "images/\(UUID().uuidString).jpg",
+            progress: { _ in /* здесь можно обновить прогресс, если нужно */ },
+            completion: { result in
+                switch result {
+                case .success(let url):
+                    completion(.success(url.absoluteString))
+                case .failure(let error):
                     completion(.failure(error))
-                } else if let urlString = url?.absoluteString {
-                    completion(.success(urlString))
                 }
             }
-        }
+        )
     }
 
     /// Поменять порядок видео внутри сторис
@@ -838,17 +848,13 @@ struct StoryVideoAdminView: View {
     /// Основное содержимое экрана управления видео
     private var videoContent: some View {
         VStack {
-            if uploadProgress > 0 && uploadProgress < 1 {
-                VStack(spacing: 12) {
-                    ProgressView(value: uploadProgress) {
-                        Text("Загрузка видео...")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                    }
-                    .progressViewStyle(LinearProgressViewStyle())
-                    .padding(.horizontal)
-                    
-                    Text("\(Int(uploadProgress * 100))%")
+            if uploadProgress > 0 {
+                VStack {
+                    ProgressView(value: uploadProgress)
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .frame(height: 8)
+                        .padding(.horizontal)
+                    Text("Загрузка: \(Int(uploadProgress * 100))%")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -928,24 +934,35 @@ struct StoryVideoAdminView: View {
                     let tmpURL = FileManager.default.temporaryDirectory
                         .appendingPathComponent(UUID().uuidString + ".mov")
                     try? data.write(to: tmpURL)
-                    uploadProgress = 0
-                    viewModel.uploadVideo(fileURL: tmpURL, progress: { p in
-                        DispatchQueue.main.async { uploadProgress = p }
-                    }, completion: { res in
-                        DispatchQueue.main.async {
-                            uploadProgress = 1
-                            switch res {
-                            case .success(let urlString):
-                                viewModel.addVideo(to: story, videoUrl: urlString)
-                                viewModel.fetchStories()
-                            case .failure(let error):
-                                print("Upload error: \(error)")
+                    uploadProgress = 0.0
+                    viewModel.uploadVideo(
+                        fileURL: tmpURL,
+                        progress: { p in
+                            DispatchQueue.main.async {
+                                uploadProgress = max(0.01, p)
                             }
-                            // Сброс selection чтобы можно было выбрать заново
-                            selectedVideoItem = nil
-                            showVideoPicker = false
+                        },
+                        completion: { res in
+                            DispatchQueue.main.async {
+                                uploadProgress = 1.0
+                                switch res {
+                                case .success(let urlString):
+                                    viewModel.addVideo(to: story, videoUrl: urlString)
+                                    viewModel.fetchStories()
+                                case .failure(let error):
+                                    print("Upload error: \(error)")
+                                }
+                                // Сброс selection чтобы можно было выбрать заново
+                                selectedVideoItem = nil
+                                showVideoPicker = false
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    withAnimation(.easeOut(duration: 0.5)) {
+                                        uploadProgress = 0.0
+                                    }
+                                }
+                            }
                         }
-                    })
+                    )
                 default:
                     break
                 }
