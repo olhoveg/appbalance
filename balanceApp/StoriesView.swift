@@ -1,7 +1,14 @@
 import SwiftUI
 import Firebase
 import FirebaseDatabase
+import FirebaseStorage
+import PhotosUI
+import UniformTypeIdentifiers
 import AVKit
+import AVFoundation
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+#endif
 
 // MARK: - Модель Story
 
@@ -80,9 +87,58 @@ struct StoryIcon: View {
 class StoriesViewModel: ObservableObject {
     @Published var stories: [Story] = []
 
+    /// Флаг администратора – определяется по сохранённому телефону в UserDefaults (или FirebaseAuth при наличии)
+    var isAdmin: Bool {
+        // Проверяем телефон, который сохранили после авторизации вашим методом
+        if let savedPhone = UserDefaults.standard.string(forKey: "userPhone") {
+            return savedPhone == "79951231243"
+        }
+#if canImport(FirebaseAuth)
+        // Фолбэк на FirebaseAuth, если библиотека есть в проекте
+        if let phone = Auth.auth().currentUser?.phoneNumber?.replacingOccurrences(of: "+", with: "") {
+            return phone == "79951231243"
+        }
+#endif
+        return false
+    }
+
     private let ref = Database.database(
       url: "https://balance-ddb48-default-rtdb.europe-west1.firebasedatabase.app"
     ).reference()
+
+    /// Поменять порядок самих сторис
+    func moveStory(fromIndex: Int, toIndex: Int) {
+        ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
+            guard var arr = snapshot.value as? [[String: Any]],
+                  fromIndex != toIndex,
+                  fromIndex < arr.count, toIndex < arr.count else { return }
+            let element = arr.remove(at: fromIndex)
+            arr.insert(element, at: toIndex)
+            snapshot.ref.setValue(arr) { error, _ in
+                if error == nil {
+                    DispatchQueue.main.async { self.fetchStories() }
+                } else {
+                    print("DEBUG: moveStory error \(error!)")
+                }
+            }
+        }
+    }
+
+    /// Удалить сторис по индексу в массиве базы
+    func deleteStory(at index: Int) {
+        ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
+            guard var arr = snapshot.value as? [[String: Any]],
+                  index < arr.count else { return }
+            arr.remove(at: index)
+            snapshot.ref.setValue(arr) { err, _ in
+                if err == nil {
+                    DispatchQueue.main.async { self.fetchStories() }
+                } else {
+                    print("DEBUG: deleteStory(at:) error \(err!)")
+                }
+            }
+        }
+    }
 
     func fetchStories() {
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
@@ -112,6 +168,169 @@ class StoriesViewModel: ObservableObject {
 
             DispatchQueue.main.async {
                 self.stories = loadedStories
+                print("DEBUG: fetchStories loaded stories IDs: \(loadedStories.map { $0.id })")
+                for s in loadedStories {
+                    print("DEBUG: story \(s.id) videos: \(s.videos.map { $0.url })")
+                }
+            }
+        }
+    }
+
+    // MARK: - Admin helpers
+
+    /// Удалить конкретный сторис
+    func deleteStory(_ story: Story) {
+        ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
+            guard var storiesArray = snapshot.value as? [[String: Any]] else { return }
+            storiesArray.removeAll { ($0["id"] as? String) == story.id }
+            snapshot.ref.setValue(storiesArray)
+
+            DispatchQueue.main.async {
+                self.stories.removeAll { $0.id == story.id }
+            }
+        }
+    }
+
+    /// Полностью удалить специалиста (в текущей структуре «Story» == «Specialist»)
+    func deleteSpecialist(_ story: Story) {
+        deleteStory(story)
+    }
+
+    /// Удалить все сторис полностью
+    func deleteAllStories() {
+        ref.child("stories/stories").setValue([]) // Очищаем массив в БД
+        DispatchQueue.main.async {
+            self.stories.removeAll() // Очищаем локальный массив
+        }
+    }
+
+    /// Добавить нового специалиста со стартовым роликом
+    func addSpecialist(name: String, image: String, videoUrl: String) {
+        let newId = UUID().uuidString
+        let newStoryDict: [String: Any] = [
+            "id": newId,
+            "name": name,
+            "image": image,
+            "videos": [["url": videoUrl]]
+        ]
+
+        ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
+            var storiesArray = snapshot.value as? [[String: Any]] ?? []
+            storiesArray.append(newStoryDict)
+            snapshot.ref.setValue(storiesArray)
+
+            DispatchQueue.main.async {
+                let newStory = Story(
+                    id: newId,
+                    name: name,
+                    image: image,
+                    videos: [StoryVideo(url: videoUrl)]
+                )
+                self.stories.append(newStory)
+            }
+        }
+    }
+
+    /// Ссылка на videos внутри конкретного сторис по индексу в базе
+    private func videosRef(for story: Story) -> DatabaseReference {
+        // story.id имеет вид "index_rawId"
+        let indexPart = story.id.components(separatedBy: "_").first ?? "0"
+        return ref.child("stories/stories").child(indexPart).child("videos")
+    }
+
+    /// Удалить конкретное видео из сторис
+    func deleteVideo(from story: Story, video: StoryVideo) {
+        let vRef = videosRef(for: story)
+        vRef.observeSingleEvent(of: .value) { snap in
+            guard var arr = snap.value as? [[String: Any]] else { return }
+            arr.removeAll { ($0["url"] as? String) == video.url }
+            vRef.setValue(arr) { err, _ in
+                if err == nil {
+                    DispatchQueue.main.async { self.fetchStories() }
+                } else {
+                    print("DEBUG: deleteVideo error \(err!)")
+                }
+            }
+        }
+    }
+
+    /// Добавить видео в существующий сторис
+    func addVideo(to story: Story, videoUrl: String) {
+        let vRef = videosRef(for: story)
+        vRef.observeSingleEvent(of: .value) { snap in
+            var arr = snap.value as? [[String: Any]] ?? []
+            arr.insert(["url": videoUrl], at: 0)
+            vRef.setValue(arr) { err, _ in
+                if err == nil {
+                    DispatchQueue.main.async { self.fetchStories() }
+                } else {
+                    print("DEBUG: addVideo error \(err!)")
+                }
+            }
+        }
+    }
+
+    /// Загрузить локальный видеофайл в Firebase Storage и вернуть URL с прогрессом
+    func uploadVideo(fileURL: URL, progress: @escaping (Double) -> Void, completion: @escaping (Result<String, Error>) -> Void) {
+        let storageRef = Storage.storage().reference()
+            .child("videos/\(UUID().uuidString).mov")
+        let uploadTask = storageRef.putFile(from: fileURL, metadata: nil)
+        uploadTask.observe(.progress) { snapshot in
+            let completed = snapshot.progress?.completedUnitCount ?? 0
+            let total = snapshot.progress?.totalUnitCount ?? 1
+            progress(Double(completed) / Double(total))
+        }
+        uploadTask.observe(.success) { _ in
+            storageRef.downloadURL { url, error in
+                if let error = error {
+                    completion(.failure(error))
+                } else if let urlString = url?.absoluteString {
+                    completion(.success(urlString))
+                }
+            }
+        }
+        uploadTask.observe(.failure) { snapshot in
+            if let error = snapshot.error {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    /// Загрузить локальный файл изображения в Firebase Storage и вернуть URL
+    func uploadImage(fileURL: URL, completion: @escaping (Result<String, Error>) -> Void) {
+        let storageRef = Storage.storage().reference()
+            .child("images/\(UUID().uuidString).jpg")
+        storageRef.putFile(from: fileURL, metadata: nil) { _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            storageRef.downloadURL { url, error in
+                if let error = error {
+                    completion(.failure(error))
+                } else if let urlString = url?.absoluteString {
+                    completion(.success(urlString))
+                }
+            }
+        }
+    }
+
+    /// Поменять порядок видео внутри сторис
+    func moveVideo(in story: Story, fromIndex: Int, toIndex: Int) {
+        let vRef = videosRef(for: story)
+        vRef.observeSingleEvent(of: .value) { snap in
+            guard var arr = snap.value as? [[String: Any]],
+                  fromIndex != toIndex,
+                  fromIndex < arr.count, toIndex < arr.count else { return }
+
+            let elem = arr.remove(at: fromIndex)
+            arr.insert(elem, at: toIndex)
+            vRef.setValue(arr) { err, _ in
+                if err == nil {
+                    DispatchQueue.main.async { self.fetchStories() }
+                } else {
+                    print("DEBUG: moveVideo error \(err!)")
+                }
             }
         }
     }
@@ -122,9 +341,19 @@ class StoriesViewModel: ObservableObject {
 struct StoriesView: View {
     @ObservedObject var viewModel: StoriesViewModel
     @State private var selectedStory: Story? = nil
+    @State private var showingAdminMenu = false
+
+    // State для редактирования видео
+    @State private var editingVideosFor: Story?
+    @State private var showVideoEditor = false
 
     // Для scenePhase, чтобы обновлять сторис при возврате
     @Environment(\.scenePhase) var scenePhase
+
+    // State для подтверждений удаления
+    @State private var showDeleteAllConfirmation = false
+    @State private var storyToDelete: Story?
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -139,9 +368,47 @@ struct StoriesView: View {
                         StoryIcon(story: story) {
                             selectedStory = story
                         }
+                        .contextMenu {
+                            if viewModel.isAdmin {
+                                // Кнопка управления видео для конкретного сторис
+                                Button {
+                                    editingVideosFor = story
+                                    showVideoEditor = true
+                                } label: {
+                                    Label("Управлять видео", systemImage: "film")
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if viewModel.isAdmin {
+                Button {
+                    showingAdminMenu = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .resizable()
+                        .frame(width: 56, height: 56)
+                        .foregroundColor(.blue)
+                        .padding()
+                }
+            }
+        }
+        .sheet(isPresented: $showingAdminMenu) {
+            AdminPanelView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showVideoEditor, onDismiss: { editingVideosFor = nil }) {
+            if let story = editingVideosFor {
+                StoryVideoAdminView(story: story, viewModel: viewModel)
+                    .id(story.id)
+            }
+        }
+        .onChange(of: showVideoEditor) { isPresented in
+            if isPresented {
+                viewModel.fetchStories()
             }
         }
         // Возможность обновления потягиванием вниз отключена
@@ -161,6 +428,26 @@ struct StoriesView: View {
             StoryPlayerView(story: story) {
                 selectedStory = nil
             }
+        }
+        .alert(isPresented: $showDeleteConfirmation) {
+            Alert(
+                title: Text("Подтвердите удаление"),
+                message: Text("Вы уверены, что хотите удалить сторис \"\(storyToDelete?.name ?? "")\"?"),
+                primaryButton: .destructive(Text("Удалить")) {
+                    if let s = storyToDelete {
+                        viewModel.deleteStory(s)
+                    }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert("Подтвердите удаление всех сторис", isPresented: $showDeleteAllConfirmation) {
+            Button("Удалить все", role: .destructive) {
+                viewModel.deleteAllStories()
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Вы уверены, что хотите удалить все сторис?")
         }
     }
 }
@@ -373,6 +660,332 @@ struct ProgressBarView: View {
             .cornerRadius(1)
         }
         .frame(height: 3)
+    }
+}
+
+
+// MARK: - AdminPanelView
+
+struct AdminPanelView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var viewModel: StoriesViewModel
+
+    @State private var name = ""
+    @State private var imageUrl: String?
+    @State private var videoUrl: String?
+    @State private var selectedImageItem: PhotosPickerItem? = nil
+    @State private var selectedVideoItem: PhotosPickerItem? = nil
+    @State private var isUploadingImage = false
+    @State private var isUploadingVideo = false
+    @State private var indexToDelete: Int? = nil
+    @State private var showDeleteStoryAlert = false
+
+    /// Обработка выбора фото специалиста
+    private func handleImageSelection(_ newItem: PhotosPickerItem?) {
+        guard let item = newItem else { return }
+        isUploadingImage = true
+        item.loadTransferable(type: Data.self) { result in
+            switch result {
+            case .success(let data?):
+                let tmpURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString + ".jpg")
+                try? data.write(to: tmpURL)
+                viewModel.uploadImage(fileURL: tmpURL) { res in
+                    DispatchQueue.main.async {
+                        isUploadingImage = false
+                        if case .success(let url) = res {
+                            imageUrl = url
+                        }
+                    }
+                }
+            default:
+                DispatchQueue.main.async { isUploadingImage = false }
+            }
+        }
+    }
+
+    /// Обработка выбора видео специалиста
+    private func handleVideoSelection(_ newItem: PhotosPickerItem?) {
+        guard let item = newItem else { return }
+        isUploadingVideo = true
+        item.loadTransferable(type: Data.self) { result in
+            switch result {
+            case .success(let data?):
+                let tmpURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString + ".mov")
+                try? data.write(to: tmpURL)
+                viewModel.uploadVideo(fileURL: tmpURL, progress: { _ in }, completion: { res in
+                    DispatchQueue.main.async {
+                        isUploadingVideo = false
+                        if case .success(let url) = res {
+                            videoUrl = url
+                        }
+                    }
+                })
+            default:
+                DispatchQueue.main.async { isUploadingVideo = false }
+            }
+        }
+    }
+
+    /// Основное содержимое админ-панели
+    private var adminContent: some View {
+        List {
+            Section(header: Text("Новый специалист")) {
+                TextField("Имя", text: $name)
+                PhotosPicker(selection: $selectedImageItem, matching: .images, photoLibrary: .shared()) {
+                    Label("Выбрать фото специалиста", systemImage: "photo")
+                }
+                if isUploadingImage {
+                    ProgressView("Загрузка фото...")
+                }
+                if let imageUrl = imageUrl {
+                    Text("Фото загружено")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+                PhotosPicker(selection: $selectedVideoItem, matching: .videos, photoLibrary: .shared()) {
+                    Label("Выбрать видео специалиста", systemImage: "film")
+                }
+                if isUploadingVideo {
+                    ProgressView("Загрузка видео...")
+                }
+                if let videoUrl = videoUrl {
+                    Text("Видео загружено")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+                Button("Добавить") {
+                    guard let img = imageUrl, let vid = videoUrl else { return }
+                    viewModel.addSpecialist(name: name, image: img, videoUrl: vid)
+                    dismiss()
+                }
+                .disabled(name.isEmpty || imageUrl == nil || videoUrl == nil)
+            }
+            Section(header: Text("Порядок сторис")) {
+                ForEach(viewModel.stories) { story in
+                    Text(story.name)
+                }
+                .onMove { indices, newOffset in
+                    if let from = indices.first {
+                        let to = newOffset > from ? newOffset - 1 : newOffset
+                        viewModel.moveStory(fromIndex: from, toIndex: to)
+                    }
+                }
+                .onDelete { indices in
+                    if let idx = indices.first {
+                        indexToDelete = idx
+                        showDeleteStoryAlert = true
+                    }
+                }
+            }
+        }
+    }
+
+    /// Навигационный контейнер для упрощения модификаторов
+    private var bodyContent: some View {
+        NavigationView {
+            adminContent
+        }
+    }
+
+    var body: some View {
+        bodyContent
+            .onChange(of: selectedImageItem, perform: handleImageSelection)
+            .onChange(of: selectedVideoItem, perform: handleVideoSelection)
+            .navigationTitle("Админ‑панель")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    EditButton()
+                }
+            }
+            .alert("Удалить сторис?", isPresented: $showDeleteStoryAlert, presenting: indexToDelete) { idx in
+                Button("Удалить", role: .destructive) {
+                    viewModel.deleteStory(at: idx)
+                }
+                Button("Отмена", role: .cancel) { }
+            } message: { _ in
+                if let idx = indexToDelete {
+                    Text("Сторис \"\(viewModel.stories[idx].name)\" будет удалён безвозвратно.")
+                } else {
+                    Text("Это действие нельзя отменить.")
+                }
+            }
+    }
+}
+
+
+// MARK: - StoryVideoAdminView
+
+struct StoryVideoAdminView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.editMode) private var environmentEditMode
+    let story: Story
+    @ObservedObject var viewModel: StoriesViewModel
+    @State private var selectedVideoItem: PhotosPickerItem? = nil
+    @State private var uploadProgress: Double = 0
+    @State private var editMode: EditMode = .inactive
+    @State private var showVideoPicker = false
+
+    /// Текущий список видео, обновляется из ViewModel
+    private var videos: [StoryVideo] {
+        viewModel.stories.first(where: { $0.id == story.id })?.videos ?? []
+    }
+
+    /// Основное содержимое экрана управления видео
+    private var videoContent: some View {
+        VStack {
+            if uploadProgress > 0 && uploadProgress < 1 {
+                VStack(spacing: 12) {
+                    ProgressView(value: uploadProgress) {
+                        Text("Загрузка видео...")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                    }
+                    .progressViewStyle(LinearProgressViewStyle())
+                    .padding(.horizontal)
+                    
+                    Text("\(Int(uploadProgress * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemBackground))
+                        .shadow(radius: 4)
+                )
+                .padding(.horizontal)
+            }
+            List {
+                Section(header: Text("Видео сторис \"\(story.name)\"")) {
+                    ForEach(videos) { video in
+                        // Видео-превью в карточке
+                        if let url = URL(string: video.url) {
+                            VideoThumbnailView(url: url)
+                                .aspectRatio(16/9, contentMode: .fill)
+                                .frame(height: 120)
+                                .clipped()
+                                .cornerRadius(8)
+                                .shadow(radius: 4)
+                                .padding(.vertical, 8)
+                        }
+                    }
+                    .onMove { indices, newOffset in
+                        if let from = indices.first {
+                            let to = newOffset > from ? newOffset - 1 : newOffset
+                            viewModel.moveVideo(in: story, fromIndex: from, toIndex: to)
+                        }
+                    }
+                    .onDelete { indices in
+                        for index in indices {
+                            let video = videos[index]
+                            viewModel.deleteVideo(from: story, video: video)
+                        }
+                    }
+                }
+            }
+            .listStyle(InsetGroupedListStyle())
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            videoContent
+                .navigationTitle("Управление видео")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Закрыть") { dismiss() }
+                    }
+                    ToolbarItemGroup(placement: .navigationBarTrailing) {
+                        EditButton()
+                        Button {
+                            showVideoPicker = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .photosPicker(
+                            isPresented: $showVideoPicker,
+                            selection: $selectedVideoItem,
+                            matching: .videos,
+                            photoLibrary: .shared()
+                        )
+                    }
+                }
+        }
+        .environment(\.editMode, $editMode)
+        .onAppear {
+            viewModel.fetchStories()
+        }
+        .onChange(of: selectedVideoItem) { newItem in
+            guard let item = newItem else { return }
+            item.loadTransferable(type: Data.self) { result in
+                switch result {
+                case .success(let data?):
+                    let tmpURL = FileManager.default.temporaryDirectory
+                        .appendingPathComponent(UUID().uuidString + ".mov")
+                    try? data.write(to: tmpURL)
+                    uploadProgress = 0
+                    viewModel.uploadVideo(fileURL: tmpURL, progress: { p in
+                        DispatchQueue.main.async { uploadProgress = p }
+                    }, completion: { res in
+                        DispatchQueue.main.async {
+                            uploadProgress = 1
+                            switch res {
+                            case .success(let urlString):
+                                viewModel.addVideo(to: story, videoUrl: urlString)
+                                viewModel.fetchStories()
+                            case .failure(let error):
+                                print("Upload error: \(error)")
+                            }
+                            // Сброс selection чтобы можно было выбрать заново
+                            selectedVideoItem = nil
+                            showVideoPicker = false
+                        }
+                    })
+                default:
+                    break
+                }
+            }
+        }
+    }
+}
+
+// MARK: - VideoThumbnailView
+
+struct VideoThumbnailView: View {
+    let url: URL
+    @State private var image: UIImage? = nil
+
+    var body: some View {
+        Group {
+            if let uiImage = image {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(height: 100)
+        .clipped()
+        .onAppear {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let asset = AVURLAsset(url: url)
+                let generator = AVAssetImageGenerator(asset: asset)
+                generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = CGSize(width: 200, height: 200)
+                if let cgImage = try? generator.copyCGImage(at: .zero, actualTime: nil) {
+                    let uiImage = UIImage(cgImage: cgImage)
+                    DispatchQueue.main.async {
+                        image = uiImage
+                    }
+                }
+            }
+        }
     }
 }
 
