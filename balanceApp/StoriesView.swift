@@ -86,17 +86,16 @@ struct StoryIcon: View {
 
 class StoriesViewModel: ObservableObject {
     @Published var stories: [Story] = []
-    
-    /// Флаг администратора – определяется по сохранённому телефону в UserDefaults (или FirebaseAuth при наличии)
+
+    @Published var adminPhones: [String] = []
+
     var isAdmin: Bool {
-        // Проверяем телефон, который сохранили после авторизации вашим методом
         if let savedPhone = UserDefaults.standard.string(forKey: "userPhone") {
-            return savedPhone == "79951231243"
+            return adminPhones.contains(savedPhone)
         }
 #if canImport(FirebaseAuth)
-        // Фолбэк на FirebaseAuth, если библиотека есть в проекте
         if let phone = Auth.auth().currentUser?.phoneNumber?.replacingOccurrences(of: "+", with: "") {
-            return phone == "79951231243"
+            return adminPhones.contains(phone)
         }
 #endif
         return false
@@ -143,14 +142,14 @@ class StoriesViewModel: ObservableObject {
     func fetchStories() {
         ref.child("stories/stories").observeSingleEvent(of: .value) { snapshot in
             var loadedStories: [Story] = []
-            
+
             if let storiesArray = snapshot.value as? [[String: Any]] {
                 for (index, storyDict) in storiesArray.enumerated() {
                     let rawId = storyDict["id"] ?? ""
                     let id = "\(index)_\(rawId)"
                     let name = storyDict["name"] as? String ?? "Без имени"
                     let image = storyDict["image"] as? String ?? ""
-                    
+
                     var videos: [StoryVideo] = []
                     if let videosArray = storyDict["videos"] as? [[String: Any]] {
                         for videoData in videosArray {
@@ -159,18 +158,27 @@ class StoriesViewModel: ObservableObject {
                             }
                         }
                     }
-                    
+
                     loadedStories.append(
                         Story(id: id, name: name, image: image, videos: videos)
                     )
                 }
             }
-            
+
             DispatchQueue.main.async {
                 self.stories = loadedStories
                 print("DEBUG: fetchStories loaded stories IDs: \(loadedStories.map { $0.id })")
                 for s in loadedStories {
                     print("DEBUG: story \(s.id) videos: \(s.videos.map { $0.url })")
+                }
+            }
+
+            // Загрузка списка номеров админов
+            self.ref.child("stories/adminPhones").observeSingleEvent(of: .value) { snapshot in
+                if let phonesDict = snapshot.value as? [String: Any] {
+                    DispatchQueue.main.async {
+                        self.adminPhones = Array(phonesDict.keys)
+                    }
                 }
             }
         }
