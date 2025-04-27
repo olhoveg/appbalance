@@ -6,35 +6,26 @@ private let API_KEY = "88fnh8jbmt44er5y28nj"
 struct BonusBlockView: View {
     @State private var bonusCards: [BonusCard] = []
     @State private var activeIndex: Int = 0
-    @State private var isLoading = false
+    @State private var isLoading = true        // стартуем в режиме загрузки (скелетон)
     @State private var phoneNumber: String = ""
     
     var body: some View {
         // Убираем NavigationView, так как родительские вкладки (TabView) уже могут иметь свою NavigationView
         ZStack {
-            // Явно задаём фон (не даём ему быть прозрачным)
+            // Явно задаём фон
             Color(UIColor.systemBackground)
                 .ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 20) {
                     if !phoneNumber.isEmpty {
-                        if isLoading {
-                            // Скелетон
-                            TabView {
-                                ForEach(0..<3, id: \.self) { _ in
-                                    SkeletonBonusBlockCardView()
-                                        .padding(.horizontal, 20)
-                                }
+                        if bonusCards.isEmpty {
+                            if !isLoading {
+                                Text("У вас нет бонусных карт")
+                                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 20)
                             }
-                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                            .frame(height: 300)
-                            .animation(.easeInOut, value: activeIndex)
-                        } else if bonusCards.isEmpty {
-                            Text("У вас нет бонусных карт")
-                                .font(.system(size: 16, weight: .medium, design: .rounded))
-                                .foregroundColor(.secondary)
-                                .padding(.top, 20)
                         } else {
                             TabView(selection: $activeIndex) {
                                 ForEach(bonusCards) { card in
@@ -61,6 +52,7 @@ struct BonusBlockView: View {
             }
         }
         .onAppear {
+            // Загружаем телефон и сразу стартуем скелетон
             if let phone = UserDefaults.standard.string(forKey: "userPhone") {
                 phoneNumber = phone
                 fetchBonusCards()
@@ -73,13 +65,16 @@ struct BonusBlockView: View {
     
     private func fetchBonusCards() {
         guard !phoneNumber.isEmpty else { return }
-        isLoading = true
+        // Устанавливаем флаг загрузки, чтобы сразу показать скелетон
+        DispatchQueue.main.async {
+            isLoading = true
+        }
         
         let groupId = "415038"
         let companyId = "433675"
         let urlString = "https://api.yclients.com/api/v1/loyalty/cards/\(phoneNumber)/\(groupId)/\(companyId)"
         guard let url = URL(string: urlString) else {
-            isLoading = false
+            DispatchQueue.main.async { isLoading = false }
             return
         }
         
@@ -90,22 +85,31 @@ struct BonusBlockView: View {
         request.setValue("Bearer \(API_KEY), User 9d241fb00061c17a5e2e76a23b214b20", forHTTPHeaderField: "Authorization")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                isLoading = false
-            }
             if let error = error {
-                print("Ошибка при получении бонусных карт: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    print("Ошибка при получении бонусных карт: \(error.localizedDescription)")
+                    isLoading = false
+                }
                 return
             }
-            guard let data = data else { return }
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    isLoading = false
+                }
+                return
+            }
             do {
                 let decoder = JSONDecoder()
                 let response = try decoder.decode(BonusAPIResponse.self, from: data)
                 DispatchQueue.main.async {
                     bonusCards = response.data
+                    isLoading = false
                 }
             } catch {
-                print("Ошибка декодирования бонусных карт: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    print("Ошибка декодирования бонусных карт: \(error.localizedDescription)")
+                    isLoading = false
+                }
             }
         }.resume()
     }
@@ -130,3 +134,7 @@ struct PaginationView: View {
         .padding(.top, 10)
     }
 }
+
+
+
+

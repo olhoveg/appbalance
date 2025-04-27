@@ -6,69 +6,89 @@ struct BonusBlockCardView: View {
     @State private var imageUrl: String? = nil
     @StateObject private var imageCache = ImageCache()
     @State private var loadedImage: UIImage? = nil
-    
-    // Имя изображения по умолчанию (убедитесь, что оно добавлено в Assets.xcassets)
-    private let defaultImageName = "defaultBonusImage"
-    
+    @State private var imageLoaded: Bool = false    // New state for animation
+
     var body: some View {
-        VStack(spacing: 12) {
-            ZStack(alignment: .topTrailing) {
-                // Изображение карты, занимающее всю ширину
-                if let imageUrl = imageUrl, !imageUrl.isEmpty {
-                    if let image = loadedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 200)
-                            .clipped()
-                    } else {
+        ZStack {
+            // Skeleton placeholder shown while the card loads
+            VStack(spacing: 12) {
+                // Grey rectangle where the card image will appear
+                Color.gray.opacity(0.2)
+                    .frame(height: 200)
+                    .cornerRadius(12)
+
+                // Grey bars imitating the “Баланс” caption and the amount
+                HStack {
+                    Spacer()
+                    VStack(spacing: 4) {
+                        Color.gray.opacity(0.2)
+                            .frame(width: 70, height: 18)
+                            .cornerRadius(4)
+
+                        Color.gray.opacity(0.2)
+                            .frame(width: 110, height: 22)
+                            .cornerRadius(4)
+                    }
+                    Spacer()
+                }
+            }
+            .padding(.horizontal)
+            .opacity(imageLoaded ? 0 : 1)
+
+            VStack(spacing: 12) {
+                ZStack(alignment: .topTrailing) {
+                    // Container for image and placeholder with fade animation
+                    ZStack {
+                        // Placeholder
                         Color.gray.opacity(0.2)
                             .frame(height: 200)
                             .overlay(ProgressView())
                             .clipped()
-                            .onAppear {
-                                imageCache.loadImage(from: imageUrl) { img in
-                                    loadedImage = img
-                                }
-                            }
+                            .opacity(imageLoaded ? 0 : 1)
+
+                        // Loaded image
+                        if let image = loadedImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 200)
+                                .clipped()
+                                .opacity(imageLoaded ? 1 : 0)
+                        }
                     }
-                } else {
-                    Image(defaultImageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 200)
-                        .clipped()
+                    .frame(maxWidth: .infinity)
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 5)
+
+                    // Номер карты, отображается справа сверху
+                    Text("№ \(bonusCard.number)")
+                        .font(.subheadline)
+                        .padding(8)
+                        .background(Color.black.opacity(0.6))
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                        .padding([.top, .trailing], 12)
                 }
-                
-                // Номер карты, отображается справа сверху
-                Text("№ \(bonusCard.number)")
-                    .font(.subheadline)
-                    .padding(8)
-                    .background(Color.black.opacity(0.6))
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
-                    .padding([.top, .trailing], 12)
-            }
-            .frame(maxWidth: .infinity)
-            .cornerRadius(12)
-            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 5)
-            
-            // Баланс карты, красиво оформленный под изображением
-            HStack {
-                Spacer()
-                VStack(spacing: 4) {
-                    Text("Баланс")
-                        .font(.title2) // замените на .title2 или другой нужный стиль
-                        .foregroundColor(.secondary)
-                    Text("\(String(format: "%.2f", bonusCard.balance)) ₽")
-                        .font(.title2) // используем тот же размер шрифта, что и в других блоках
-                        .bold()
-                        .foregroundColor(.blue)
+
+                // Баланс карты, красиво оформленный под изображением
+                HStack {
+                    Spacer()
+                    VStack(spacing: 4) {
+                        Text("Баланс")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                        Text("\(String(format: "%.2f", bonusCard.balance)) ₽")
+                            .font(.title2)
+                            .bold()
+                            .foregroundColor(.blue)
+                    }
+                    Spacer()
                 }
-                Spacer()
             }
+            .opacity(imageLoaded ? 1 : 0)
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
+        .animation(.easeInOut(duration: 0.4), value: imageLoaded)
         .onAppear {
             fetchBonusCardImage()
         }
@@ -80,25 +100,26 @@ struct BonusBlockCardView: View {
         
         ref.observeSingleEvent(of: .value) { snapshot in
             if let dict = snapshot.value as? [String: Any] {
-                // Сначала проверяем верхний уровень
+                // выбираем URL как ранее
+                var selectedURL: String? = nil
                 if let title = dict["title"] as? String,
                    let url = dict["image_url"] as? String,
                    title.lowercased() == bonusCard.type.title.lowercased() {
-                    DispatchQueue.main.async {
-                        self.imageUrl = url
-                    }
-                    return
-                }
-                // Ищем вложенный словарь с ключом, равным bonusCard.type.title
-                if let nested = dict[bonusCard.type.title] as? [String: Any],
-                   let nestedUrl = nested["image_url"] as? String {
-                    DispatchQueue.main.async {
-                        self.imageUrl = nestedUrl
-                    }
-                    return
+                    selectedURL = url
+                } else if let nested = dict[bonusCard.type.title] as? [String: Any],
+                          let nestedUrl = nested["image_url"] as? String {
+                    selectedURL = nestedUrl
                 }
                 DispatchQueue.main.async {
-                    self.imageUrl = ""
+                    self.imageUrl = selectedURL
+                    if let urlString = selectedURL {
+                        imageCache.loadImage(from: urlString) { img in
+                            loadedImage = img
+                            withAnimation {
+                                imageLoaded = true
+                            }
+                        }
+                    }
                 }
             }
         }
