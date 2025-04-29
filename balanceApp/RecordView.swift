@@ -114,6 +114,12 @@ class RecordViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Флаг первичной синхронизации
+    private var isInitialSnapshotFinished: Bool {
+        get { UserDefaults.standard.bool(forKey: "recordsSnapshotReady") }
+        set { UserDefaults.standard.set(newValue, forKey: "recordsSnapshotReady") }
+    }
+
     // MARK: - Логирование (для отладки)
     func log(_ message: String) {
         debugLogs.append(message)
@@ -124,6 +130,7 @@ class RecordViewModel: ObservableObject {
         self.recordsByCompany = [:]
         self.phone = ""
         UserDefaults.standard.removeObject(forKey: "savedRecords")
+        isInitialSnapshotFinished = false
     }
 
     
@@ -346,19 +353,25 @@ class RecordViewModel: ObservableObject {
         if !fetchHadError {
             let oldRecordsByCompany = self.recordsByCompany
             let newRecordsByCompany = self.tempRecordsByCompany
-            
+
             let (added, changed, deleted) = detectRecordChanges(
                 oldRecordsByCompany: oldRecordsByCompany,
                 newRecordsByCompany: newRecordsByCompany
             )
-            
+
             self.recordsByCompany = newRecordsByCompany
             self.saveRecords(newRecordsByCompany) // <-- Сохраняем
 
             cancelNotificationsForDeletedRecords(deleted)
 
-            if !added.isEmpty || !changed.isEmpty || !deleted.isEmpty {
-                sendScheduleUpdatedNotification()
+            if isInitialSnapshotFinished {
+                // Отправляем пуш только при правке или удалении после начальной синхронизации
+                if !changed.isEmpty || !deleted.isEmpty {
+                    sendScheduleUpdatedNotification()
+                }
+            } else {
+                // Помечаем завершение начальной синхронизации без пуша
+                isInitialSnapshotFinished = true
             }
         }
     }
