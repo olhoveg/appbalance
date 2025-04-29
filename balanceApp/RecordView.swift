@@ -90,6 +90,8 @@ class RecordViewModel: ObservableObject {
 
     private var pendingClientRequests: Int = 0
     private var fetchHadError: Bool = false
+    /// Флаг, указывающий, была ли уже выполнена первая синхронизация за текущий сеанс
+    private var hasPerformedInitialSync: Bool = false
 
     // Временное хранилище для записей (используется только во время одного обновления)
     private var tempRecordsByCompany: [String: [Record]] = [:]
@@ -114,12 +116,6 @@ class RecordViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Флаг первичной синхронизации
-    private var isInitialSnapshotFinished: Bool {
-        get { UserDefaults.standard.bool(forKey: "recordsSnapshotReady") }
-        set { UserDefaults.standard.set(newValue, forKey: "recordsSnapshotReady") }
-    }
-
     // MARK: - Логирование (для отладки)
     func log(_ message: String) {
         debugLogs.append(message)
@@ -129,8 +125,9 @@ class RecordViewModel: ObservableObject {
     func clearCachedRecords() {
         self.recordsByCompany = [:]
         self.phone = ""
+        // при выходе из учётки сбрасываем флаг первой синхронизации
+        self.hasPerformedInitialSync = false
         UserDefaults.standard.removeObject(forKey: "savedRecords")
-        isInitialSnapshotFinished = false
     }
 
     
@@ -349,30 +346,36 @@ class RecordViewModel: ObservableObject {
    
     
 
+    /// Завершаем процесс получения записей, обрабатываем изменения
     private func finishFetchingRecords() {
-        if !fetchHadError {
-            let oldRecordsByCompany = self.recordsByCompany
-            let newRecordsByCompany = self.tempRecordsByCompany
+        // Если при загрузке произошла ошибка – ничего не делаем
+        guard !fetchHadError else { return }
 
-            let (added, changed, deleted) = detectRecordChanges(
-                oldRecordsByCompany: oldRecordsByCompany,
-                newRecordsByCompany: newRecordsByCompany
-            )
+        let oldRecordsByCompany = self.recordsByCompany
+        let newRecordsByCompany = self.tempRecordsByCompany
 
-            self.recordsByCompany = newRecordsByCompany
-            self.saveRecords(newRecordsByCompany) // <-- Сохраняем
+        // Выявляем изменения (добавления, изменения времени, удалённые записи)
+        let (added, changed, deleted) = detectRecordChanges(
+            oldRecordsByCompany: oldRecordsByCompany,
+            newRecordsByCompany: newRecordsByCompany
+        )
 
-            cancelNotificationsForDeletedRecords(deleted)
+        // Сохраняем обновлённое состояние
+        self.recordsByCompany = newRecordsByCompany
+        self.saveRecords(newRecordsByCompany)
 
-            if isInitialSnapshotFinished {
-                // Отправляем пуш только при правке или удалении после начальной синхронизации
-                if !changed.isEmpty || !deleted.isEmpty {
-                    sendScheduleUpdatedNotification()
-                }
-            } else {
-                // Помечаем завершение начальной синхронизации без пуша
-                isInitialSnapshotFinished = true
-            }
+        // Отменяем уведомления для удалённых записей ещё до возможной отправки "расписание изменилось"
+        cancelNotificationsForDeletedRecords(deleted)
+
+        // Чтобы избежать ложного пуша при самом первом входе/открытии,
+        // отправляем уведомление ТОЛЬКО если первая синхронизация уже была.
+        if hasPerformedInitialSync && (!changed.isEmpty || !deleted.isEmpty) {
+            sendScheduleUpdatedNotification()
+        }
+
+        // Отмечаем, что первичная синхронизация завершена
+        if !hasPerformedInitialSync {
+            hasPerformedInitialSync = true
         }
     }
 
