@@ -8,6 +8,10 @@ struct AbonementCardView: View {
     @EnvironmentObject var imageCache: ImageCache
     // Используем отдельный loader для получения imageUrl из Firebase – он остаётся один для данного ключа
     @StateObject private var imageLoader: AbonementImageLoader
+    // Локальная копия картинки до попадания в кеш
+    @State private var loadedImage: UIImage? = nil
+    /// Флаг для плавного fade-in после загрузки изображения
+    @State private var isImageLoaded: Bool = false
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -21,36 +25,42 @@ struct AbonementCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .topTrailing) {
-                // Используем imageLoader.imageUrl для получения URL
-                if let url = imageLoader.imageUrl, !url.isEmpty {
-                    // Если изображение уже есть в глобальном кэше – используем его немедленно
-                    if let entry = imageCache.cachedImages[url] {
-                        Image(uiImage: entry.image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 200)
-                            .clipped()
-                    } else {
-                        // Если изображения ещё нет в кэше – показываем placeholder и запускаем загрузку
-                        Color.gray.opacity(0.3)
-                            .frame(height: 200)
-                            .overlay(ProgressView())
-                            .onAppear {
-                                // Загрузка из глобального кэша (если ещё не загружено)
-                                imageCache.loadImage(from: url) { _ in }
-                            }
+                ZStack {
+                    // Серый placeholder – база для плавного появления
+                    Color.gray.opacity(0.15)
+
+                    if let url = imageLoader.imageUrl, !url.isEmpty {
+                        if let entry = imageCache.cachedImages[url] {
+                            Image(uiImage: entry.image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .opacity(isImageLoaded ? 1 : 0)
+                                .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                                .onAppear { isImageLoaded = true }
+                        } else if let img = loadedImage {
+                            Image(uiImage: img)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .opacity(isImageLoaded ? 1 : 0)
+                                .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                                .onAppear { isImageLoaded = true }
+                        } else {
+                            ProgressView()
+                                .onAppear {
+                                    imageCache.loadImage(from: url) { image in
+                                        self.loadedImage = image
+                                        withAnimation {
+                                            self.isImageLoaded = true
+                                        }
+                                    }
+                                }
+                        }
                     }
-                } else {
-                    // Если URL не получен – показываем fallback
-                    ZStack {
-                        Color.gray.opacity(0.3)
-                        Text("No Image")
-                            .foregroundColor(.white)
-                            .font(.headline)
-                    }
-                    .frame(height: 200)
                 }
-                
+                .frame(height: 200)
+                .clipped()
+
+                // Номер абонемента – поверх изображения
                 Text("№ \(abonement.number)")
                     .font(.footnote)
                     .fontWeight(.bold)

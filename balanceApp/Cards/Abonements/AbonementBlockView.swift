@@ -1,21 +1,27 @@
 import SwiftUI
 
 struct AbonementBlockView: View {
-    @State private var abonements: [Abonement] = []
-    @State private var activeIndex: Int = 0 // Отслеживает текущую страницу
-    @State private var isLoading: Bool = false
-    @State private var hasLoaded: Bool = false  // Флаг: загрузка завершена (успешно или с ошибкой)
-    
+    @StateObject private var viewModel = AbonementViewModel()
+    @State private var activeIndex: Int = 0      // для пагинатора
+    @State private var hasLoaded: Bool = false   // флаг: загрузка завершена
+
+    private func getUserPhoneNumber() -> String? {
+        UserDefaults.standard.string(forKey: "userPhone")
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Проверяем авторизацию
                     if let phone = getUserPhoneNumber(), !phone.isEmpty {
-                        // Показываем skeleton или карточки только во время загрузки или при наличии абонементов
-                        if !hasLoaded || isLoading || !abonements.isEmpty {
+                        // 1) Пока не загружено или есть уже карточки — показываем ZStack
+                        if !hasLoaded || viewModel.isLoading || !viewModel.abonements.isEmpty {
                             ZStack {
                                 Color.clear.frame(height: 380)
-                                if !hasLoaded || isLoading {
+
+                                // 2) Если ещё идёт загрузка — skeleton-карточки
+                                if !hasLoaded || viewModel.isLoading {
                                     TabView {
                                         ForEach(0..<3, id: \.self) { _ in
                                             SkeletonAbonementCardView()
@@ -24,11 +30,13 @@ struct AbonementBlockView: View {
                                     }
                                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                                     .frame(height: 380)
-                                } else {
+                                }
+                                // 3) Иначе — реальные карточки
+                                else {
                                     TabView(selection: $activeIndex) {
-                                        ForEach(abonements.indices, id: \.self) { index in
+                                        ForEach(viewModel.abonements.indices, id: \.self) { index in
                                             AbonementCardContainerView(
-                                                abonement: abonements[index],
+                                                abonement: viewModel.abonements[index],
                                                 phoneNumber: phone,
                                                 isLoading: false
                                             )
@@ -41,8 +49,26 @@ struct AbonementBlockView: View {
                                 }
                             }
                         }
+
+                        // Пагинатор
+                        if !hasLoaded {
+                            PaginationView(dots: 3, activeIndex: activeIndex)
+                        } else if !viewModel.abonements.isEmpty {
+                            PaginationView(dots: viewModel.abonements.count, activeIndex: activeIndex)
+                        }
+
+                        // Сообщение, если нет абонементов (показываем только после загрузки)
+                        if hasLoaded && viewModel.abonements.isEmpty {
+                            Text("У вас нет активных абонементов")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 0)
+                                .padding(.bottom, 16)
+                                .multilineTextAlignment(.center)
+                        }
+
                     } else {
-                        // Если пользователь не авторизован, сразу показываем сообщение без пустого пространства
+                        // Неавторизован
                         Text("Абонементы недоступны. Пожалуйста, авторизуйтесь.")
                             .font(.title2)
                             .fontWeight(.semibold)
@@ -50,119 +76,46 @@ struct AbonementBlockView: View {
                             .multilineTextAlignment(.center)
                             .padding()
                     }
-                    
-                    // Пагинатор – отображается только если пользователь авторизован и есть карточки/скелеты
-                    if let phone = getUserPhoneNumber(), !phone.isEmpty {
-                        if !hasLoaded {
-                            PaginationView(dots: 3, activeIndex: activeIndex)
-                        } else if !abonements.isEmpty {
-                            PaginationView(dots: abonements.count, activeIndex: activeIndex)
-                        }
-                    }
-                    
-                    // Если данные загружены, но массив пуст, выводим сообщение (для авторизованных пользователей)
-                    if hasLoaded && abonements.isEmpty, let phone = getUserPhoneNumber(), !phone.isEmpty {
-                        Text("У вас нет активных абонементов")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                    .padding(.top, 0)     // теперь нет верхнего отступа
-                                    .padding(.bottom, 16) // небольшой отступ снизу, если нужен
-                            }
-                    
-                    // Блок покупки абонементов – всегда отрисовывается ниже
+
+                    // Всегда показываем блок покупки
                     AbonementPurchaseListView()
                 }
                 .padding()
             }
             .onAppear {
-                fetchAbonements()
+                viewModel.fetchAbonements {
+                    hasLoaded = true
+                }
             }
             .refreshable {
-                fetchAbonements()
-            }
-        }
-    }
-    
-    private func getUserPhoneNumber() -> String? {
-        UserDefaults.standard.string(forKey: "userPhone")
-    }
-    
-    private func fetchAbonements() {
-        guard let phone = getUserPhoneNumber() else {
-            DispatchQueue.main.async {
-                self.isLoading = false
-                self.hasLoaded = true  // Устанавливаем, что загрузка завершена, даже если телефон отсутствует
-            }
-            return
-        }
-        isLoading = true
-        let urlString = "https://api.yclients.com/api/v1/loyalty/abonements/?company_id=433675&phone=\(phone)"
-        guard let url = URL(string: urlString) else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/vnd.api.v2+json", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer 88fnh8jbmt44er5y28nj, User 9d241fb00061c17a5e2e76a23b214b20", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                self.isLoading = false
-                self.hasLoaded = true
-            }
-            if let error = error {
-                print("Ошибка: \(error.localizedDescription)")
-                return
-            }
-            guard let data = data else { return }
-            do {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                let response = try decoder.decode(AbonementAPIResponse.self, from: data)
-                DispatchQueue.main.async {
-                    self.abonements = response.data
-                    // Предзагрузка изображений для всех абонементов
-                    prefetchAbonementImages()
+                viewModel.fetchAbonements {
+                    hasLoaded = true
                 }
-            } catch {
-                print("Ошибка декодирования: \(error.localizedDescription)")
             }
-        }.resume()
+        }
     }
+}
 
-    
-    private func prefetchAbonementImages() {
-        guard let imageCache = ImageCache.shared.cachedImages as? [String: UIImage] else { return }
-        for abonement in abonements {
-            let key = abonement.type.title
-            // Если для ключа еще не загружено изображение, инициируем загрузку
-            if imageCache[key] == nil {
-                AbonementImageLoader(key: key).loadImage()
-            }
+// Контейнер для перехода skeleton ↔ real
+struct AbonementCardContainerView: View {
+    let abonement: Abonement
+    let phoneNumber: String
+    let isLoading: Bool
+
+    var body: some View {
+        ZStack {
+            SkeletonAbonementCardView()
+                .opacity(isLoading ? 1 : 0)
+            AbonementCardView(abonement: abonement, phoneNumber: phoneNumber)
+                .opacity(isLoading ? 0 : 1)
         }
+        .animation(.easeInOut(duration: 0.3), value: isLoading)
     }
-    
-    // Контейнер для плавного перехода между skeleton‑версией и реальной карточкой
-    struct AbonementCardContainerView: View {
-        let abonement: Abonement
-        let phoneNumber: String
-        let isLoading: Bool
-        
-        var body: some View {
-            ZStack {
-                SkeletonAbonementCardView()
-                    .opacity(isLoading ? 1 : 0)
-                AbonementCardView(abonement: abonement, phoneNumber: phoneNumber)
-                    .opacity(isLoading ? 0 : 1)
-            }
-            .animation(.easeInOut(duration: 0.3), value: isLoading)
-        }
-    }
-    
-    
-    
-    struct AbonementBlockView_Previews: PreviewProvider {
-        static var previews: some View {
-            AbonementBlockView()
-        }
+}
+
+struct AbonementBlockView_Previews: PreviewProvider {
+    static var previews: some View {
+        AbonementBlockView()
+            .environmentObject(ImageCache.shared)
     }
 }

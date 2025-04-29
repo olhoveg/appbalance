@@ -11,32 +11,47 @@ struct AbonementPurchase: Identifiable {
 
 struct AbonementPurchaseListView: View {
     @State private var purchases: [AbonementPurchase] = []
-    
+    @State private var loadedPurchaseIndices: Set<Int> = []
+
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             Text("Купить абонемент")
                 .font(.title2)
                 .fontWeight(.bold)
                 .padding(.horizontal, 16)
-            
-            ForEach(purchases) { purchase in
+
+            // Пробегаемся с индексом, чтобы задать задержку
+            ForEach(Array(purchases.enumerated()), id: \.element.id) { index, purchase in
                 HStack(spacing: 12) {
-                    // Изображение (80% доступной ширины)
                     GeometryReader { geometry in
                         AsyncImage(url: URL(string: purchase.imageURL)) { phase in
-                            if let image = phase.image {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } else if phase.error != nil {
-                                Color.gray
-                            } else {
-                                ProgressView()
+                            ZStack {
+                                // базовый серый фон
+                                Color.gray.opacity(0.15)
+                                
+                                switch phase {
+                                case .empty:
+                                    ProgressView()
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        // когда картинка загрузилась, отмечаем индекс
+                                        .opacity(loadedPurchaseIndices.contains(index) ? 1 : 0)
+                                        .onAppear {
+                                            loadedPurchaseIndices.insert(index)
+                                        }
+                                case .failure:
+                                    // просто оставляем серый фон
+                                    Color.gray.opacity(0.15)
+                                @unknown default:
+                                    EmptyView()
+                                }
                             }
                         }
                         .frame(
-                            width: geometry.size.width * 0.8, // 80% ширины контейнера
-                            height: geometry.size.height // Высота зависит от контейнера
+                            width: geometry.size.width * 0.8,
+                            height: geometry.size.height
                         )
                         .clipped()
                         .cornerRadius(10)
@@ -45,9 +60,8 @@ struct AbonementPurchaseListView: View {
                                 .stroke(Color.gray.opacity(0.5), lineWidth: 2)
                         )
                     }
-                    .frame(height: UIScreen.main.bounds.height * 0.15) // Динамическая высота
-                    
-                    // Боковая колонка (20% доступной ширины)
+                    .frame(height: UIScreen.main.bounds.height * 0.15)
+
                     VStack(spacing: 8) {
                         Button(action: {
                             if let url = URL(string: purchase.buyURL) {
@@ -67,10 +81,17 @@ struct AbonementPurchaseListView: View {
                             .fontWeight(.bold)
                             .foregroundColor(Color.primary)
                     }
-                    .frame(width: UIScreen.main.bounds.width * 0.2) // 20% ширины экрана
+                    .frame(width: UIScreen.main.bounds.width * 0.2)
                 }
                 .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity) // Растягиваем на всю ширину
+                .frame(maxWidth: .infinity)
+                // Fade-in + очередь появления
+                .opacity(loadedPurchaseIndices.contains(index) ? 1 : 0)
+                .animation(
+                    .easeInOut(duration: 0.35)
+                        .delay(Double(index) * 0.05),
+                    value: loadedPurchaseIndices
+                )
             }
         }
         .padding(.vertical, 20)
@@ -78,7 +99,7 @@ struct AbonementPurchaseListView: View {
             fetchPurchases()
         }
     }
-    
+
     private func fetchPurchases() {
         let dbRef = Database.database().reference()
         let ref = dbRef.child("abonement_images")
@@ -89,8 +110,7 @@ struct AbonementPurchaseListView: View {
                     guard let order = value["order"] as? Int,
                           let imageURL = value["image_url"] as? String,
                           let buyURL = value["buy_url"] as? String,
-                          let price = value["price"] as? Int
-                    else { continue }
+                          let price = value["price"] as? Int else { continue }
                     items.append(
                         AbonementPurchase(
                             id: key,

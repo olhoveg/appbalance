@@ -7,6 +7,8 @@ struct CertificateCardView: View {
     // Используем общий кэш из окружения
     @EnvironmentObject var imageCache: ImageCache
     @State private var loadedImage: UIImage? = nil
+    /// Флаг, что изображение уже загружено ‑ нужен для плавного появления
+    @State private var isImageLoaded: Bool = false
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -111,25 +113,34 @@ struct CertificateCardView: View {
     @ViewBuilder
     private func certificateImageView() -> some View {
         ZStack {
+            // Базовый серый placeholder, из которого «выезжает» картинка
+            Color.gray.opacity(0.15)
+
             if let imageUrl = certificate.imageUrl, !imageUrl.isEmpty {
                 if let entry = imageCache.cachedImages[imageUrl] {
                     Image(uiImage: entry.image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .opacity(isImageLoaded ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                        .onAppear { isImageLoaded = true }
+                } else if let img = loadedImage {
+                    Image(uiImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .opacity(isImageLoaded ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
                 } else {
-                    Color.gray.opacity(0.2)
-                        .overlay(ProgressView())
+                    ProgressView()
                         .onAppear {
                             imageCache.loadImage(from: imageUrl) { image in
-                                loadedImage = image
+                                self.loadedImage = image
+                                withAnimation {
+                                    self.isImageLoaded = true
+                                }
                             }
                         }
                 }
-            } else {
-                Image(systemName: "photo")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundColor(.gray)
             }
         }
     }
