@@ -3,7 +3,7 @@ import SwiftUI
 struct AbonementBlockView: View {
     @StateObject private var viewModel = AbonementViewModel()
     @State private var activeIndex: Int = 0      // для пагинатора
-    @State private var hasLoaded: Bool = false   // флаг: загрузка завершена
+    @State private var isInitialLoadCompleted = false
 
     private func getUserPhoneNumber() -> String? {
         UserDefaults.standard.string(forKey: "userPhone")
@@ -13,15 +13,10 @@ struct AbonementBlockView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Проверяем авторизацию
-                    if let phone = getUserPhoneNumber(), !phone.isEmpty {
-                        // 1) Пока не загружено или есть уже карточки — показываем ZStack
-                        if !hasLoaded || viewModel.isLoading || !viewModel.abonements.isEmpty {
-                            ZStack {
-                                Color.clear.frame(height: 380)
-
-                                // 2) Если ещё идёт загрузка — skeleton-карточки
-                                if !hasLoaded || viewModel.isLoading {
+                    ZStack(alignment: .top) {
+                        Group {
+                            if let phone = getUserPhoneNumber(), !phone.isEmpty {
+                                if viewModel.isLoading && isInitialLoadCompleted {
                                     TabView {
                                         ForEach(0..<3, id: \.self) { _ in
                                             SkeletonAbonementCardView()
@@ -30,9 +25,8 @@ struct AbonementBlockView: View {
                                     }
                                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                                     .frame(height: 380)
-                                }
-                                // 3) Иначе — реальные карточки
-                                else {
+
+                                } else if !viewModel.abonements.isEmpty {
                                     TabView(selection: $activeIndex) {
                                         ForEach(viewModel.abonements.indices, id: \.self) { index in
                                             AbonementCardContainerView(
@@ -46,50 +40,47 @@ struct AbonementBlockView: View {
                                     }
                                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                                     .frame(height: 380)
+
+                                } else if !viewModel.isLoading && isInitialLoadCompleted && viewModel.abonements.isEmpty {
+                                    Text("У вас нет активных абонементов")
+                                        .font(.headline)
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, 0)
+                                        .padding(.bottom, 16)
+                                        .multilineTextAlignment(.center)
                                 }
+                            } else {
+                                Text("Абонементы недоступны. Пожалуйста, авторизуйтесь.")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.center)
+                                    .padding()
                             }
                         }
-
-                        // Пагинатор
-                        if !hasLoaded {
-                            PaginationView(dots: 3, activeIndex: activeIndex)
-                        } else if !viewModel.abonements.isEmpty {
-                            PaginationView(dots: viewModel.abonements.count, activeIndex: activeIndex)
-                        }
-
-                        // Сообщение, если нет абонементов (показываем только после загрузки)
-                        if hasLoaded && viewModel.abonements.isEmpty {
-                            Text("У вас нет активных абонементов")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 0)
-                                .padding(.bottom, 16)
-                                .multilineTextAlignment(.center)
-                        }
-
-                    } else {
-                        // Неавторизован
-                        Text("Абонементы недоступны. Пожалуйста, авторизуйтесь.")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding()
+                    }
+                    if viewModel.isLoading && isInitialLoadCompleted {
+                        PaginationView(dots: 3, activeIndex: activeIndex)
+                    } else if !viewModel.abonements.isEmpty {
+                        PaginationView(dots: viewModel.abonements.count, activeIndex: activeIndex)
                     }
 
-                    // Всегда показываем блок покупки
-                    AbonementPurchaseListView()
+                    if isInitialLoadCompleted {
+                        AbonementPurchaseListView()
+                    }
                 }
                 .padding()
             }
             .onAppear {
                 viewModel.fetchAbonements {
-                    hasLoaded = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                        isInitialLoadCompleted = true
+                    }
                 }
             }
             .refreshable {
                 viewModel.fetchAbonements {
-                    hasLoaded = true
+                    isInitialLoadCompleted = true
                 }
             }
         }

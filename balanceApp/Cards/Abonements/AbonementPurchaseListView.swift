@@ -18,6 +18,7 @@ struct AbonementPurchaseListView: View {
             Text("Купить абонемент")
                 .font(.title2)
                 .fontWeight(.bold)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.horizontal, 16)
 
             // Пробегаемся с индексом, чтобы задать задержку
