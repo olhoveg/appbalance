@@ -25,6 +25,7 @@ struct LoyaltyBonusCardResponse: Codable {
 class LoyaltyBonusCardViewModel: ObservableObject {
     @Published var bonusCards: [LoyaltyBonusCard] = []
     @Published var isLoading = false
+    @Published var hasLoadedOnce = false
     
     private let apiURL = "https://api.yclients.com/api/v1/loyalty/cards/"
     private let apiKey = "88fnh8jbmt44er5y28nj"
@@ -63,11 +64,17 @@ class LoyaltyBonusCardViewModel: ObservableObject {
                 let decodedResponse = try JSONDecoder().decode(LoyaltyBonusCardResponse.self, from: data)
                 DispatchQueue.main.async {
                     self.bonusCards = decodedResponse.data
+                    self.hasLoadedOnce = true
                 }
             } catch {
                 print("Ошибка декодирования бонусных карт: \(error.localizedDescription)")
             }
         }.resume()
+    }
+    
+    func refreshBonusCards(phone: String) {
+        bonusCards = []
+        fetchBonusCards(phone: phone)
     }
 }
 
@@ -77,6 +84,8 @@ struct LoyaltyBonusCardView: View {
     var bonusCard: LoyaltyBonusCard
     @Environment(\.colorScheme) private var colorScheme
     @State private var bonusCardImageURL: URL?
+    @State private var loadedImage: UIImage? = nil
+    @State private var isImageLoaded: Bool = false
     
     private var screenWidth: CGFloat {
         UIScreen.main.bounds.width
@@ -100,32 +109,34 @@ struct LoyaltyBonusCardView: View {
             let cardHeight = cardWidth * 0.4
             
             HStack(spacing: 12 * scaleFactor) {
-                AsyncImage(url: bonusCardImageURL ?? placeholderURL) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .transition(.opacity)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .foregroundColor(.gray)
+                ZStack {
+                    // Серый placeholder – база для плавного появления
+                    Color.gray.opacity(0.15)
+
+                    AsyncImage(url: bonusCardImageURL ?? placeholderURL) { phase in
+                        switch phase {
+                        case .empty:
+                            // вместо стандартного placeholder ничего не рисуем: оставляем серый фон
+                            EmptyView()
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .opacity(isImageLoaded ? 1 : 0)
+                                .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                                .onAppear { isImageLoaded = true }
+                        case .failure:
+                            // при ошибке также оставляем серый фон
+                            EmptyView()
+                        @unknown default:
+                            EmptyView()
+                        }
                     }
                 }
                 .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
                 .cornerRadius(12 * scaleFactor)
                 .clipped()
-                
+
                 VStack(alignment: .leading, spacing: 6 * scaleFactor) {
                     Text("Бонусная карта")
                         .font(.system(size: 18 * scaleFactor, weight: .bold))
@@ -212,44 +223,47 @@ struct LoyaltyBonusCardMainView: View {
     @AppStorage("userPhone") private var userPhone: String = ""
     
     var body: some View {
-        ZStack {
-            Color(.systemBackground)
-                .ignoresSafeArea()
-            
-            if viewModel.isLoading {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            SkeletonBonusCardView()
-                                .frame(width: min(UIScreen.main.bounds.width * 0.9, 400), height: 160)
-                        }
+        ScrollView {
+            ZStack {
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+
+                if !viewModel.hasLoadedOnce {
+                    // Пока данные ещё не загружены — индикатор загрузки
+                    ProgressView()
+                } else if viewModel.bonusCards.isEmpty {
+                    // После первой загрузки, если всё же пусто
+                    if userPhone.isEmpty {
+                        Text("Авторизуйтесь, чтобы увидеть бонусные карты")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("У вас нет бонусных карт")
+                            .foregroundColor(.secondary)
                     }
-                    .padding(.horizontal, 16)
-                }
-            } else if viewModel.bonusCards.isEmpty {
-                if userPhone.isEmpty {
-                    Text("Авторизуйтесь, чтобы увидеть бонусные карты")
-                        .foregroundColor(.secondary)
                 } else {
-                    Text("У вас нет бонусных карт")
-                        .foregroundColor(.secondary)
-                }
-            
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(viewModel.bonusCards) { bonusCard in
-                            LoyaltyBonusCardView(bonusCard: bonusCard)
-                                .frame(width: min(UIScreen.main.bounds.width * 0.9, 400)) // ✅ Ограничиваем максимальную ширину
+                    // Если есть карты — показываем горизонтальный скролл
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(viewModel.bonusCards) { bonusCard in
+                                LoyaltyBonusCardView(bonusCard: bonusCard)
+                                    .frame(width: min(UIScreen.main.bounds.width * 0.9, 400))
+                            }
                         }
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal, 16)
                 }
             }
         }
-        .onAppear {
+        .refreshable {
             if !userPhone.isEmpty {
+                viewModel.refreshBonusCards(phone: userPhone)
+            }
+        }
+        .onAppear {
+            if !userPhone.isEmpty && !viewModel.hasLoadedOnce {
                 viewModel.fetchBonusCards(phone: userPhone)
+            } else if viewModel.hasLoadedOnce {
+                // already loaded
             }
         }
     }

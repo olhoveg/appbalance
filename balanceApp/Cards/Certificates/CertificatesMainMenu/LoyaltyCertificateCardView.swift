@@ -24,6 +24,7 @@ struct LoyaltyCertificateResponse: Codable {
 class LoyaltyCertificateViewModel: ObservableObject {
     @Published var certificates: [LoyaltyCertificate] = []
     @Published var isLoading = false
+    @Published var hasLoadedOnce = false
     
     private let apiURL = "https://api.yclients.com/api/v1/loyalty/certificates/"
     private let apiKey = "88fnh8jbmt44er5y28nj"
@@ -67,6 +68,7 @@ class LoyaltyCertificateViewModel: ObservableObject {
                 let decodedResponse = try JSONDecoder().decode(LoyaltyCertificateResponse.self, from: data)
                 DispatchQueue.main.async {
                     self.certificates = decodedResponse.data
+                    self.hasLoadedOnce = true
                 }
             } catch {
                 print("Ошибка декодирования: \(error)")
@@ -81,6 +83,8 @@ struct LoyaltyCertificateCardView: View {
     var certificate: LoyaltyCertificate
     @Environment(\.colorScheme) private var colorScheme
     @State private var certificateImageURL: URL?
+    @State private var loadedImage: UIImage? = nil
+    @State private var isImageLoaded: Bool = false
     
     private var screenWidth: CGFloat {
         UIScreen.main.bounds.width
@@ -104,26 +108,29 @@ struct LoyaltyCertificateCardView: View {
             let cardHeight = cardWidth * 0.4
             
             HStack(spacing: 12 * scaleFactor) {
-                AsyncImage(url: certificateImageURL ?? placeholderURL) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .transition(.opacity)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .foregroundColor(.gray)
+                ZStack {
+                    Color.gray.opacity(0.15)
+
+                    if let url = certificateImageURL ?? placeholderURL {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .opacity(isImageLoaded ? 1 : 0)
+                                    .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                                    .onAppear {
+                                        isImageLoaded = true
+                                    }
+                            case .failure:
+                                Color.gray.opacity(0.15)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
                     }
                 }
                 .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
@@ -179,6 +186,7 @@ struct LoyaltyCertificateCardView: View {
 struct LoyaltyCertificateMainView: View {
     @ObservedObject var viewModel: LoyaltyCertificateViewModel
     @AppStorage("userPhone") private var userPhone: String = ""
+    @State private var isInitialLoadCompleted = false
     
     var body: some View {
         ScrollView {
@@ -186,9 +194,9 @@ struct LoyaltyCertificateMainView: View {
                 Color(.systemBackground)
                     .ignoresSafeArea()
                 
-                if viewModel.isLoading {
+                if viewModel.isLoading && isInitialLoadCompleted {
                     ProgressView("Загрузка сертификатов...")
-                } else if viewModel.certificates.isEmpty {
+                } else if !viewModel.isLoading && isInitialLoadCompleted && viewModel.certificates.isEmpty {
                     if userPhone.isEmpty {
                         Text("Авторизуйтесь, чтобы увидеть сертификаты")
                             .foregroundColor(.secondary)
@@ -214,11 +222,19 @@ struct LoyaltyCertificateMainView: View {
         .refreshable {
             if !userPhone.isEmpty {
                 viewModel.fetchCertificates(phone: userPhone)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    isInitialLoadCompleted = true
+                }
             }
         }
         .onAppear {
-            if !userPhone.isEmpty {
+            if !userPhone.isEmpty && !viewModel.hasLoadedOnce {
                 viewModel.fetchCertificates(phone: userPhone)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    isInitialLoadCompleted = true
+                }
+            } else if viewModel.hasLoadedOnce {
+                isInitialLoadCompleted = true
             }
         }
     }

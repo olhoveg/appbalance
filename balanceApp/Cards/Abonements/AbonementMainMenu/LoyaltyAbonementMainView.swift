@@ -24,6 +24,7 @@ struct LoyaltyAbonementResponse: Codable {
 class LoyaltyAbonementViewModel: ObservableObject {
     @Published var abonements: [LoyaltyAbonement] = []
     @Published var isLoading = false
+    @Published var hasLoadedOnce = false
     
     private let apiURL = "https://api.yclients.com/api/v1/loyalty/abonements/"
     private let apiKey = "88fnh8jbmt44er5y28nj"
@@ -67,6 +68,7 @@ class LoyaltyAbonementViewModel: ObservableObject {
                 let decodedResponse = try JSONDecoder().decode(LoyaltyAbonementResponse.self, from: data)
                 DispatchQueue.main.async {
                     self.abonements = decodedResponse.data
+                    self.hasLoadedOnce = true
                 }
             } catch {
                 print("Ошибка декодирования: \(error)")
@@ -124,6 +126,9 @@ struct LoyaltyAbonementCardView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var abonementImageURL: URL?
     
+    @State private var loadedImage: UIImage? = nil
+    @State private var isImageLoaded: Bool = false
+    
     private var screenWidth: CGFloat {
         UIScreen.main.bounds.width
     }
@@ -146,26 +151,29 @@ struct LoyaltyAbonementCardView: View {
             let cardHeight = cardWidth * 0.4
             
             HStack(spacing: 12 * scaleFactor) {
-                AsyncImage(url: abonementImageURL ?? placeholderURL) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .transition(.opacity)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .foregroundColor(.gray)
-                    @unknown default:
-                        Image(systemName: "photo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .foregroundColor(.gray)
+                ZStack {
+                    Color.gray.opacity(0.15)
+
+                    if let url = abonementImageURL {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .opacity(isImageLoaded ? 1 : 0)
+                                    .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                                    .onAppear {
+                                        isImageLoaded = true
+                                    }
+                            case .failure:
+                                Color.gray.opacity(0.15)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
                     }
                 }
                 .frame(width: 140 * scaleFactor, height: 90 * scaleFactor)
@@ -230,6 +238,7 @@ struct LoyaltyAbonementCardView: View {
 struct LoyaltyAbonementMainView: View {
     @ObservedObject var viewModel: LoyaltyAbonementViewModel
     @AppStorage("userPhone") private var userPhone: String = ""
+    @State private var isInitialLoadCompleted = false
     
     var body: some View {
         ScrollView {
@@ -237,9 +246,9 @@ struct LoyaltyAbonementMainView: View {
                 Color(.systemBackground)
                     .ignoresSafeArea()
                 
-                if viewModel.isLoading {
+                if viewModel.isLoading && isInitialLoadCompleted {
                     ProgressView("Загрузка абонементов...")
-                } else if viewModel.abonements.isEmpty {
+                } else if !viewModel.isLoading && isInitialLoadCompleted && viewModel.abonements.isEmpty {
                     if userPhone.isEmpty {
                         Text("Авторизуйтесь, чтобы увидеть абонементы")
                             .foregroundColor(.secondary)
@@ -247,7 +256,7 @@ struct LoyaltyAbonementMainView: View {
                         Text("У вас нет активных абонементов")
                             .foregroundColor(.secondary)
                     }
-                } else {
+                } else if !viewModel.abonements.isEmpty {
                     // Отображение карточек абонементов
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
@@ -264,11 +273,19 @@ struct LoyaltyAbonementMainView: View {
         .refreshable {
             if !userPhone.isEmpty {
                 viewModel.fetchAbonements(phone: userPhone)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    isInitialLoadCompleted = true
+                }
             }
         }
         .onAppear {
-            if !userPhone.isEmpty {
+            if !userPhone.isEmpty && !viewModel.hasLoadedOnce {
                 viewModel.fetchAbonements(phone: userPhone)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    isInitialLoadCompleted = true
+                }
+            } else if viewModel.hasLoadedOnce {
+                isInitialLoadCompleted = true
             }
         }
     }

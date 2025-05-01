@@ -78,7 +78,7 @@ struct MainView: View {
                     print("MainView: Refreshable вызван – обновляем данные всех блоков.")
                     recordViewModel.refreshData()
                     if !userPhone.isEmpty {
-                        bonusCardVM.fetchBonusCards(phone: userPhone)
+                        bonusCardVM.refreshBonusCards(phone: userPhone)
                         abonementVM.fetchAbonements(phone: userPhone)
                         certificateVM.fetchCertificates(phone: userPhone)
                         // Обновляем сторис
