@@ -199,10 +199,72 @@ struct RecommendationItemView: View {
     }
 }
 
+// MARK: - TrackableScrollView to detect scroll offset
+struct TrackableScrollView<Content: View>: UIViewRepresentable {
+    let axes: Axis.Set
+    let showsIndicators: Bool
+    let onOffsetChange: (CGPoint) -> Void
+    let content: Content
+
+    init(_ axes: Axis.Set = .vertical,
+         showsIndicators: Bool = true,
+         onOffsetChange: @escaping (CGPoint) -> Void = { _ in },
+         @ViewBuilder content: () -> Content) {
+        self.axes = axes
+        self.showsIndicators = showsIndicators
+        self.onOffsetChange = onOffsetChange
+        self.content = content()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onOffsetChange: onOffsetChange)
+    }
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.delegate = context.coordinator
+        scrollView.showsVerticalScrollIndicator = showsIndicators && axes.contains(.vertical)
+        scrollView.showsHorizontalScrollIndicator = showsIndicators && axes.contains(.horizontal)
+
+        let hostedView = UIHostingController(rootView: content)
+        hostedView.view.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(hostedView.view)
+
+        NSLayoutConstraint.activate([
+            hostedView.view.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            hostedView.view.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            hostedView.view.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            hostedView.view.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            hostedView.view.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
+        ])
+
+        return scrollView
+    }
+
+    func updateUIView(_ uiView: UIScrollView, context: Context) {
+        // No update needed; SwiftUI manages the content automatically
+    }
+
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        let onOffsetChange: (CGPoint) -> Void
+
+        init(onOffsetChange: @escaping (CGPoint) -> Void) {
+            self.onOffsetChange = onOffsetChange
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            onOffsetChange(scrollView.contentOffset)
+        }
+    }
+}
+
 // MARK: - Детальный экран рекомендации (HTML → AttributedString)
 struct RecommendationDetailsView: View {
     let recommendation: Recommendation
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.presentationMode) var presentationMode
+    
+    @State private var showBackButton = false
     
     func renderedDescription() -> AnyView {
         guard let descriptionHTML = recommendation.description,
@@ -240,7 +302,13 @@ struct RecommendationDetailsView: View {
     }
     
     var body: some View {
-        ScrollView {
+        TrackableScrollView(.vertical, showsIndicators: false, onOffsetChange: { offset in
+            // threshold as before
+            let threshold: CGFloat = 200
+            withAnimation {
+                showBackButton = offset.y > threshold
+            }
+        }) {
             VStack(alignment: .leading) {
                 AsyncImage(url: URL(string: recommendation.image)) { phase in
                     if let image = phase.image {
@@ -268,6 +336,28 @@ struct RecommendationDetailsView: View {
                     renderedDescription()
                 }
                 .padding()
+            }
+            .padding(.bottom, 12) // base padding; no conditional
+        }
+        .safeAreaInset(edge: .bottom) {
+            if showBackButton {
+                Button(action: {
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    Text("Назад")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color.accentColor)
+                        .cornerRadius(12)
+                        .padding(.horizontal, 16)
+                        .shadow(radius: 5)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.easeInOut, value: showBackButton)
+            } else {
+                EmptyView().frame(height: 0)
             }
         }
         .navigationTitle("Детали")
