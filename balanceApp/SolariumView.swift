@@ -685,14 +685,30 @@ struct SolariumView: View {
                     .font(.headline)
                     .foregroundColor(colorScheme == .dark ? .white : .black)
                 AsyncImage(url: URL(string: cabinet.image)) { phase in
-                    if let image = phase.image {
-                        image.resizable()
-                            .scaledToFit()
+                    switch phase {
+                    case .empty:
+                        ZStack {
+                            Color.gray.opacity(0.15)
+                            ProgressView()
+                        }
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 120, height: 120, alignment: .top)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().stroke(Color.gray.opacity(0.4), lineWidth: 2)
+                            )
+                    case .failure:
+                        Circle()
+                            .fill(Color.gray.opacity(0.15))
                             .frame(width: 120, height: 120)
-                    } else {
-                        ProgressView().frame(width: 120, height: 120)
+                    @unknown default:
+                        EmptyView()
                     }
                 }
+                .frame(width: 120, height: 120)
                 if slots.isEmpty {
                     Text(cabinet.noAvailabilityMessage)
                         .foregroundColor(.gray)

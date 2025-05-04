@@ -2,8 +2,10 @@ import SwiftUI
 import Firebase
 import FirebaseFirestore
 import FirebaseStorage
+import MessageUI
 
 struct ProfileView: View {
+    @Environment(\.colorScheme) private var colorScheme
     // MARK: - Environment Object
     @EnvironmentObject var auth: AuthViewModel
     
@@ -24,6 +26,7 @@ struct ProfileView: View {
     @State private var profileImage: UIImage? = nil
     @State private var profileImageURL: URL? = nil
     @State private var isShowingImagePicker = false
+    @State private var showFeedbackForm = false
 
     var body: some View {
         VStack {
@@ -94,10 +97,10 @@ struct ProfileView: View {
                             }) {
                                 Text("Выйти из аккаунта")
                                     .fontWeight(.semibold)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(colorScheme == .dark ? .primary : .white)
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(Color.red)
+                                    .background(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color.black)
                                     .cornerRadius(10)
                             }
 
@@ -108,7 +111,17 @@ struct ProfileView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.black)
+                            .background(Color.red)
+                            .cornerRadius(10)
+
+                            Button("Написать разработчику") {
+                                showFeedbackForm = true
+                            }
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
                             .cornerRadius(10)
                         }
                         .padding(.horizontal)
@@ -138,6 +151,9 @@ struct ProfileView: View {
                 }
                 .sheet(isPresented: $isShowingImagePicker) {
                     ImagePicker(selectedImage: $profileImage)
+                }
+                .sheet(isPresented: $showFeedbackForm) {
+                    FeedbackFormView()
                 }
                 .onChange(of: profileImage) { newImage in
                     if newImage != nil {
@@ -596,5 +612,199 @@ struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         ProfileView()
             .environmentObject(AuthViewModel())
+    }
+}
+
+// MARK: - Форма обратной связи
+import SwiftUI
+
+struct FeedbackFormView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @State private var name = ""
+    @State private var email = ""
+    @State private var message = ""
+    @AppStorage("userPhone") private var userPhone: String = ""
+    
+    @State private var isSending = false
+    @State private var sendResult: String? = nil
+    @State private var attachedImage: UIImage? = nil
+    @State private var showImagePicker = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Ваше имя")) {
+                    TextField("Введите имя", text: $name)
+                }
+                
+                Section(header: Text("Email")) {
+                    TextField("Введите email", text: $email)
+                        .keyboardType(.emailAddress)
+                }
+                
+                Section(header: Text("Сообщение")) {
+                    TextEditor(text: $message)
+                        .frame(height: 150)
+                }
+                
+                Section {
+                    Button(action: {
+                        showImagePicker = true
+                    }) {
+                        Text(attachedImage == nil ? "Прикрепить фото" : "Фото прикреплено")
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                if isSending {
+                    HStack {
+                        Spacer()
+                        ProgressView("Отправка...")
+                        Spacer()
+                    }
+                }
+                
+                if let result = sendResult {
+                    HStack {
+                        Spacer()
+                        Text(result)
+                            .foregroundColor(result == "Успешно отправлено!" ? .green : .red)
+                        Spacer()
+                    }
+                }
+
+                Button("Отправить") {
+                    sendFeedback()
+                }
+                .disabled(message.isEmpty || isSending)
+            }
+            .navigationTitle("Обратная связь")
+            .navigationBarItems(trailing: Button("Закрыть") {
+                presentationMode.wrappedValue.dismiss()
+            })
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(selectedImage: $attachedImage)
+        }
+    }
+    
+    private func sendFeedback() {
+        isSending = true
+        sendResult = nil
+        
+        TelegramSender.shared.sendMessage(name: name, email: email, phone: userPhone, message: message, photo: attachedImage) { success in
+            DispatchQueue.main.async {
+                isSending = false
+                sendResult = success ? "Успешно отправлено!" : "Ошибка отправки"
+
+                if success {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+import Foundation
+
+class TelegramSender {
+    static let shared = TelegramSender()
+    
+    private let botToken = "7907354811:AAH4-8ZdjOksEuACnh51kNI2YyC824FeWxs"
+    private let chatId = "-1002640550524"
+    
+    func sendMessage(name: String, email: String, phone: String, message: String, photo: UIImage? = nil, completion: @escaping (Bool) -> Void) {
+        let text = """
+        📩 Новое сообщение от пользователя
+
+        Имя: \(name)
+        Телефон: \(phone)
+        Email: \(email)
+        Сообщение: \(message)
+        """
+        if let photo = photo,
+           let imageData = photo.jpegData(compressionQuality: 0.7) {
+            // Send photo with caption using multipart/form-data
+            let urlString = "https://api.telegram.org/bot\(botToken)/sendPhoto"
+            guard let url = URL(string: urlString) else {
+                completion(false)
+                return
+            }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            let boundary = "Boundary-\(UUID().uuidString)"
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            var body = Data()
+            // chat_id
+            body.append("--\(boundary)\r\n")
+            body.append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n")
+            body.append("\(chatId)\r\n")
+            // caption
+            body.append("--\(boundary)\r\n")
+            body.append("Content-Disposition: form-data; name=\"caption\"\r\n\r\n")
+            body.append("\(text)\r\n")
+            // photo
+            body.append("--\(boundary)\r\n")
+            body.append("Content-Disposition: form-data; name=\"photo\"; filename=\"feedback.jpg\"\r\n")
+            body.append("Content-Type: image/jpeg\r\n\r\n")
+            body.append(imageData)
+            body.append("\r\n")
+            body.append("--\(boundary)--\r\n")
+            request.httpBody = body
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Ошибка отправки фото: \(error)")
+                    completion(false)
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse,
+                   (200...299).contains(httpResponse.statusCode) {
+                    completion(true)
+                } else {
+                    completion(false)
+                }
+            }.resume()
+        } else {
+            // Send text-only message
+            let urlString = "https://api.telegram.org/bot\(botToken)/sendMessage"
+            guard let url = URL(string: urlString) else {
+                completion(false)
+                return
+            }
+            let parameters = [
+                "chat_id": chatId,
+                "text": text
+            ]
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            request.httpBody = parameters
+                .map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }
+                .joined(separator: "&")
+                .data(using: .utf8)
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Ошибка отправки: \(error)")
+                    completion(false)
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse,
+                   (200...299).contains(httpResponse.statusCode) {
+                    completion(true)
+                } else {
+                    completion(false)
+                }
+            }.resume()
+        }
+    }
+}
+
+private extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
     }
 }

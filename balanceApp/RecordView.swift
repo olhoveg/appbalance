@@ -804,21 +804,23 @@ struct RecordView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 8)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(viewModel.upcomingTenRecords()) { record in
-                        if let date = viewModel.recordDate(from: record.date) {
-                            let address = viewModel.companyIdToAddress["\(record.company_id)"] ?? ""
-                            UpcomingRecordBlock(date: date, address: address)
-                                .onTapGesture {
-                                    viewModel.selectedRecord = record
-                                    viewModel.showModal = true
-                                }
-                        }
+            // Grid of upcoming records: 5 columns, no horizontal scroll
+            let upcoming = viewModel.upcomingTenRecords()
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(upcoming) { record in
+                    if let date = viewModel.recordDate(from: record.date) {
+                        let address = viewModel.companyIdToAddress["\(record.company_id)"] ?? ""
+                        UpcomingRecordBlock(date: date, address: address)
+                            .onTapGesture {
+                                viewModel.selectedRecord = record
+                                viewModel.showModal = true
+                            }
                     }
                 }
-                .padding(.horizontal)
             }
+            .padding(.horizontal)
 
             Spacer()
         }
