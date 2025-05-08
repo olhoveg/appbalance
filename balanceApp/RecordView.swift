@@ -1,8 +1,12 @@
 
+
 import SwiftUI
 import Combine
 import FirebaseDatabase
 import OneSignalFramework
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Расширение модели Record
 
@@ -368,10 +372,18 @@ class RecordViewModel: ObservableObject {
         cancelNotificationsForDeletedRecords(deleted)
 
         // Чтобы избежать ложного пуша при самом первом входе/открытии,
-        // отправляем уведомление ТОЛЬКО если первая синхронизация уже была.
+        // отправляем уведомление ТОЛЬКО если первая синхронизация уже была
+        // и приложение находится в фоне/свернуто.
+        #if canImport(UIKit)
+        let appState = UIApplication.shared.applicationState
+        if hasPerformedInitialSync && appState != .active && (!changed.isEmpty || !deleted.isEmpty) {
+            sendScheduleUpdatedNotification()
+        }
+        #else
         if hasPerformedInitialSync && (!changed.isEmpty || !deleted.isEmpty) {
             sendScheduleUpdatedNotification()
         }
+        #endif
 
         // Отмечаем, что первичная синхронизация завершена
         if !hasPerformedInitialSync {
