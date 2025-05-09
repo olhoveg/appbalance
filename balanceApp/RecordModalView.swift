@@ -205,6 +205,7 @@ struct RecordModalView: View {
                     .background(Color(UIColor.systemBackground))
                     .cornerRadius(10)
                     .shadow(radius: 2)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 10)
                     .onAppear {
                         print("Record \(record.id) has \(services.count) services")
