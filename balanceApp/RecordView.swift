@@ -82,7 +82,7 @@ struct ClientsData: Codable {
 @MainActor
 class RecordViewModel: ObservableObject {
     static let sharedInstance = RecordViewModel()
-
+    static let shared = RecordViewModel()
     @Published var phone: String = ""
     @Published var clients: [Client] = []
     @Published var recordsByCompany: [String: [Record]] = [:]
@@ -127,6 +127,10 @@ class RecordViewModel: ObservableObject {
     }
 
     func clearCachedRecords() {
+        // Сначала отменяем все запланированные push‑уведомления
+        cancelAllScheduledNotifications()
+        
+        // Очищаем локальное состояние
         self.recordsByCompany = [:]
         self.phone = ""
         // при выходе из учётки сбрасываем флаг первой синхронизации
@@ -134,9 +138,22 @@ class RecordViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "savedRecords")
     }
 
-    
-    
-    
+    // MARK: - Отмена всех запланированных уведомлений (например, при выходе из профиля)
+    /// Отменяет каждый уведомленный пуш, сохранённый в `scheduledNotificationMapping`,
+    /// а затем очищает все локальные словари, связанные с уведомлениями.
+    func cancelAllScheduledNotifications() {
+        // Отменяем каждое сохранённое уведомление через OneSignal API
+        let mappingCopy = self.scheduledNotificationMapping
+        for (externalId, notifId) in mappingCopy {
+            if !notifId.isEmpty {
+                cancelNotification(notificationId: notifId, externalId: externalId)
+            }
+        }
+        // Полностью очищаем локальные кэши уведомлений
+        self.scheduledNotificationMapping = [:]
+        self.externalIdMapping = [:]
+    }
+
     func loadSavedRecords() {
         guard let data = UserDefaults.standard.data(forKey: "savedRecords") else { return }
         if let dict = try? JSONDecoder().decode([String: [Record]].self, from: data) {
@@ -579,6 +596,10 @@ class RecordViewModel: ObservableObject {
 
     // Запланировать уведомление «за 1 час» для каждой записи
     func scheduleNotificationsForRecords(records: [Record]) {
+        guard UserDefaults.standard.bool(forKey: "isLoggedIn") else {
+            self.log("⛔️ Пользователь вышел — уведомления не планируем.")
+            return
+        }
         for record in records {
             guard let recordDate = recordDate(from: record.date) else { continue }
             // Если запись в будущем и подтвердили (например confirmed == 1)
