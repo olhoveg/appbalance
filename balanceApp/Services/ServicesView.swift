@@ -216,8 +216,8 @@ struct VerticalServiceCardView: View {
         .onAppear {
             loadFinalURL()
         }
-        .onChange(of: finalImageUrl) { newURL in
-            loadImage(from: newURL)
+        .onChange(of: finalImageUrl) {
+            loadImage(from: finalImageUrl)
         }
     }
 
@@ -357,10 +357,10 @@ struct VerticalServiceDetailsView: View {
                             GeometryReader { proxy in
                                 let minY = proxy.frame(in: .named("scroll")).minY
                                 Color.clear
-                                    .onChange(of: minY) { newY in
+                                    .onChange(of: minY) {
                                         // Compare to viewport height
                                         let viewportHeight = UIScreen.main.bounds.height
-                                        if newY < viewportHeight {
+                                        if minY < viewportHeight {
                                             withAnimation(.easeInOut) { showBackButton = true }
                                         } else {
                                             withAnimation(.easeInOut) { showBackButton = false }
@@ -412,7 +412,7 @@ struct VerticalServiceDetailsView: View {
                 loadImageIfNeeded()
             }
         }
-        .onChange(of: detailImageUrl) { _ in
+        .onChange(of: detailImageUrl) {
             loadImageIfNeeded()
         }
     }

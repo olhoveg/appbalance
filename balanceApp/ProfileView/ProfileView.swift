@@ -155,8 +155,8 @@ struct ProfileView: View {
                 .sheet(isPresented: $showFeedbackForm) {
                     FeedbackFormView()
                 }
-                .onChange(of: profileImage) { newImage in
-                    if newImage != nil {
+                .onChange(of: profileImage) {
+                    if profileImage != nil {
                         uploadPhoto()
                     }
                 }

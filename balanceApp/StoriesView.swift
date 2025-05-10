@@ -424,8 +424,8 @@ struct StoriesView: View {
                     .id(story.id)
             }
         }
-        .onChange(of: showVideoEditor) { isPresented in
-            if isPresented {
+        .onChange(of: showVideoEditor) {
+            if showVideoEditor {
                 viewModel.fetchStories()
             }
         }
@@ -435,9 +435,8 @@ struct StoriesView: View {
             viewModel.fetchStories()
         }
         // Если пользователь вернулся в активное состояние (приложение / вкладка)
-        .onChange(of: scenePhase) { newPhase in
-            if newPhase == .active {
-                // Повторяем fetchStories, чтобы удостовериться, что все загрузится
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
                 viewModel.fetchStories()
             }
         }
@@ -483,6 +482,7 @@ struct StoryPlayerView: View {
     @State private var timeObserverToken: Any?
     @State private var itemEndObserver: NSObjectProtocol?
     @State private var isPlayerReady = false
+    @State private var isMuted: Bool = false
 
     var body: some View {
         ZStack {
@@ -491,6 +491,7 @@ struct StoryPlayerView: View {
                     .edgesIgnoringSafeArea(.all)
                     .onAppear {
                         player.play()
+                        player.isMuted = isMuted
                     }
             } else {
                 Color.black.edgesIgnoringSafeArea(.all)
@@ -547,8 +548,29 @@ struct StoryPlayerView: View {
                     .onTapGesture { playNextVideo() }
             }
             .zIndex(0)
+
+            // Кнопка управления звуком поверх жестов
+            Button {
+                isMuted.toggle()
+                player.isMuted = isMuted
+            } label: {
+                Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .padding(12)
+                    .background(Color.black.opacity(0.5))
+                    .clipShape(Circle())
+                    .foregroundColor(.white)
+            }
+            .contentShape(Rectangle())
+            .zIndex(2)
+            .position(x: UIScreen.main.bounds.width - 80, y: 55)
         }
         .onAppear {
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                print("Audio session setup error on appear: \(error)")
+            }
             setupPlayer()
         }
         .onDisappear {
@@ -575,7 +597,14 @@ struct StoryPlayerView: View {
                 do {
                     let _ : Bool = try await firstItem.asset.load(.isPlayable)
                     DispatchQueue.main.async {
+                        do {
+                            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+                            try AVAudioSession.sharedInstance().setActive(true)
+                        } catch {
+                            print("Audio session setup error: \(error)")
+                        }
                         player.replaceCurrentItem(with: firstItem)
+                        player.isMuted = isMuted
                         for item in playerItems.dropFirst() {
                             player.insert(item, after: nil)
                         }
@@ -757,7 +786,7 @@ struct AdminPanelView: View {
                 if isUploadingImage {
                     ProgressView("Загрузка фото...")
                 }
-                if let imageUrl = imageUrl {
+                if imageUrl != nil {
                     Text("Фото загружено")
                         .font(.caption)
                         .foregroundColor(.green)
@@ -768,7 +797,7 @@ struct AdminPanelView: View {
                 if isUploadingVideo {
                     ProgressView("Загрузка видео...")
                 }
-                if let videoUrl = videoUrl {
+                if videoUrl != nil {
                     Text("Видео загружено")
                         .font(.caption)
                         .foregroundColor(.green)
@@ -809,8 +838,12 @@ struct AdminPanelView: View {
 
     var body: some View {
         bodyContent
-            .onChange(of: selectedImageItem, perform: handleImageSelection)
-            .onChange(of: selectedVideoItem, perform: handleVideoSelection)
+            .onChange(of: selectedImageItem) { oldItem, newItem in
+                handleImageSelection(newItem)
+            }
+            .onChange(of: selectedVideoItem) { oldItem, newItem in
+                handleVideoSelection(newItem)
+            }
             .navigationTitle("Админ‑панель")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -934,7 +967,7 @@ struct StoryVideoAdminView: View {
         .onAppear {
             viewModel.fetchStories()
         }
-        .onChange(of: selectedVideoItem) { newItem in
+        .onChange(of: selectedVideoItem) { _, newItem in
             guard let item = newItem else { return }
             item.loadTransferable(type: Data.self) { result in
                 switch result {

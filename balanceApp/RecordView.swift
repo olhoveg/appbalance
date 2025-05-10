@@ -376,8 +376,7 @@ class RecordViewModel: ObservableObject {
         let newRecordsByCompany = self.tempRecordsByCompany
 
         // Выявляем изменения (добавления, изменения времени, удалённые записи)
-        let (added, changed, deleted) = detectRecordChanges(
-            oldRecordsByCompany: oldRecordsByCompany,
+        let (_, changed, deleted) = detectRecordChanges(            oldRecordsByCompany: oldRecordsByCompany,
             newRecordsByCompany: newRecordsByCompany
         )
 
@@ -868,8 +867,8 @@ struct RecordView: View {
                 viewModel.loadSavedRecords()
             }
         }
-        .onChange(of: auth.isLoggedIn) { isLoggedIn in
-            if !isLoggedIn {
+        .onChange(of: auth.isLoggedIn) {
+            if !auth.isLoggedIn {
                 viewModel.clearCachedRecords()
             } else {
                 viewModel.loadSavedRecords()

@@ -201,12 +201,12 @@ struct ServiceBlockCardView: View {
             loadFinalURL()
         }
         // Если вдруг что-то меняется в initialURL (маловероятно), заново грузим
-        .onChange(of: initialURL) { _ in
+        .onChange(of: initialURL) {
             loadFinalURL()
         }
         // Если вдруг finalImageURL меняется, перезагружаем саму картинку
-        .onChange(of: finalImageURL) { newValue in
-            loadImage(from: newValue)
+        .onChange(of: finalImageURL) {
+            loadImage(from: finalImageURL)
         }
     }
     
@@ -316,8 +316,8 @@ struct ServiceDetailsView: View {
         .onAppear {
             loadFinalURL()
         }
-        .onChange(of: detailURL) { newValue in
-            loadDetailImage(newValue)
+        .onChange(of: detailURL) {
+            loadDetailImage(detailURL)
         }
     }
     
