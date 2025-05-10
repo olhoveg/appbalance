@@ -479,6 +479,7 @@ struct StoryPlayerView: View {
     @State private var playerItems: [AVPlayerItem] = []
     @State private var currentVideoIndex: Int = 0
     @State private var currentVideoProgress: Double = 0.0
+    @AppStorage("storiesIsMuted") private var globalIsMuted: Bool = false
     @State private var timeObserverToken: Any?
     @State private var itemEndObserver: NSObjectProtocol?
     @State private var isPlayerReady = false
@@ -553,6 +554,7 @@ struct StoryPlayerView: View {
             Button {
                 isMuted.toggle()
                 player.isMuted = isMuted
+                globalIsMuted = isMuted       // сохраняем для следующих сторис
             } label: {
                 Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .padding(12)
@@ -565,6 +567,11 @@ struct StoryPlayerView: View {
             .position(x: UIScreen.main.bounds.width - 80, y: 55)
         }
         .onAppear {
+            // Определяем стартовое состояние звука
+            if UserDefaults.standard.object(forKey: "storiesIsMuted") == nil {
+                globalIsMuted = AVAudioSession.sharedInstance().secondaryAudioShouldBeSilencedHint
+            }
+            isMuted = globalIsMuted
             do {
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
                 try AVAudioSession.sharedInstance().setActive(true)
