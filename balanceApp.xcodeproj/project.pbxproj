@@ -541,7 +541,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = balanceApp/balanceApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"balanceApp/Preview Content\"";
 				DEVELOPMENT_TEAM = B9K44XR228;
@@ -583,7 +583,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = balanceApp/balanceAppRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"balanceApp/Preview Content\"";
 				DEVELOPMENT_TEAM = B9K44XR228;
@@ -712,7 +712,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = B9K44XR228;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = org.reactjs.native.example.balance24App/Info.plist;
@@ -740,7 +740,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = org.reactjs.native.example.balance24App/org.reactjs.native.example.balance24AppRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = B9K44XR228;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = org.reactjs.native.example.balance24App/Info.plist;
