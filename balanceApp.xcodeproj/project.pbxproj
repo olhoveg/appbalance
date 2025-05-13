@@ -19,6 +19,12 @@
 		0AD443392D5DED6B0063ECEF /* FirebaseFirestoreCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 0AD443382D5DED6B0063ECEF /* FirebaseFirestoreCombine-Community */; };
 		0AD4433B2D5DED6B0063ECEF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 0AD4433A2D5DED6B0063ECEF /* FirebaseStorage */; };
 		0AD4433D2D5DED6B0063ECEF /* FirebaseStorageCombine-Community in Frameworks */ = {isa = PBXBuildFile; productRef = 0AD4433C2D5DED6B0063ECEF /* FirebaseStorageCombine-Community */; };
+		0E989E092DD91C21007B62CB /* AppMetricaAdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 0E989E082DD91C21007B62CB /* AppMetricaAdSupport */; };
+		0E989E0B2DD91C21007B62CB /* AppMetricaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0E989E0A2DD91C21007B62CB /* AppMetricaCore */; };
+		0E989E0D2DD91C21007B62CB /* AppMetricaCrashes in Frameworks */ = {isa = PBXBuildFile; productRef = 0E989E0C2DD91C21007B62CB /* AppMetricaCrashes */; };
+		0E989E0F2DD91C21007B62CB /* AppMetricaLibraryAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = 0E989E0E2DD91C21007B62CB /* AppMetricaLibraryAdapter */; };
+		0E989E112DD91C21007B62CB /* AppMetricaScreenshot in Frameworks */ = {isa = PBXBuildFile; productRef = 0E989E102DD91C21007B62CB /* AppMetricaScreenshot */; };
+		0E989E132DD91C21007B62CB /* AppMetricaWebKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0E989E122DD91C21007B62CB /* AppMetricaWebKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -118,15 +124,21 @@
 			buildActionMask = 2147483647;
 			files = (
 				0A6FA6532D6755AE009EB62D /* OneSignalFramework in Frameworks */,
+				0E989E0F2DD91C21007B62CB /* AppMetricaLibraryAdapter in Frameworks */,
 				0A6FA6512D6755AE009EB62D /* OneSignalExtension in Frameworks */,
 				0AD443352D5DED6B0063ECEF /* FirebaseDatabase in Frameworks */,
 				0A6FA6552D6755AE009EB62D /* OneSignalInAppMessages in Frameworks */,
 				0AD443392D5DED6B0063ECEF /* FirebaseFirestoreCombine-Community in Frameworks */,
 				0AD443332D5DED6B0063ECEF /* FirebaseAuth in Frameworks */,
 				0A6FA6572D6755AE009EB62D /* OneSignalLocation in Frameworks */,
+				0E989E112DD91C21007B62CB /* AppMetricaScreenshot in Frameworks */,
+				0E989E092DD91C21007B62CB /* AppMetricaAdSupport in Frameworks */,
 				0AD4433B2D5DED6B0063ECEF /* FirebaseStorage in Frameworks */,
 				0A6A2CAC2D6C418400448D00 /* FeedKit in Frameworks */,
 				0AD4433D2D5DED6B0063ECEF /* FirebaseStorageCombine-Community in Frameworks */,
+				0E989E132DD91C21007B62CB /* AppMetricaWebKit in Frameworks */,
+				0E989E0B2DD91C21007B62CB /* AppMetricaCore in Frameworks */,
+				0E989E0D2DD91C21007B62CB /* AppMetricaCrashes in Frameworks */,
 				0AD443372D5DED6B0063ECEF /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -210,6 +222,12 @@
 				0A6FA6542D6755AE009EB62D /* OneSignalInAppMessages */,
 				0A6FA6562D6755AE009EB62D /* OneSignalLocation */,
 				0A6A2CAB2D6C418400448D00 /* FeedKit */,
+				0E989E082DD91C21007B62CB /* AppMetricaAdSupport */,
+				0E989E0A2DD91C21007B62CB /* AppMetricaCore */,
+				0E989E0C2DD91C21007B62CB /* AppMetricaCrashes */,
+				0E989E0E2DD91C21007B62CB /* AppMetricaLibraryAdapter */,
+				0E989E102DD91C21007B62CB /* AppMetricaScreenshot */,
+				0E989E122DD91C21007B62CB /* AppMetricaWebKit */,
 			);
 			productName = balanceApp;
 			productReference = 0A5684422D5CDBE200F299AA /* balanceApp.app */;
@@ -323,6 +341,7 @@
 				0AD443312D5DED6B0063ECEF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				0A6FA64F2D6755AE009EB62D /* XCRemoteSwiftPackageReference "OneSignal-iOS-SDK" */,
 				0A6A2CAA2D6C418400448D00 /* XCRemoteSwiftPackageReference "FeedKit" */,
+				0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0A5684432D5CDBE200F299AA /* Products */;
@@ -541,7 +560,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = balanceApp/balanceApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"balanceApp/Preview Content\"";
 				DEVELOPMENT_TEAM = B9K44XR228;
@@ -583,7 +602,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = balanceApp/balanceAppRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"balanceApp/Preview Content\"";
 				DEVELOPMENT_TEAM = B9K44XR228;
@@ -712,7 +731,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = B9K44XR228;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = org.reactjs.native.example.balance24App/Info.plist;
@@ -740,7 +759,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = org.reactjs.native.example.balance24App/org.reactjs.native.example.balance24AppRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = B9K44XR228;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = org.reactjs.native.example.balance24App/Info.plist;
@@ -839,6 +858,14 @@
 				minimumVersion = 11.8.1;
 			};
 		};
+		0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/appmetrica/appmetrica-sdk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.10.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -896,6 +923,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0AD443312D5DED6B0063ECEF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = "FirebaseStorageCombine-Community";
+		};
+		0E989E082DD91C21007B62CB /* AppMetricaAdSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */;
+			productName = AppMetricaAdSupport;
+		};
+		0E989E0A2DD91C21007B62CB /* AppMetricaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */;
+			productName = AppMetricaCore;
+		};
+		0E989E0C2DD91C21007B62CB /* AppMetricaCrashes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */;
+			productName = AppMetricaCrashes;
+		};
+		0E989E0E2DD91C21007B62CB /* AppMetricaLibraryAdapter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */;
+			productName = AppMetricaLibraryAdapter;
+		};
+		0E989E102DD91C21007B62CB /* AppMetricaScreenshot */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */;
+			productName = AppMetricaScreenshot;
+		};
+		0E989E122DD91C21007B62CB /* AppMetricaWebKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E989E072DD91C21007B62CB /* XCRemoteSwiftPackageReference "appmetrica-sdk-ios" */;
+			productName = AppMetricaWebKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

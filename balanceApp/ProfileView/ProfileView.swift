@@ -3,6 +3,7 @@ import Firebase
 import FirebaseFirestore
 import FirebaseStorage
 import MessageUI
+import AppMetricaCore
 
 struct ProfileView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -161,6 +162,7 @@ struct ProfileView: View {
                     }
                 }
                 .onAppear {
+                    AppMetrica.reportEvent(name: "Пользователь открыл экран профиля")
                     // При появлении профиля берем данные из UserDefaults
                     clientPhone = UserDefaults.standard.string(forKey: "userPhone") ?? "Нет номера"
                     clientName = UserDefaults.standard.string(forKey: "userName") ?? "Имя пользователя"
@@ -247,6 +249,7 @@ struct ProfileView: View {
                 }
                 .onAppear {
                     // Проверяем статус авторизации при появлении
+                    AppMetrica.reportEvent(name: "Пользователь открыл экран авторизации")
                     checkAuthStatus()
                 }
             }
@@ -362,6 +365,7 @@ struct ProfileView: View {
                         UserDefaults.standard.set(userEmail, forKey: "userEmail")
                         
                         // Авторизация прошла успешно
+                        AppMetrica.reportEvent(name: "Пользователь успешно авторизовался")
                         auth.loginSuccess()
                         
                         alertMessage = "Вход выполнен!"

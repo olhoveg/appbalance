@@ -12,6 +12,8 @@ import BackgroundTasks
 import os
 import UserNotifications  // Добавляем для работы с уведомлениями
 import OneSignalFramework
+import AppMetricaCore   // ← заменили здесь
+
 
 // MARK: - AppDelegate с использованием BGAppRefreshTask и UNUserNotificationCenterDelegate
 
@@ -20,6 +22,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         os_log("Приложение запущено. Регистрация фоновой задачи...", log: OSLog.default, type: .info)
+
+        // 🔹 AppMetrica SDK
+                let configuration = AppMetricaConfiguration(apiKey: "f72ff25d-a8de-4a9b-bc66-a381245eb7e1")!
+                AppMetrica.activate(with: configuration)
+        
         
         // Настраиваем делегат для уведомлений
         UNUserNotificationCenter.current().delegate = self
@@ -39,6 +46,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         return true
     }
+    
     
     /// Планирует выполнение фоновой задачи обновления
     func scheduleAppRefresh() {
@@ -147,7 +155,6 @@ struct balanceAppApp: App {
         FirebaseApp.configure()
         // Инициализируем OneSignal сразу при запуске приложения
         OneSignalService.shared.initialize()
-
     }
     
     var sharedModelContainer: ModelContainer = {
@@ -163,29 +170,29 @@ struct balanceAppApp: App {
     }()
     
     var body: some Scene {
-            WindowGroup {
-                if !isSplashFinished {
-                    SplashScreen()
-                        .onAppear {
-                            // Ждем 2 секунды, затем скрываем SplashScreen
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                self.isSplashFinished = true
-                            }
+        WindowGroup {
+            if !isSplashFinished {
+                SplashScreen()
+                    .onAppear {
+                        // Ждем 2 секунды, затем скрываем SplashScreen
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            self.isSplashFinished = true
                         }
+                    }
+                    .environmentObject(authViewModel)
+                    .environmentObject(imageCache)
+            } else {
+                if authViewModel.isLoggedIn {
+                    ContentView()
                         .environmentObject(authViewModel)
                         .environmentObject(imageCache)
                 } else {
-                    if authViewModel.isLoggedIn {
-                        ContentView()
-                            .environmentObject(authViewModel)
-                            .environmentObject(imageCache)
-                    } else {
-                        ContentView()
-                            .environmentObject(authViewModel)
-                            .environmentObject(imageCache)
-                    }
+                    ContentView()
+                        .environmentObject(authViewModel)
+                        .environmentObject(imageCache)
                 }
             }
-            .modelContainer(sharedModelContainer)
         }
+        .modelContainer(sharedModelContainer)
     }
+}
