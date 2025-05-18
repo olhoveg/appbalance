@@ -115,6 +115,7 @@ class CertificateViewModel: ObservableObject {
                         imageUrl: dict["image_url"] as? String,
                         buyUrl: dict["buyUrl"] as? String,
                         expirationText: dict["expirationText"] as? String,
+                        price: dict["price"] as? Int ?? 0,
                         type: CertificateType(title: key),
                         status: nil
                     )

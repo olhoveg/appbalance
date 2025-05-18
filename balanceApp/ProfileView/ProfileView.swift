@@ -94,6 +94,7 @@ struct ProfileView: View {
                         // Кнопки действий
                         VStack(spacing: 15) {
                             Button(action: {
+                                AppMetrica.reportEvent(name: "Пользователь нажал 'Выйти из аккаунта'")
                                 auth.logout()
                             }) {
                                 Text("Выйти из аккаунта")
@@ -106,6 +107,7 @@ struct ProfileView: View {
                             }
 
                             Button("Удалить аккаунт") {
+                                AppMetrica.reportEvent(name: "Пользователь нажал 'Удалить аккаунт'")
                                 showDeleteConfirmation = true
                             }
                             .fontWeight(.semibold)
@@ -116,6 +118,7 @@ struct ProfileView: View {
                             .cornerRadius(10)
 
                             Button("Написать разработчику") {
+                                AppMetrica.reportEvent(name: "Пользователь нажал 'Написать разработчику'")
                                 showFeedbackForm = true
                             }
                             .fontWeight(.semibold)
@@ -158,6 +161,7 @@ struct ProfileView: View {
                 }
                 .onChange(of: profileImage) {
                     if profileImage != nil {
+                        AppMetrica.reportEvent(name: "Пользователь изменил фото в профиле")
                         uploadPhoto()
                     }
                 }
@@ -695,7 +699,7 @@ struct FeedbackFormView: View {
     private func sendFeedback() {
         isSending = true
         sendResult = nil
-        
+        AppMetrica.reportEvent(name: "Пользователь отправил сообщение разработчику")
         TelegramSender.shared.sendMessage(name: name, email: email, phone: userPhone, message: message, photo: attachedImage) { success in
             DispatchQueue.main.async {
                 isSending = false

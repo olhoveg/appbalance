@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseDatabase
+import AppMetricaCore
 
 struct AbonementPurchase: Identifiable {
     let id: String
@@ -65,6 +66,10 @@ struct AbonementPurchaseListView: View {
 
                     VStack(spacing: 8) {
                         Button(action: {
+                            AppMetrica.reportEvent(
+                                name: "Пользователь нажал кнопку 'Купить абонемент'",
+                                parameters: ["Цена абонемента": purchase.price]
+                            )
                             if let url = URL(string: purchase.buyURL) {
                                 UIApplication.shared.open(url)
                             }

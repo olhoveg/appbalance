@@ -1,3 +1,4 @@
+import AppMetricaCore
 import SwiftUI
 
 // MARK: - Enum вкладок
@@ -49,6 +50,20 @@ struct ContentView: View {
                     .tag(Tab.solarium)
             }
             .navigationBarHidden(true)
+            .onChange(of: selectedTab) { tab in
+                switch tab {
+                case .main:
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Главная'")
+                case .cards:
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Карты'")
+                case .service:
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Услуги'")
+                case .chat:
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Команда'")
+                case .solarium:
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Записаться'")
+                }
+            }
         }
         .ignoresSafeArea(.container, edges: .top)
     }

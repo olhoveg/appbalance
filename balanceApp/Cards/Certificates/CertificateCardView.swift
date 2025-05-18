@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseDatabase
+import AppMetricaCore
 
 struct CertificateCardView: View {
     let certificate: Certificate
@@ -84,9 +85,14 @@ struct CertificateCardView: View {
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 8) {
+                VStack(spacing: 8) {
                     if let buyUrl = certificate.buyUrl, let url = URL(string: buyUrl) {
                         Button(action: {
+                            let priceValue = certificate.price ?? certificate.defaultBalance ?? 0
+                            AppMetrica.reportEvent(
+                                name: "Пользователь нажал кнопку 'Купить сертификат'",
+                                parameters: ["Цена сертификата": priceValue]
+                            )
                             UIApplication.shared.open(url)
                         }) {
                             Text("Купить")
@@ -99,13 +105,15 @@ struct CertificateCardView: View {
                         }
                     }
 
-                    if let price = certificate.defaultBalance {
+                    if let price = certificate.price ?? certificate.defaultBalance {
                         Text("\(price) ₽")
                             .font(.footnote)
                             .fontWeight(.bold)
                             .foregroundColor(colorScheme == .dark ? .white : .primary)
                     }
                 }
+                .frame(width: UIScreen.main.bounds.width * 0.2)
+                .multilineTextAlignment(.center)
             }
         }
     }

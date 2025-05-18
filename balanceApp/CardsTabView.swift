@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppMetricaCore
 
 struct CardsTabView: View {
     @State private var selectedTab = 0 // Устанавливаем 0 для "Абонементы" (он будет первым)
@@ -20,6 +21,18 @@ struct CardsTabView: View {
             }
             .pickerStyle(SegmentedPickerStyle())
             .padding()
+            .onChange(of: selectedTab) { value in
+                switch value {
+                case 0:
+                    AppMetrica.reportEvent(name: "Пользователь выбрал 'Абонементы'")
+                case 1:
+                    AppMetrica.reportEvent(name: "Пользователь выбрал 'Сертификаты'")
+                case 2:
+                    AppMetrica.reportEvent(name: "Пользователь выбрал 'Бонусная карта'")
+                default:
+                    break
+                }
+            }
 
             // Отображение соответствующего контента в зависимости от выбранной вкладки
             switch selectedTab {

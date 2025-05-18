@@ -12,7 +12,8 @@ import BackgroundTasks
 import os
 import UserNotifications  // Добавляем для работы с уведомлениями
 import OneSignalFramework
-import AppMetricaCore   // ← заменили здесь
+import AppMetricaCore
+import AppMetricaPush
 
 
 // MARK: - AppDelegate с использованием BGAppRefreshTask и UNUserNotificationCenterDelegate
@@ -27,14 +28,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 let configuration = AppMetricaConfiguration(apiKey: "f72ff25d-a8de-4a9b-bc66-a381245eb7e1")!
                 AppMetrica.activate(with: configuration)
         
-        
-        // Настраиваем делегат для уведомлений
-        UNUserNotificationCenter.current().delegate = self
+        AppMetricaPush.handleApplicationDidFinishLaunching(options: launchOptions)
+        // Настройка цепочки делегатов для UNUserNotificationCenter
+        let pushDelegate = AppMetricaPush.userNotificationCenterDelegate
+        pushDelegate.nextDelegate = self
+        UNUserNotificationCenter.current().delegate = pushDelegate
         
         // Запрашиваем разрешение на уведомления
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             os_log("🔐 Разрешение на уведомления: %@", log: OSLog.default, type: .info, granted ? "разрешено" : "отказано")
         }
+        
+        application.registerForRemoteNotifications()
         
         // Регистрируем фоновую задачу с вашим уникальным идентификатором
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.yourcompany.balanceApp.refresh", using: nil) { task in
@@ -47,6 +52,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         return true
     }
     
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        #if DEBUG
+        let environment = AppMetricaPushEnvironment.development
+        #else
+        let environment = AppMetricaPushEnvironment.production
+        #endif
+        AppMetricaPush.setDeviceTokenFrom(deviceToken, pushEnvironment: environment)
+    }
     
     /// Планирует выполнение фоновой задачи обновления
     func scheduleAppRefresh() {

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import OneSignalFramework
+import AppMetricaCore
 
 struct MainView: View {
     @Binding var selectedTab: Tab
@@ -40,9 +41,13 @@ struct MainView: View {
                                     .cornerRadius(8)
                             }
                             .padding(.horizontal)
+                            .simultaneousGesture(TapGesture().onEnded {
+                                AppMetrica.reportEvent(name: "Пользователь нажал на кнопку 'Войти'")
+                            })
                         } else {
                             // Запись на солярий
                             Button(action: {
+                                AppMetrica.reportEvent(name: "Пользователь нажал на кнопку 'Записаться'")
                                 selectedTab = .solarium
                             }) {
                                 Text("Записаться")
@@ -123,6 +128,9 @@ struct CustomNavigationBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
+            .simultaneousGesture(TapGesture().onEnded {
+                AppMetrica.reportEvent(name: "Пользователь нажал на иконку профиля")
+            })
             .zIndex(1)
             
             Spacer()
@@ -145,6 +153,9 @@ struct CustomNavigationBar: View {
                         .foregroundColor(.green)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .simultaneousGesture(TapGesture().onEnded {
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку чата")
+                })
                 
                 Button(action: {
                     if let url = URL(string: "tel://+79615805108") {
@@ -157,6 +168,9 @@ struct CustomNavigationBar: View {
                         .foregroundColor(.blue)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .simultaneousGesture(TapGesture().onEnded {
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку телефона")
+                })
             }
         }
         .padding(.horizontal, 20)

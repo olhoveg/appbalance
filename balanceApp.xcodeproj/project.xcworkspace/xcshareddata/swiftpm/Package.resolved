@@ -1,5 +1,5 @@
 {
-  "originHash" : "fe83a762340499ef19e6412ff7581d3457f14505c3065c9026be564564cdb34c",
+  "originHash" : "becf649ddd2f960953bdbd2ee8da240432e7fe9850999902d559af69ffc5bdc6",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -143,6 +143,15 @@
       "state" : {
         "revision" : "540318ecedd63d883069ae7f1ed811a2df00b6ac",
         "version" : "2.4.0"
+      }
+    },
+    {
+      "identity" : "push-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/appmetrica/push-sdk-ios",
+      "state" : {
+        "revision" : "bca0509fe9723549230d824b3f5b7452a05aafef",
+        "version" : "3.1.0"
       }
     },
     {
