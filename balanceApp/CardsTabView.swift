@@ -21,7 +21,7 @@ struct CardsTabView: View {
             }
             .pickerStyle(SegmentedPickerStyle())
             .padding()
-            .onChange(of: selectedTab) { value in
+            .onChange(of: selectedTab) { oldValue, value in
                 switch value {
                 case 0:
                     AppMetrica.reportEvent(name: "Пользователь выбрал 'Абонементы'")

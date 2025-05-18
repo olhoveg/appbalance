@@ -50,7 +50,7 @@ struct ContentView: View {
                     .tag(Tab.solarium)
             }
             .navigationBarHidden(true)
-            .onChange(of: selectedTab) { tab in
+            .onChange(of: selectedTab) { oldValue, tab in
                 switch tab {
                 case .main:
                     AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Главная'")

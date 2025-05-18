@@ -489,7 +489,7 @@ struct VerticalServicesView: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Поиск услуг"
             )
-            .onChange(of: searchText) { query in
+            .onChange(of: searchText) { oldValue, query in
                 // Cancel previous pending event
                 searchDebounceWorkItem?.cancel()
                 // Create new work item
@@ -505,7 +505,7 @@ struct VerticalServicesView: View {
                 searchDebounceWorkItem = workItem
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
             }
-            .onChange(of: selectedSortOption) { option in
+            .onChange(of: selectedSortOption) { oldOption, option in
                 switch option {
                 case .price:
                     AppMetrica.reportEvent(name: "Пользователь отфильтровал услуги по цене")
