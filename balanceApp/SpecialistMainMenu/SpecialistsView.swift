@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseDatabase
 import Firebase
+import AppMetricaCore
 
 // MARK: - Модели данных
 
@@ -300,6 +301,10 @@ struct SpecialistsView: View {
                         .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray, lineWidth: 1))
                         .padding(.horizontal)
                         .onTapGesture {
+                            AppMetrica.reportEvent(
+                                name: "Пользователь выбрал специалиста",
+                                parameters: ["имя": expert.name]
+                            )
                             selectedExpert = expert
                         }
                     }
@@ -368,6 +373,10 @@ struct SpecialistsView: View {
                                             Text("• \(techniques[key] ?? "")")
                                             Spacer()
                                             Button {
+                                                AppMetrica.reportEvent(
+                                                    name: "Пользователь открыл информацию о технике",
+                                                    parameters: ["техника": techniques[key] ?? ""]
+                                                )
                                                 viewModel.fetchTechnique(techniqueKey: key) { technique in
                                                     if let technique = technique {
                                                         selectedTechnique = technique
@@ -418,6 +427,10 @@ struct SpecialistsView: View {
                                                     .multilineTextAlignment(.center)
                                             }
                                             .onTapGesture {
+                                                AppMetrica.reportEvent(
+                                                    name: "Пользователь открыл диплом специалиста",
+                                                    parameters: ["диплом": certificate.title]
+                                                )
                                                 selectedCertificate = certificate
                                             }
                                         }
@@ -429,6 +442,7 @@ struct SpecialistsView: View {
                             // Кнопка "Оставить чаевые"
                             if let tipUrl = expert.tipUrl, let url = URL(string: tipUrl) {
                                 Button("Оставить чаевые") {
+                                    AppMetrica.reportEvent(name: "Пользователь нажал 'Оставить чаевые'")
                                     UIApplication.shared.open(url)
                                 }
                                 .padding()

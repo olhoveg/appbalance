@@ -2,6 +2,7 @@ import SwiftUI
 import Firebase
 import FirebaseDatabase
 import Foundation
+import AppMetricaCore
 
 // MARK: - Константы и идентификаторы
 fileprivate let SCHEDULE_API_URL = "https://api.yclients.com/api/v1/book_times"
@@ -492,7 +493,10 @@ struct SolariumView: View {
     private var startScreen: some View {
         ScrollView {
             VStack(spacing: 20) {
-                        Button(action: { viewModel.selectedType = .horizontal }) {
+                        Button(action: {
+                            AppMetrica.reportEvent(name: "Пользователь выбрал горизонтальный солярий")
+                            viewModel.selectedType = .horizontal
+                        }) {
                             GeometryReader { geometry in
                                 HStack(spacing: 0) {
                                     Text("Горизонтальный солярий")
@@ -517,7 +521,10 @@ struct SolariumView: View {
                             .cornerRadius(20)
                         }
                 
-                        Button(action: { viewModel.selectedType = .vertical }) {
+                        Button(action: {
+                            AppMetrica.reportEvent(name: "Пользователь выбрал вертикальный солярий")
+                            viewModel.selectedType = .vertical
+                        }) {
                             GeometryReader { geometry in
                                 HStack(spacing: 0) {
                                     Text("Вертикальный солярий")
@@ -542,7 +549,10 @@ struct SolariumView: View {
                             .cornerRadius(20)
                         }
                 
-                Button(action: { viewModel.selectedType = .cab }) {
+                Button(action: {
+                    AppMetrica.reportEvent(name: "Пользователь выбрал массаж на Свердлова 126")
+                    viewModel.selectedType = .cab
+                }) {
                     GeometryReader { geometry in
                         HStack(spacing: 0) {
                             Text("Массаж на Свердлова 126")
@@ -567,7 +577,10 @@ struct SolariumView: View {
                     .cornerRadius(20)
                 }
                 
-                Button(action: { viewModel.selectedType = .cab5 }) {
+                Button(action: {
+                    AppMetrica.reportEvent(name: "Пользователь выбрал массаж на Коммунаров 26")
+                    viewModel.selectedType = .cab5
+                }) {
                     GeometryReader { geometry in
                         HStack(spacing: 0) {
                             Text("Массаж на Коммунаров 26")
@@ -728,6 +741,14 @@ struct SolariumView: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 60), spacing: 10), count: 5), spacing: 10) {
             ForEach(times) { slot in
                 Button {
+                    let type = viewModel.selectedType
+                    let eventName = (type == .cab || type == .cab5)
+                        ? "Пользователь выбрал время записи на массаж"
+                        : "Пользователь выбрал время записи на солярий"
+                    AppMetrica.reportEvent(
+                        name: eventName,
+                        parameters: ["время": slot.displayTime]
+                    )
                     pendingTimeSlot = slot
                     pendingStaffId = staffId
                     showConfirmationDialog = true
@@ -764,6 +785,10 @@ struct SolariumView: View {
     // MARK: - Обработка подтверждения бронирования
     private func handleBookingConfirmation() {
         guard let slot = pendingTimeSlot else { return }
+        AppMetrica.reportEvent(
+            name: "Пользователь подтвердил запись",
+            parameters: ["время": slot.displayTime]
+        )
         print("Подтверждение записи на \(slot.displayTime)")
         Task {
             do {
@@ -772,6 +797,15 @@ struct SolariumView: View {
                                                 serviceType: viewModel.selectedType)
                 alertMessage = "Вы успешно записались!"
                 print("Запись успешна. Обновляем данные...")
+                if let bookingDate = iso8601StringToDate(slot.dateTimeString) {
+                    AppMetrica.reportEvent(
+                        name: "Бронирование прошло успешно",
+                        parameters: [
+                            "дата": formattedDate(bookingDate),
+                            "время": slot.displayTime
+                        ]
+                    )
+                }
                 await reloadData()
             } catch {
                 let errorText = (error as? BookingError)?.errorDescription ?? error.localizedDescription
