@@ -9,6 +9,7 @@ import AVFoundation
 #if canImport(FirebaseAuth)
 import FirebaseAuth
 #endif
+import AppMetricaCore
 
 // MARK: - Модель Story
 
@@ -37,7 +38,13 @@ struct StoryIcon: View {
     @State private var isLoading = false
 
     var body: some View {
-        Button(action: onPress) {
+        Button(action: {
+            AppMetrica.reportEvent(
+                name: "Пользователь выбрал сторис",
+                parameters: ["story_id": story.id, "story_name": story.name]
+            )
+            onPress()
+        }) {
             VStack {
                 ZStack {
                     if let image = uiImage {
@@ -493,6 +500,10 @@ struct StoryPlayerView: View {
                     .onAppear {
                         player.play()
                         player.isMuted = isMuted
+                        AppMetrica.reportEvent(
+                            name: "Пользователь начал просмотр сторис",
+                            parameters: ["story_id": story.id]
+                        )
                     }
             } else {
                 Color.black.edgesIgnoringSafeArea(.all)
@@ -555,6 +566,10 @@ struct StoryPlayerView: View {
                 isMuted.toggle()
                 player.isMuted = isMuted
                 globalIsMuted = isMuted       // сохраняем для следующих сторис
+                AppMetrica.reportEvent(
+                    name: "Пользователь изменил звук сторис",
+                    parameters: ["story_id": story.id, "is_muted": isMuted]
+                )
             } label: {
                 Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .padding(12)
@@ -673,6 +688,10 @@ struct StoryPlayerView: View {
     }
 
     private func playNextVideo() {
+        AppMetrica.reportEvent(
+            name: "Пользователь перешел к следующему видео в сторис",
+            parameters: ["story_id": story.id, "next_index": currentVideoIndex + 1]
+        )
         if currentVideoIndex < playerItems.count - 1 {
             player.advanceToNextItem()
             currentVideoIndex += 1
@@ -683,6 +702,10 @@ struct StoryPlayerView: View {
     }
 
     private func playPreviousVideo() {
+        AppMetrica.reportEvent(
+            name: "Пользователь вернулся к предыдущему видео в сторис",
+            parameters: ["story_id": story.id, "prev_index": currentVideoIndex - 1]
+        )
         if currentVideoIndex > 0 {
             currentVideoIndex -= 1
             currentVideoProgress = 0.0
@@ -1060,3 +1083,4 @@ struct StoriesView_Previews: PreviewProvider {
         StoriesView(viewModel: StoriesViewModel())
     }
 }
+

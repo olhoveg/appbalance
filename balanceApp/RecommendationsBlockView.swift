@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseDatabase
+import AppMetricaCore
 
 // MARK: - Кастомный Shape для округления отдельных углов
 struct RoundedCorner: Shape {
@@ -107,6 +108,16 @@ struct RecommendationsBlockView: View {
                             NavigationLink(destination: RecommendationDetailsView(recommendation: recommendation)) {
                                 RecommendationItemView(recommendation: recommendation)
                             }
+                            .simultaneousGesture(TapGesture().onEnded {
+                                AppMetrica.reportEvent(
+                                    name: "Пользователь выбрал рекомендацию",
+                                    parameters: [
+                                        "id": recommendation.id,
+                                        "категория": recommendation.category,
+                                        "заголовок": recommendation.title
+                                    ]
+                                )
+                            })
                         }
                     }
                     .padding(.horizontal, 10)
