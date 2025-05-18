@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseDatabase
 import UIKit
+import AppMetricaCore
 
 // MARK: - Кэширование URL изображений для Vertical Services
 class VerticalServiceImageURLCache {
@@ -318,7 +319,7 @@ struct VerticalServiceDetailsView: View {
                     .frame(width: cardWidth, height: 250)
                     .clipped()
                     .padding(.leading, 16)
- 
+
                     // Цена и время
                     HStack {
                         if let priceStr = formattedPrice {
@@ -338,7 +339,7 @@ struct VerticalServiceDetailsView: View {
                     )
                     .frame(width: cardWidth)
                     .padding(.leading, 16)
- 
+
                     // Комментарий
                     if let comment = service.comment, !comment.isEmpty {
                         Text(comment)
@@ -347,9 +348,9 @@ struct VerticalServiceDetailsView: View {
                             .frame(width: cardWidth, alignment: .leading)
                             .padding(.leading, 16)
                     }
- 
+
                     Spacer()
- 
+
                     // Detection area: shows back button when reached
                     Color.clear
                         .frame(height: 1)
@@ -378,7 +379,7 @@ struct VerticalServiceDetailsView: View {
             }
             .coordinateSpace(name: "scroll")
             .scrollIndicators(.hidden)
- 
+
             // Back button overlay
             if showBackButton {
                 Button(action: {
@@ -400,6 +401,16 @@ struct VerticalServiceDetailsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(UIColor.systemBackground))
         .onAppear {
+            let priceValue = Int(service.price_max ?? 0)
+            let durationMinutes = (service.duration ?? 0) / 60
+            AppMetrica.reportEvent(
+                name: "Пользователь выбрал услугу",
+                parameters: [
+                    "название": service.title,
+                    "цена": priceValue,
+                    "длительность (мин)": durationMinutes
+                ]
+            )
             if detailImageUrl == nil || detailImageUrl?.isEmpty == true {
                 Task {
                     let url = await verticalGetImageByServiceTitle(service.title)
@@ -449,6 +460,7 @@ struct VerticalServicesView: View {
     @State private var searchText = ""
     @State private var selectedSortOption: SortOption = .none
     @State private var isSearchPresented = false
+    @State private var searchDebounceWorkItem: DispatchWorkItem?
 
     var body: some View {
         NavigationView {
@@ -477,6 +489,32 @@ struct VerticalServicesView: View {
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Поиск услуг"
             )
+            .onChange(of: searchText) { query in
+                // Cancel previous pending event
+                searchDebounceWorkItem?.cancel()
+                // Create new work item
+                let workItem = DispatchWorkItem {
+                    let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !cleanQuery.isEmpty else { return }
+                    AppMetrica.reportEvent(
+                        name: "Пользователь воспользовался поиском услуг",
+                        parameters: ["запрос": cleanQuery]
+                    )
+                }
+                // Store and schedule after 1 second of no typing
+                searchDebounceWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+            }
+            .onChange(of: selectedSortOption) { option in
+                switch option {
+                case .price:
+                    AppMetrica.reportEvent(name: "Пользователь отфильтровал услуги по цене")
+                case .duration:
+                    AppMetrica.reportEvent(name: "Пользователь отфильтровал услуги по времени")
+                default:
+                    break
+                }
+            }
             .refreshable {
                 await viewModel.refresh()
             }
