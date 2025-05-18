@@ -4,6 +4,7 @@ import SwiftUI
 import Combine
 import FirebaseDatabase
 import OneSignalFramework
+import AppMetricaCore
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -822,6 +823,10 @@ struct RecordView: View {
                                           visit_attendance: closestRecord.visit_attendance,
                                           attendance: closestRecord.attendance)
                                     .onTapGesture {
+                                        AppMetrica.reportEvent(
+                                            name: "Пользователь нажал на ближайшую запись",
+                                            parameters: ["address": display.address, "date": display.dateString]
+                                        )
                                         viewModel.selectedRecord = closestRecord
                                         viewModel.showModal = true
                                     }
@@ -846,6 +851,14 @@ struct RecordView: View {
                         let address = viewModel.companyIdToAddress["\(record.company_id)"] ?? ""
                         UpcomingRecordBlock(date: date, address: address)
                             .onTapGesture {
+                                let formatter = DateFormatter()
+                                formatter.locale = Locale(identifier: "ru_RU")
+                                formatter.dateFormat = "HH:mm"
+                                let timeString = formatter.string(from: date)
+                                AppMetrica.reportEvent(
+                                    name: "Пользователь нажал на запись",
+                                    parameters: ["address": address, "time": timeString]
+                                )
                                 viewModel.selectedRecord = record
                                 viewModel.showModal = true
                             }

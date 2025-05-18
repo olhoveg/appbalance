@@ -1,8 +1,10 @@
+
 //RecordModalView.swift
 
 
 import SwiftUI
 import FirebaseDatabase
+import AppMetricaCore
 
 // MARK: - Дополнительные модели (при необходимости)
 
@@ -262,6 +264,7 @@ struct RecordModalView: View {
                     .alert("Подтверждение записи", isPresented: $showConfirmationAlert) {
                         Button("Отмена", role: .cancel) {}
                         Button("Подтвердить", role: .none) {
+                            AppMetrica.reportEvent(name: "Пользователь подтвердил запись из модального окна")
                             confirmRecord()
                         }
                     } message: {
@@ -286,6 +289,7 @@ struct RecordModalView: View {
                 .alert("Удаление записи", isPresented: $showDeleteAlert) {
                     Button("Отмена", role: .cancel) {}
                     Button("Удалить", role: .destructive) {
+                        AppMetrica.reportEvent(name: "Пользователь удалил запись из модального окна")
                         confirmDelete()
                     }
                 } message: {
@@ -295,22 +299,25 @@ struct RecordModalView: View {
                 // Контактная информация (иконки звонка, сайта, WhatsApp)
                 HStack(spacing: 20) {
                     Button {
+                        AppMetrica.reportEvent(name: "Пользователь нажал иконку телефона в модальном окне записи")
                         openLink(url: "tel:+79615805108")
                     } label: {
                         Image(systemName: "phone.fill")
                             .font(.system(size: 40))
                             .foregroundColor(.primary)
                     }
-                    
+
                     Button {
+                        AppMetrica.reportEvent(name: "Пользователь нажал иконку сайта в модальном окне записи")
                         openLink(url: "https://24balance.ru")
                     } label: {
                         Image(systemName: "globe")
                             .font(.system(size: 40))
                             .foregroundColor(.primary)
                     }
-                    
+
                     Button {
+                        AppMetrica.reportEvent(name: "Пользователь нажал иконку чата в модальном окне записи")
                         openLink(url: "https://wa.me/message/AURK3MS65RQ5K1")
                     } label: {
                         Image(systemName: "message.fill")
@@ -321,6 +328,7 @@ struct RecordModalView: View {
                 
                 // Кнопка закрытия
                 Button(action: {
+                    AppMetrica.reportEvent(name: "Пользователь закрыл модальное окно записи")
                     viewModel.showModal = false
                 }) {
                     Text("Закрыть")
