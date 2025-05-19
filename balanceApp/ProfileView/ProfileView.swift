@@ -341,37 +341,49 @@ struct ProfileView: View {
                     showingAlert = true
                     return
                 }
-                
+
                 guard let httpResponse = response as? HTTPURLResponse else {
                     alertMessage = "Неизвестная ошибка сети"
                     showingAlert = true
                     return
                 }
-                
+
                 guard (200...299).contains(httpResponse.statusCode),
                       let data = data else {
                     alertMessage = "Неверный код"
                     showingAlert = true
                     return
                 }
-                
+
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                        let dataObj = json["data"] as? [String: Any] {
-                        
+
                         // Извлекаем name и email из ответа
                         let userName = dataObj["name"] as? String ?? "Имя не указано"
                         let userEmail = dataObj["email"] as? String ?? "email@example.com"
-                        
+
                         // Сохраняем в UserDefaults
                         UserDefaults.standard.set(cleanedPhone, forKey: "userPhone")
                         UserDefaults.standard.set(userName, forKey: "userName")
                         UserDefaults.standard.set(userEmail, forKey: "userEmail")
-                        
+
+                        // Создаём или обновляем документ пользователя с базовой информацией
+                        Firestore.firestore()
+                            .collection("users")
+                            .document(cleanedPhone)
+                            .setData([
+                                "phone": cleanedPhone,
+                                "name": userName,
+                                "email": userEmail
+                            ], merge: true)
+
                         // Авторизация прошла успешно
                         AppMetrica.reportEvent(name: "Пользователь успешно авторизовался")
                         auth.loginSuccess()
-                        
+                        self.clientPhone = cleanedPhone
+                        syncDeviceIDHash(for: cleanedPhone)
+
                         alertMessage = "Вход выполнен!"
                         showingAlert = true
                     } else {
@@ -471,6 +483,32 @@ struct ProfileView: View {
                 profileImageURL = url
             }
         }
+    }
+    // MARK: - AppMetrica DeviceIDHash sync
+    /// Отправляет AppMetrica DeviceIDHash в Firestore
+    private func syncDeviceIDHash(for phone: String) {
+        AppMetrica.requestStartupIdentifiers(for: [.deviceIDHashKey], on: .main) { ids, error in
+            guard error == nil,
+                  let hashValue = ids?[.deviceIDHashKey] as? String else {
+                print("DeviceIDHash error: \(error?.localizedDescription ?? "unknown")")
+                return
+            }
+            writeDeviceIDHash(hashValue, for: phone)
+        }
+    }
+
+    /// Записывает DeviceIDHash в документ пользователя, добавляя в массив уникальных ID
+    private func writeDeviceIDHash(_ hash: String, for phone: String) {
+        Firestore.firestore()
+            .collection("users")
+            .document(phone)
+            .updateData([
+                "appmetrica_device_ids": FieldValue.arrayUnion([hash])
+            ]) { err in
+                if let err = err {
+                    print("Ошибка сохранения списка DeviceIDHash: \(err.localizedDescription)")
+                }
+            }
     }
 }
 
