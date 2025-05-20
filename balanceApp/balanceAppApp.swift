@@ -25,7 +25,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         os_log("Приложение запущено. Регистрация фоновой задачи...", log: OSLog.default, type: .info)
 
         // 🔹 AppMetrica SDK
-                let configuration = AppMetricaConfiguration(apiKey: "f72ff25d-a8de-4a9b-bc66-a381245eb7e1")!
+                let configuration = AppMetricaConfiguration(apiKey: "d0903bcd-73ec-46c9-988b-32582a4d7334")!
                 AppMetrica.activate(with: configuration)
         
         AppMetricaPush.handleApplicationDidFinishLaunching(options: launchOptions)
