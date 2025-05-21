@@ -25,8 +25,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         os_log("Приложение запущено. Регистрация фоновой задачи...", log: OSLog.default, type: .info)
 
         // 🔹 AppMetrica SDK
-                let configuration = AppMetricaConfiguration(apiKey: "f72ff25d-a8de-4a9b-bc66-a381245eb7e1")!
+                let configuration = AppMetricaConfiguration(apiKey: "d0903bcd-73ec-46c9-988b-32582a4d7334")!
                 AppMetrica.activate(with: configuration)
+        AppMetrica.reportEvent(name: "Приложение запущено")
         
         AppMetricaPush.handleApplicationDidFinishLaunching(options: launchOptions)
         // Настройка цепочки делегатов для UNUserNotificationCenter
@@ -34,9 +35,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         pushDelegate.nextDelegate = self
         UNUserNotificationCenter.current().delegate = pushDelegate
         
-        // Запрашиваем разрешение на уведомления
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            os_log("🔐 Разрешение на уведомления: %@", log: OSLog.default, type: .info, granted ? "разрешено" : "отказано")
+        // Запрашиваем разрешение на уведомления с задержкой
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+                os_log("🔐 Разрешение на уведомления: %@", log: OSLog.default, type: .info, granted ? "разрешено" : "отказано")
+                print("AppMetrica push permission status: \(granted)")
+                AppMetrica.reportEvent(name: "Push (UNUserNotificationCenter): Разрешение на push-уведомления", parameters: ["разрешено": granted])
+            }
         }
         
         application.registerForRemoteNotifications()
@@ -60,6 +65,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         let environment = AppMetricaPushEnvironment.production
         #endif
         AppMetricaPush.setDeviceTokenFrom(deviceToken, pushEnvironment: environment)
+        AppMetrica.reportEvent(name: "Push (AppMetrica): Устройство зарегистрировано", parameters: ["environment": environment == .production ? "production" : "development"])
     }
     
     /// Планирует выполнение фоновой задачи обновления
@@ -70,14 +76,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         do {
             try BGTaskScheduler.shared.submit(request)
             print("Background refresh scheduled at: \(request.earliestBeginDate ?? Date())")
+            AppMetrica.reportEvent(
+                name: "Фоновая задача запланирована",
+                parameters: ["scheduled_time": ISO8601DateFormatter().string(from: request.earliestBeginDate ?? Date())]
+            )
         } catch {
             print("Could not schedule app refresh: \(error)")
+            AppMetrica.reportEvent(
+                name: "Фоновая задача не запланирована",
+                parameters: ["error": error.localizedDescription]
+            )
         }
     }
     
     /// Обработчик фоновой задачи обновления
     func handleAppRefresh(task: BGAppRefreshTask) {
         os_log("Фоновая задача получена от системы.", log: OSLog.default, type: .info)
+        AppMetrica.reportEvent(name: "Фоновая задача началась")
         
         // Планируем следующую задачу
         scheduleAppRefresh()
@@ -93,6 +108,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             let success = !operation.isCancelled
             os_log("Фоновая задача завершена. Успешно: %@", log: OSLog.default, type: .info, success ? "Да" : "Нет")
             task.setTaskCompleted(success: success)
+            AppMetrica.reportEvent(
+                name: "Фоновая задача завершена",
+                parameters: ["success": success]
+            )
         }
         
         os_log("Добавляем операцию в очередь.", log: OSLog.default, type: .info)
@@ -169,6 +188,16 @@ struct balanceAppApp: App {
         FirebaseApp.configure()
         // Инициализируем OneSignal сразу при запуске приложения
         OneSignalService.shared.initialize()
+        let workItem = DispatchWorkItem {
+            let deviceState = OneSignal.User.pushSubscription
+            AppMetrica.reportEvent(name: "Push (OneSignal): Состояние устройства",
+                parameters: [
+                    "userId": deviceState.id ?? "nil",
+                    "isSubscribed": deviceState.optedIn
+                ])
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: workItem)
     }
     
     var sharedModelContainer: ModelContainer = {

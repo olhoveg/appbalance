@@ -245,6 +245,7 @@ class RecordViewModel: ObservableObject {
     // MARK: - Обновление данных
     func refreshData() {
         getPhoneNumber()
+        AppMetrica.reportEvent(name: "Фоновое обновление данных началось")
         if self.phone.isEmpty { return }
         cleanupEmptyNotifications()
         fetchHadError = false
@@ -277,8 +278,9 @@ class RecordViewModel: ObservableObject {
         URLSession.shared.dataTask(with: request) { data, response, error in
             Task { @MainActor in
                 self.isLoading = false
-                if error != nil {
+                if let error = error {
                     self.fetchHadError = true
+                    AppMetrica.reportEvent(name: "Ошибка при загрузке клиентов", parameters: ["error": error.localizedDescription])
                     return
                 }
                 guard let data = data else {
@@ -377,7 +379,8 @@ class RecordViewModel: ObservableObject {
         let newRecordsByCompany = self.tempRecordsByCompany
 
         // Выявляем изменения (добавления, изменения времени, удалённые записи)
-        let (_, changed, deleted) = detectRecordChanges(            oldRecordsByCompany: oldRecordsByCompany,
+        let (_, changed, deleted) = detectRecordChanges(
+            oldRecordsByCompany: oldRecordsByCompany,
             newRecordsByCompany: newRecordsByCompany
         )
 
@@ -406,6 +409,16 @@ class RecordViewModel: ObservableObject {
         if !hasPerformedInitialSync {
             hasPerformedInitialSync = true
         }
+
+        // Log completion with summary
+        AppMetrica.reportEvent(
+            name: "Фоновое обновление данных завершено",
+            parameters: [
+                "companies": newRecordsByCompany.keys.count,
+                "added_or_changed": changed.count,
+                "deleted": deleted.count
+            ]
+        )
     }
 
     // MARK: - Выявление изменений (добавленные, изменённые, удалённые)
