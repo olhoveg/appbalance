@@ -97,6 +97,19 @@ class RecordViewModel: ObservableObject {
     private var fetchHadError: Bool = false
     /// Флаг, указывающий, была ли уже выполнена первая синхронизация за текущий сеанс
     private var hasPerformedInitialSync: Bool = false
+    /// Суммарное количество запланированных уведомлений за всю синхронизацию
+    private var totalScheduledNotificationsCount: Int = 0
+    /// Background task identifier for iOS background execution
+#if canImport(UIKit)
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+#endif
+
+    /// URLSession configured for network requests
+    private lazy var backgroundSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.waitsForConnectivity = true
+        return URLSession(configuration: config)
+    }()
 
     // Временное хранилище для записей (используется только во время одного обновления)
     private var tempRecordsByCompany: [String: [Record]] = [:]
@@ -244,12 +257,21 @@ class RecordViewModel: ObservableObject {
 
     // MARK: - Обновление данных
     func refreshData() {
+#if canImport(UIKit)
+        // Begin background task to keep the app alive for network requests
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "RefreshData") {
+            UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+            self.backgroundTaskID = .invalid
+        }
+#endif
         getPhoneNumber()
         AppMetrica.reportEvent(name: "Фоновое обновление данных началось")
         if self.phone.isEmpty { return }
         cleanupEmptyNotifications()
         fetchHadError = false
         tempRecordsByCompany.removeAll()
+        // Сбросим счётчик запланированных уведомлений перед новой синхронизацией
+        totalScheduledNotificationsCount = 0
         fetchClients()
     }
 
@@ -275,7 +297,7 @@ class RecordViewModel: ObservableObject {
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        backgroundSession.dataTask(with: request) { data, response, error in
             Task { @MainActor in
                 self.isLoading = false
                 if let error = error {
@@ -327,7 +349,7 @@ class RecordViewModel: ObservableObject {
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
         request.setValue("Bearer \(accessToken), User \(accessUserToken)", forHTTPHeaderField: "Authorization")
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        backgroundSession.dataTask(with: request) { data, response, error in
             Task { @MainActor in
                 self.isLoading = false
                 if error != nil {
@@ -384,6 +406,19 @@ class RecordViewModel: ObservableObject {
             newRecordsByCompany: newRecordsByCompany
         )
 
+        // Report before/after counts if any records changed
+        let oldCount = oldRecordsByCompany.values.flatMap { $0 }.count
+        let newCount = newRecordsByCompany.values.flatMap { $0 }.count
+        if !changed.isEmpty || !deleted.isEmpty {
+            AppMetrica.reportEvent(
+                name: "Записи изменились: подсчет",
+                parameters: [
+                    "oldCount": oldCount,
+                    "newCount": newCount
+                ]
+            )
+        }
+
         // Сохраняем обновлённое состояние
         self.recordsByCompany = newRecordsByCompany
         self.saveRecords(newRecordsByCompany)
@@ -419,6 +454,21 @@ class RecordViewModel: ObservableObject {
                 "deleted": deleted.count
             ]
         )
+        
+        // Отправляем суммарное количество запланированных уведомлений за синхронизацию
+        AppMetrica.reportEvent(
+            name: "Запланировано уведомлений",
+            parameters: ["count": totalScheduledNotificationsCount]
+        )
+        
+        
+#if canImport(UIKit)
+        // End background task now that work is complete
+        if backgroundTaskID != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
+        }
+#endif
     }
 
     // MARK: - Выявление изменений (добавленные, изменённые, удалённые)
@@ -613,6 +663,7 @@ class RecordViewModel: ObservableObject {
             self.log("⛔️ Пользователь вышел — уведомления не планируем.")
             return
         }
+        // Счётчик запланированных уведомлений
         for record in records {
             guard let recordDate = recordDate(from: record.date) else { continue }
             // Если запись в будущем и подтвердили (например confirmed == 1)
@@ -627,6 +678,8 @@ class RecordViewModel: ObservableObject {
                    oneHourBefore > Date(),
                    !self.playerId.isEmpty
                 {
+                    // Увеличиваем счётчик запланированных уведомлений
+                    self.totalScheduledNotificationsCount += 1
                     let formattedTime = formattedTime(from: recordDate)
                     let address = self.companyIdToAddress["\(record.company_id)"] ?? ""
                     let sendAfter = formattedSendAfter(from: oneHourBefore)
@@ -639,6 +692,8 @@ class RecordViewModel: ObservableObject {
                 }
             }
         }
+        // Отправляем метрику запланированного количества уведомлений
+       
     }
 
     // Отправка одиночного уведомления «за 1 час до записи»
