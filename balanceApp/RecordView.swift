@@ -426,10 +426,9 @@ class RecordViewModel: ObservableObject {
         // Отменяем уведомления для удалённых записей ещё до возможной отправки "расписание изменилось"
         cancelNotificationsForDeletedRecords(deleted)
 
-        // Чтобы пуш об изменении расписания приходил только когда приложение свернуто
+        // Чтобы пуш об изменении расписания приходил только при необходимости
         #if canImport(UIKit)
-        let appState = UIApplication.shared.applicationState
-        if hasPerformedInitialSync && appState != .active && (!added.isEmpty || !changed.isEmpty || !deleted.isEmpty) {
+        if hasPerformedInitialSync && (!added.isEmpty || !changed.isEmpty || !deleted.isEmpty) {
             sendScheduleUpdatedNotification()
         }
         #endif
