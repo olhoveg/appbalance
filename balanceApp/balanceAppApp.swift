@@ -188,6 +188,8 @@ struct balanceAppApp: App {
         FirebaseApp.configure()
         // Инициализируем OneSignal сразу при запуске приложения
         OneSignalService.shared.initialize()
+        // Remove old OneSignal player records for this user
+        OneSignalService.shared.deleteOldPlayers(externalId: authViewModel.externalId)
         let workItem = DispatchWorkItem {
             let deviceState = OneSignal.User.pushSubscription
             AppMetrica.reportEvent(name: "Push (OneSignal): Состояние устройства",
@@ -214,28 +216,80 @@ struct balanceAppApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if !isSplashFinished {
-                SplashScreen()
-                    .onAppear {
-                        // Ждем 2 секунды, затем скрываем SplashScreen
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            self.isSplashFinished = true
+            Group {
+                if !isSplashFinished {
+                    SplashScreen()
+                        .onAppear {
+                            // Ждем 2 секунды, затем скрываем SplashScreen
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                self.isSplashFinished = true
+                            }
                         }
-                    }
-                    .environmentObject(authViewModel)
-                    .environmentObject(imageCache)
-            } else {
-                if authViewModel.isLoggedIn {
-                    ContentView()
-                        .environmentObject(authViewModel)
-                        .environmentObject(imageCache)
                 } else {
-                    ContentView()
-                        .environmentObject(authViewModel)
-                        .environmentObject(imageCache)
+                    if authViewModel.isLoggedIn {
+                        ContentView()
+                    } else {
+                        ContentView()
+                    }
                 }
+            }
+            .environmentObject(authViewModel)
+            .environmentObject(imageCache)
+            .onAppear {
+                // Associate device once views load
+                OneSignal.login(externalId: authViewModel.externalId, token: nil)
             }
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+extension AuthViewModel {
+    /// External ID for OneSignal; replace the return value with your actual user identifier property
+    var externalId: String {
+        return "" // TODO: return your actual external ID here (e.g., phoneNumber or userId)
+    }
+}
+
+
+extension OneSignalService {
+    /// Deletes any existing OneSignal player records for the given external ID using the OneSignal REST API.
+    func deleteOldPlayers(externalId: String) {
+        let appId = "61e511f4-5929-448d-85f4-e5bf171f0764"
+        let restApiKey = "hcflud5wte26uko23ag2d4rni"
+
+        // 1. Fetch players by external_user_id
+        guard let url = URL(string: "https://onesignal.com/api/v1/players?app_id=\(appId)&external_user_id=\(externalId)") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Basic \(restApiKey)", forHTTPHeaderField: "Authorization")
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data, error == nil,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let players = json["players"] as? [[String: Any]] else {
+                print("Failed to fetch players for externalId \(externalId):", error ?? "unknown error")
+                return
+            }
+
+            // 2. Delete each player
+            for player in players {
+                if let playerId = player["id"] as? String,
+                   let deleteURL = URL(string: "https://onesignal.com/api/v1/players/\(playerId)?app_id=\(appId)") {
+
+                    var deleteRequest = URLRequest(url: deleteURL)
+                    deleteRequest.httpMethod = "DELETE"
+                    deleteRequest.setValue("Basic \(restApiKey)", forHTTPHeaderField: "Authorization")
+
+                    URLSession.shared.dataTask(with: deleteRequest) { _, _, deleteError in
+                        if let deleteError = deleteError {
+                            print("Failed to delete player \(playerId):", deleteError)
+                        } else {
+                            print("Deleted OneSignal player:", playerId)
+                        }
+                    }.resume()
+                }
+            }
+        }.resume()
     }
 }
