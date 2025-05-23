@@ -426,13 +426,6 @@ class RecordViewModel: ObservableObject {
         // Отменяем уведомления для удалённых записей ещё до возможной отправки "расписание изменилось"
         cancelNotificationsForDeletedRecords(deleted)
 
-        // Чтобы пуш об изменении расписания приходил только при необходимости
-        #if canImport(UIKit)
-        if hasPerformedInitialSync && (!added.isEmpty || !changed.isEmpty || !deleted.isEmpty) {
-            sendScheduleUpdatedNotification()
-        }
-        #endif
-
         // Отмечаем, что первичная синхронизация завершена
         if !hasPerformedInitialSync {
             hasPerformedInitialSync = true
