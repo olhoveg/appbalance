@@ -142,7 +142,7 @@ struct ProfileView: View {
                     }
                     .padding(.vertical)
                 }
-                .navigationBarTitle("Профиль", displayMode: .inline)
+                .navigationTitle("Профиль")
                 .alert(isPresented: $showDeleteConfirmation) {
                     Alert(
                         title: Text("Удаление аккаунта"),

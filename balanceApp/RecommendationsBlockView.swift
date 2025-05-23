@@ -91,9 +91,25 @@ class RecommendationsViewModel: ObservableObject {
 // MARK: - Блок рекомендаций в SwiftUI
 struct RecommendationsBlockView: View {
     @StateObject var viewModel = RecommendationsViewModel()
+    @State private var selectedRecommendation: Recommendation? = nil
+    @State private var isDetailActive: Bool = false
     
     var body: some View {
         VStack {
+            NavigationLink(
+                isActive: $isDetailActive,
+                destination: {
+                    if let recommendation = selectedRecommendation {
+                        RecommendationDetailsView(recommendation: recommendation)
+                    } else {
+                        EmptyView()
+                    }
+                },
+                label: {
+                    EmptyView()
+                }
+            )
+            .hidden()
             if viewModel.recommendations.isEmpty {
                 // Если рекомендаций нет – сразу показываем сообщение без пустого пространства
                 Text("Рекомендации недоступны. Пожалуйста, авторизуйтесь или обновите экран.")
@@ -105,10 +121,9 @@ struct RecommendationsBlockView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(viewModel.recommendations) { recommendation in
-                            NavigationLink(destination: RecommendationDetailsView(recommendation: recommendation)) {
-                                RecommendationItemView(recommendation: recommendation)
-                            }
-                            .simultaneousGesture(TapGesture().onEnded {
+                            Button(action: {
+                                selectedRecommendation = recommendation
+                                isDetailActive = true
                                 AppMetrica.reportEvent(
                                     name: "Пользователь выбрал рекомендацию",
                                     parameters: [
@@ -117,7 +132,9 @@ struct RecommendationsBlockView: View {
                                         "заголовок": recommendation.title
                                     ]
                                 )
-                            })
+                            }) {
+                                RecommendationItemView(recommendation: recommendation)
+                            }
                         }
                     }
                     .padding(.horizontal, 10)
