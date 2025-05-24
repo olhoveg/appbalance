@@ -9,7 +9,7 @@ class VKCloudUploader {
     private let bucketName = "24balancemp"
     private let service = "s3"
     private let region = "ru-msk"
-    private let host = "hb.vkcs.cloud"
+    private let host = "hb.ru-msk.vkcloud-storage.ru"
     
     private init() {}
     
@@ -58,9 +58,10 @@ class VKCloudUploader {
 
         let canonicalHeaders =
             "host:\(bucketName).\(host)\n" +
+            "x-amz-acl:public-read\n" +
             "x-amz-content-sha256:\(payloadHash)\n" +
             "x-amz-date:\(amzDate)\n"
-        let signedHeaders = "host;x-amz-content-sha256;x-amz-date"
+        let signedHeaders = "host;x-amz-acl;x-amz-content-sha256;x-amz-date"
         let canonicalRequest =
             "\(method)\n\(canonicalURI)\n\n\(canonicalHeaders)\n\(signedHeaders)\n\(payloadHash)"
 
