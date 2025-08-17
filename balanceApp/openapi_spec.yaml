@@ -1,0 +1,42 @@
+openapi: 3.0.0
+info:
+  title: yk-api
+  version: 1.0.0
+servers:
+- url: https://d5dgl1ikvie8dgvombue.fary004x.apigw.yandexcloud.net
+paths:
+  /payments/create:
+    post:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eddmpv77r6uei62hdg
+        tag: "$latest"
+        payload_format_version: "1.0"
+  /payments/status:
+    get:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eddmpv77r6uei62hdg
+        tag: "$latest"
+        payload_format_version: "1.0"
+  /payments/pending:
+    get:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eddmpv77r6uei62hdg
+        tag: "$latest"
+        payload_format_version: "1.0"
+  /payments/pending/remove:
+    delete:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eddmpv77r6uei62hdg
+        tag: "$latest"
+        payload_format_version: "1.0"
+  /webhooks/yookassa:
+    post:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4eddmpv77r6uei62hdg
+        tag: "$latest"
+        payload_format_version: "1.0"

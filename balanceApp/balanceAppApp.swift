@@ -14,6 +14,7 @@ import UserNotifications  // Добавляем для работы с увед�
 import OneSignalFramework
 import AppMetricaCore
 import AppMetricaPush
+import YooKassaPayments
 
 
 // MARK: - AppDelegate с использованием BGAppRefreshTask и UNUserNotificationCenterDelegate
@@ -55,6 +56,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         scheduleAppRefresh()
         
         return true
+    }
+    
+    // MARK: - Обработка URL схем для YooKassa
+    func application(
+        _ application: UIApplication,
+        open url: URL,
+        sourceApplication: String?,
+        annotation: Any
+    ) -> Bool {
+        return YKSdk.shared.handleOpen(
+            url: url,
+            sourceApplication: sourceApplication
+        )
     }
     
     func application(_ application: UIApplication,

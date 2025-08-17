@@ -28,6 +28,7 @@ struct ProfileView: View {
     @State private var profileImageURL: URL? = nil
     @State private var isShowingImagePicker = false
     @State private var showFeedbackForm = false
+    @State private var showFirebaseDataLoader = false
 
     var body: some View {
         VStack {
@@ -91,6 +92,36 @@ struct ProfileView: View {
                         .cornerRadius(12)
                         .padding(.horizontal)
 
+                        // Мои видео уроки
+                        NavigationLink(destination: PurchasedVideoLessonsView()) {
+                            HStack {
+                                Image(systemName: "play.rectangle.fill")
+                                    .foregroundColor(.accentColor)
+                                    .font(.title2)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Мои видео уроки")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Text("Доступ к купленным видео урокам")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(12)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal)
+
                         // Кнопки действий
                         VStack(spacing: 15) {
                             Button(action: {
@@ -127,6 +158,20 @@ struct ProfileView: View {
                             .padding()
                             .background(Color.blue)
                             .cornerRadius(10)
+                            
+                            // Временная кнопка для загрузки тестовых данных (только для разработки)
+                            #if DEBUG
+                            Button("Загрузить тестовые данные") {
+                                AppMetrica.reportEvent(name: "Пользователь нажал 'Загрузить тестовые данные'")
+                                showFirebaseDataLoader = true
+                            }
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(10)
+                            #endif
                         }
                         .padding(.horizontal)
 
@@ -158,6 +203,9 @@ struct ProfileView: View {
                 }
                 .sheet(isPresented: $showFeedbackForm) {
                     FeedbackFormView()
+                }
+                .sheet(isPresented: $showFirebaseDataLoader) {
+                    FirebaseDataLoader()
                 }
                 .onChange(of: profileImage) {
                     if profileImage != nil {

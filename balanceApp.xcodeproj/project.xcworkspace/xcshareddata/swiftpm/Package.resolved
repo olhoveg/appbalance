@@ -1,5 +1,5 @@
 {
-  "originHash" : "becf649ddd2f960953bdbd2ee8da240432e7fe9850999902d559af69ffc5bdc6",
+  "originHash" : "be5ea7b7ffc036c1cff65d05cfebe101d0f6cb37d2be39a17b3a4194dde44a15",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "2e4a4daac9da51f79c131e76cb47e785dd7708c4",
         "version" : "11.10.0"
+      }
+    },
+    {
+      "identity" : "functional-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/functional-swift.git",
+      "state" : {
+        "revision" : "ffc24bb635a518f663e03bb81a265bc5ff5dd7ac",
+        "version" : "2.3.3"
       }
     },
     {
@@ -137,6 +146,15 @@
       }
     },
     {
+      "identity" : "openssl-package",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/krzyzanowskim/OpenSSL-Package.git",
+      "state" : {
+        "revision" : "71dbe0b4514cdaad95961470db72e8231f5943a6",
+        "version" : "3.3.3001"
+      }
+    },
+    {
       "identity" : "promises",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/google/promises.git",
@@ -155,12 +173,120 @@
       }
     },
     {
+      "identity" : "sdkpay-static",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sdkpay/sdkpay-static.git",
+      "state" : {
+        "revision" : "09920030eafb8cd31d7af3c18b81fe62b0c29c03",
+        "version" : "2.5.2"
+      }
+    },
+    {
       "identity" : "swift-protobuf",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-protobuf.git",
       "state" : {
         "revision" : "d72aed98f8253ec1aa9ea1141e28150f408cf17f",
         "version" : "1.29.0"
+      }
+    },
+    {
+      "identity" : "yookassa-payments-api-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yookassa-payments-api-swift.git",
+      "state" : {
+        "revision" : "c207a3f33d4a60f3a837c3967ebc87bb95be5c29",
+        "version" : "2.25.0"
+      }
+    },
+    {
+      "identity" : "yookassa-payments-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yookassa-payments-swift.git",
+      "state" : {
+        "revision" : "f166e43da9d225945e4c9363b9b8087921ddf0a1",
+        "version" : "8.0.1"
+      }
+    },
+    {
+      "identity" : "yookassa-wallet-api-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yookassa-wallet-api-swift.git",
+      "state" : {
+        "revision" : "beef683d63a3f9202e210513e82ad62aeeb7aaac",
+        "version" : "2.7.2"
+      }
+    },
+    {
+      "identity" : "yoomoney-auth-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-auth-sdk-ios.git",
+      "state" : {
+        "revision" : "d2366a7cb7b909fa0ff7938b5b563ed168a6fd68",
+        "version" : "12.1.3"
+      }
+    },
+    {
+      "identity" : "yoomoney-authenticator-api-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-authenticator-api-sdk-ios.git",
+      "state" : {
+        "revision" : "2031d1a4e5c76fe9afeea9e035a5005550642ad2",
+        "version" : "2.0.2"
+      }
+    },
+    {
+      "identity" : "yoomoney-core-api-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-core-api-swift.git",
+      "state" : {
+        "revision" : "f253c80c2005b946f1ae5542190ecdeccbf5f810",
+        "version" : "3.3.4"
+      }
+    },
+    {
+      "identity" : "yoomoney-pinning-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-pinning-sdk-ios.git",
+      "state" : {
+        "revision" : "8948e32afb9ca74b82440aee7c2deb7c58687fb3",
+        "version" : "2.3.1"
+      }
+    },
+    {
+      "identity" : "yoomoney-session-profiler-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-session-profiler-sdk-ios.git",
+      "state" : {
+        "revision" : "41e54d894e19f7f01c466d07d0999aef98cf5a85",
+        "version" : "5.3.4"
+      }
+    },
+    {
+      "identity" : "yoomoney-two-fa-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-two-fa-sdk-ios.git",
+      "state" : {
+        "revision" : "ec500ec946a32472c357c3e4ca23b3f642b4d3fc",
+        "version" : "1.3.4"
+      }
+    },
+    {
+      "identity" : "yoomoney-ui-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-ui-sdk-ios.git",
+      "state" : {
+        "revision" : "b8a4dd849d31d3a843bcad9098d6087b1a4a42b1",
+        "version" : "7.13.5"
+      }
+    },
+    {
+      "identity" : "yoomoney-user-auth-center-api-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://git.yoomoney.ru/scm/sdk/yoomoney-user-auth-center-api-sdk-ios.git",
+      "state" : {
+        "revision" : "b1966d886e87986a0cee0a03227dfcee43de0314",
+        "version" : "10.4.4"
       }
     }
   ],

@@ -1,9 +1,10 @@
 import AppMetricaCore
 import SwiftUI
+import AVKit
 
 // MARK: - Enum вкладок
 enum Tab: Hashable {
-    case main, cards, service, chat, solarium
+    case main, cards, service, chat, solarium, videoLessons
 }
 
 // MARK: - Root ContentView с TabView
@@ -48,6 +49,13 @@ struct ContentView: View {
                         Text("Записаться")
                     }
                     .tag(Tab.solarium)
+                
+                VideoLessonsView()
+                    .tabItem {
+                        Image(systemName: "play.rectangle.fill")
+                        Text("Видео уроки")
+                    }
+                    .tag(Tab.videoLessons)
             }
             .navigationBarHidden(true)
             .onChange(of: selectedTab) { oldValue, tab in
@@ -62,6 +70,8 @@ struct ContentView: View {
                     AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Команда'")
                 case .solarium:
                     AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Записаться'")
+                case .videoLessons:
+                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку 'Видео уроки'")
                 }
             }
         }

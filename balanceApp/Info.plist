@@ -11,5 +11,37 @@
 		<string>fetch</string>
 		<string>processing</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Приложению требуется доступ к камере для сканирования карт</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.yourcompany.balanceApp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>balanceapp</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>yoomoneyauth</string>
+		<string>sbolidexternallogin</string>
+		<string>sberbankidexternallogin</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Так вы подтвердите, что именно вы выполняете вход</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Данные о местонахождении собираются и отправляются на сервер для безопасного проведения оплаты</string>
+	<key>PaymentsBackendURL</key>
+	<string>https://d5dgl1ikvie8dgvombue.fary004x.apigw.yandexcloud.net</string>
 </dict>
 </plist>
