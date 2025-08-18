@@ -58,6 +58,8 @@ export async function handler(event, context) {
       return await yookassaWebhook(event);
     }
 
+
+
     return response(404, { error: "Not found", path, method });
   } catch (e) {
     console.error("Handler error:", e);
@@ -110,7 +112,23 @@ async function createPayment(event) {
       description: description || "Покупка",
       payment_method_data: { type: "sbp", payment_token: sdkToken },
       confirmation: { type: "redirect", return_url: returnUrl || "balanceapp://payment-return" },
-      save_payment_method: false
+      save_payment_method: false,
+      receipt: {
+        customer: {
+          email: "customer@example.com"
+        },
+        items: [
+          {
+            description: description || "Покупка",
+            quantity: "1",
+            amount: {
+              value: String(amount),
+              currency: "RUB"
+            },
+            vat_code: 1
+          }
+        ]
+      }
     };
   } else if (finalPaymentMethodType === "sberbank") {
     payload = {
@@ -119,7 +137,23 @@ async function createPayment(event) {
       description: description || "Покупка",
       payment_method_data: { type: "sberbank", payment_token: sdkToken },
       confirmation: { type: "redirect", return_url: returnUrl || "balanceapp://payment-return" },
-      save_payment_method: false
+      save_payment_method: false,
+      receipt: {
+        customer: {
+          email: "customer@example.com"
+        },
+        items: [
+          {
+            description: description || "Покупка",
+            quantity: "1",
+            amount: {
+              value: String(amount),
+              currency: "RUB"
+            },
+            vat_code: 1
+          }
+        ]
+      }
     };
   } else if (finalPaymentMethodType === "tinkoff_bank") {
     payload = {
@@ -128,7 +162,23 @@ async function createPayment(event) {
       description: description || "Покупка",
       payment_method_data: { type: "tinkoff_bank", payment_token: sdkToken },
       confirmation: { type: "redirect", return_url: returnUrl || "balanceapp://payment-return" },
-      save_payment_method: false
+      save_payment_method: false,
+      receipt: {
+        customer: {
+          email: "customer@example.com"
+        },
+        items: [
+          {
+            description: description || "Покупка",
+            quantity: "1",
+            amount: {
+              value: String(amount),
+              currency: "RUB"
+            },
+            vat_code: 1
+          }
+        ]
+      }
     };
   } else {
     // Для банковских карт используем redirect (требование YooKassa)
@@ -141,7 +191,23 @@ async function createPayment(event) {
         type: "redirect", 
         return_url: returnUrl || "balanceapp://payment-return" 
       },
-      save_payment_method: false
+      save_payment_method: false,
+      receipt: {
+        customer: {
+          email: "customer@example.com"
+        },
+        items: [
+          {
+            description: description || "Покупка",
+            quantity: "1",
+            amount: {
+              value: String(amount),
+              currency: "RUB"
+            },
+            vat_code: 1
+          }
+        ]
+      }
     };
   }
 
@@ -215,33 +281,116 @@ async function yookassaWebhook(event) {
   try {
     body = JSON.parse(getBody(event) || "{}");
   } catch {
+    console.error("❌ Invalid JSON in webhook");
     return response(400, { error: "Invalid JSON" });
   }
 
-  console.log("Webhook:", JSON.stringify(body));
+  console.log("📨 Webhook received:", JSON.stringify(body, null, 2));
 
   if (body.event === "payment.succeeded") {
     const payment = body.object;
-    console.log("Payment succeeded:", {
+    console.log("🎉 Payment succeeded webhook:", {
       id: payment.id,
       status: payment.status,
       amount: payment.amount,
-      description: payment.description
+      description: payment.description,
+      created_at: payment.created_at
     });
     
-    // Отложенные покупки больше не нужны - покупки создаются сразу при успешной оплате
-    console.log("Payment succeeded - no pending purchase needed");
+    // Извлекаем информацию о пользователе и уроке из описания
+    const userPhone = extractUserPhoneFromDescription(payment.description);
+    const videoLessonId = extractVideoLessonIdFromDescription(payment.description);
+    
+    console.log("🔍 Extracted data:", {
+      userPhone,
+      videoLessonId,
+      paymentId: payment.id
+    });
+    
+    if (userPhone && videoLessonId) {
+      console.log("💾 Creating purchase in Firebase:", {
+        userPhone,
+        videoLessonId,
+        paymentId: payment.id,
+        amount: payment.amount.value
+      });
+      
+      try {
+        // Создаем покупку в Firebase
+        const purchaseData = {
+          userId: userPhone,
+          videoLessonId: videoLessonId,
+          price: parseInt(payment.amount.value),
+          paymentMethod: "YooKassa",
+          transactionId: payment.id,
+          purchase_date: Math.floor(Date.now() / 1000), // TimeInterval в секундах
+          status: "completed"
+        };
+        
+        // Сохраняем в Firebase под номером телефона
+        const response = await fetch(`${FIREBASE_DATABASE_URL}/videoLessonPurchases/${userPhone}/${payment.id}.json`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(purchaseData)
+        });
+        
+        if (response.ok) {
+          console.log("✅ Purchase saved to Firebase via webhook:", payment.id);
+          console.log("📊 Purchase data structure:", JSON.stringify(purchaseData, null, 2));
+          
+          // Отправляем push-уведомление пользователю (если настроено)
+          // await sendPushNotification(userPhone, "Оплата прошла успешно!", "Видео урок разблокирован");
+        } else {
+          console.error("❌ Failed to save purchase to Firebase:", response.status, await response.text());
+        }
+      } catch (error) {
+        console.error("❌ Error saving purchase to Firebase:", error);
+      }
+    } else {
+      console.warn("⚠️ Could not extract user phone or video lesson ID from description:", payment.description);
+    }
   }
 
   if (body.event === "payment.canceled") {
     const payment = body.object;
-    console.log("Payment canceled:", {
+    console.log("❌ Payment canceled webhook:", {
       id: payment.id,
-      status: payment.status
+      status: payment.status,
+      created_at: payment.created_at
+    });
+  }
+
+  if (body.event === "payment.waiting_for_capture") {
+    const payment = body.object;
+    console.log("⏳ Payment waiting for capture webhook:", {
+      id: payment.id,
+      status: payment.status,
+      created_at: payment.created_at
     });
   }
 
   return response(200, { ok: true });
 }
+
+
+
+// Вспомогательные функции для извлечения данных из описания
+function extractUserPhoneFromDescription(description) {
+  // Извлекаем телефон пользователя из описания
+  // Например: "Оплата в BalanceApp: Урок (телефон: +79001234567)"
+  const phoneMatch = description.match(/телефон:\s*(\+?\d+)/);
+  return phoneMatch ? phoneMatch[1] : null;
+}
+
+function extractVideoLessonIdFromDescription(description) {
+  // Извлекаем ID урока из описания
+  // Например: "Оплата в BalanceApp: Урок (ID: lesson_123)"
+  const idMatch = description.match(/ID:\s*(\w+)/);
+  return idMatch ? idMatch[1] : null;
+}
+
+
 
 // MARK: - Админские функции

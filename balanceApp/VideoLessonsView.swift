@@ -38,7 +38,7 @@ struct VideoLessonsView: View {
         NavigationView {
             VStack(spacing: 0) {
                 // Кастомный NavigationBar
-                CustomVideoLessonsNavigationBar()
+                CustomVideoLessonsNavigationBar(userPhone: userPhone, viewModel: viewModel)
                 
                 VStack(spacing: 16) {
                     // Поиск
@@ -135,6 +135,8 @@ struct VideoLessonsView: View {
             // Обновляем данные при возвращении в приложение
             if !userPhone.isEmpty {
                 viewModel.refreshVideoLessons(phone: userPhone)
+                // Также обновляем статусы покупок
+                viewModel.refreshAllPurchaseStatuses(phone: userPhone)
             }
         }
         .refreshable {
@@ -199,6 +201,8 @@ struct VideoLessonsView: View {
 // MARK: - Кастомный NavigationBar для видео уроков
 struct CustomVideoLessonsNavigationBar: View {
     @Environment(\.colorScheme) var colorScheme
+    let userPhone: String
+    let viewModel: VideoLessonViewModel
 
     var body: some View {
         HStack {
@@ -219,9 +223,49 @@ struct CustomVideoLessonsNavigationBar: View {
             
             Spacer()
             
-            Text("Видео уроки")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(colorScheme == .dark ? .white : .black)
+            HStack {
+                Text("Видео уроки")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                // Кнопка обновления статуса покупок
+                Button(action: {
+                    if !userPhone.isEmpty {
+                        viewModel.refreshAllPurchaseStatuses(phone: userPhone)
+                    }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                        .foregroundColor(.accentColor)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Кнопка принудительного обновления уроков (только для админов)
+                if viewModel.adminPhones.contains(userPhone) {
+                    Button(action: {
+                        viewModel.forceRefreshLessonsWithPurchaseStatus(phone: userPhone)
+                    }) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                // Кнопка тестирования (только для админов)
+                if viewModel.adminPhones.contains(userPhone) {
+                    Button(action: {
+                        viewModel.testAllLessonsStatus()
+                    }) {
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
             
             Spacer()
             

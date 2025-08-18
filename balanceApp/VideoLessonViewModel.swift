@@ -87,6 +87,7 @@ class VideoLessonViewModel: ObservableObject {
                             lesson.isPurchased = userPurchases[lessonId] != nil
                             if lesson.isPurchased {
                                 lesson.purchaseDate = userPurchases[lessonId]
+                                print("✅ При загрузке: урок \(lessonId) (\(lesson.title)) - КУПЛЕН")
                             }
                             lessons.append(lesson)
                         }
@@ -96,6 +97,10 @@ class VideoLessonViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.videoLessons = lessons.filter { $0.isActive } // Показываем только активные уроки
                     self.isLoading = false
+                    
+                    // Логируем финальное состояние
+                    let purchasedCount = self.videoLessons.filter { $0.isPurchased }.count
+                    print("📊 Загрузка завершена: \(self.videoLessons.count) уроков, \(purchasedCount) купленных")
                 }
             }
         }
@@ -400,28 +405,18 @@ class VideoLessonViewModel: ObservableObject {
             self?.databaseRef.child("videoLessonPurchases").child(phone).child(purchase.id).setValue(purchase.toDictionary()) { [weak self] error, _ in
                 DispatchQueue.main.async {
                     if error == nil {
-                        print("✅ Покупка успешно сохранена: \(purchase.id)")
-                        // Обновляем локальный статус
+                        print("✅ Покупка успешно сохранена в Firebase")
+                        
+                        // Обновляем локальное состояние урока
                         if let index = self?.videoLessons.firstIndex(where: { $0.id == lesson.id }) {
                             self?.videoLessons[index].isPurchased = true
                             self?.videoLessons[index].purchaseDate = purchase.purchaseDate
+                            print("✅ Локальное состояние урока обновлено: \(lesson.id)")
                         }
                         
-                        // Показываем алерт об успешной покупке
-                        self?.successMessage = "🎉 Видео урок '\(lesson.title)' успешно куплен!"
+                        // Показываем сообщение об успехе
+                        self?.successMessage = "Урок успешно куплен!"
                         self?.showSuccessAlert = true
-                        
-                        // Отправляем аналитику
-                        AppMetrica.reportEvent(name: "Пользователь купил видео урок", parameters: [
-                            "video_id": lesson.id,
-                            "video_title": lesson.title,
-                            "price": lesson.currentPrice,
-                            "original_price": lesson.originalPrice,
-                            "has_discount": lesson.hasActiveDiscount,
-                            "discount_percentage": lesson.discountPercentage ?? 0,
-                            "payment_method": "YooKassa",
-                            "payment_token": paymentToken
-                        ])
                         
                         // Останавливаем индикатор загрузки
                         self?.setProcessingPayment(false, for: lesson.id)
@@ -429,7 +424,8 @@ class VideoLessonViewModel: ObservableObject {
                         completion(true)
                     } else {
                         print("❌ Ошибка сохранения покупки: \(error?.localizedDescription ?? "неизвестная ошибка")")
-                        self?.errorAlertMessage = "Ошибка сохранения покупки: \(error?.localizedDescription ?? "Неизвестная ошибка")"
+                        // Показываем ошибку пользователю
+                        self?.errorAlertMessage = "Ошибка сохранения покупки: \(error?.localizedDescription ?? "неизвестная ошибка")"
                         self?.showErrorAlert = true
                         // Останавливаем индикатор загрузки при ошибке
                         self?.setProcessingPayment(false, for: lesson.id)
@@ -663,6 +659,208 @@ class VideoLessonViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Обновление статуса покупки
+    
+    func refreshPurchaseStatus(for lessonId: String, phone: String) {
+        print("🔄 Обновляем статус покупки для урока: \(lessonId)")
+        
+        databaseRef.child("videoLessonPurchases").child(phone).queryOrdered(byChild: "videoLessonId").queryEqual(toValue: lessonId).observeSingleEvent(of: .value) { [weak self] snapshot in
+            DispatchQueue.main.async {
+                if let purchases = snapshot.value as? [String: [String: Any]], !purchases.isEmpty {
+                    print("✅ Найдена покупка в Firebase для урока: \(lessonId)")
+                    
+                    // Обновляем локальное состояние
+                    if let index = self?.videoLessons.firstIndex(where: { $0.id == lessonId }) {
+                        self?.videoLessons[index].isPurchased = true
+                        
+                        // Получаем дату покупки
+                        if let purchaseData = purchases.values.first,
+                           let timestamp = purchaseData["purchase_date"] as? TimeInterval {
+                            self?.videoLessons[index].purchaseDate = Date(timeIntervalSince1970: timestamp)
+                        }
+                        
+                        print("✅ Локальное состояние обновлено для урока: \(lessonId)")
+                        print("   isPurchased = \(self?.videoLessons[index].isPurchased ?? false)")
+                        
+                        // Принудительно обновляем UI
+                        self?.objectWillChange.send()
+                    } else {
+                        print("❌ Урок \(lessonId) не найден в локальном списке")
+                    }
+                } else {
+                    print("❌ Покупка не найдена в Firebase для урока: \(lessonId)")
+                }
+            }
+        }
+    }
+    
+    func forceUpdateLessonPurchaseStatus(lessonId: String, phone: String) {
+        print("🚀 Принудительное обновление статуса покупки для урока: \(lessonId)")
+        
+        // Сначала проверяем в Firebase
+        databaseRef.child("videoLessonPurchases").child(phone).queryOrdered(byChild: "videoLessonId").queryEqual(toValue: lessonId).observeSingleEvent(of: .value) { [weak self] snapshot in
+            DispatchQueue.main.async {
+                let hasPurchase = snapshot.exists()
+                print("🔍 Проверка Firebase: покупка \(hasPurchase ? "найдена" : "не найдена")")
+                
+                // Обновляем локальное состояние
+                if let index = self?.videoLessons.firstIndex(where: { $0.id == lessonId }) {
+                    let oldStatus = self?.videoLessons[index].isPurchased ?? false
+                    self?.videoLessons[index].isPurchased = hasPurchase
+                    
+                    print("📊 Статус урока \(lessonId):")
+                    print("   Было: isPurchased = \(oldStatus)")
+                    print("   Стало: isPurchased = \(self?.videoLessons[index].isPurchased ?? false)")
+                    
+                    // Принудительно обновляем UI
+                    self?.objectWillChange.send()
+                } else {
+                    print("❌ Урок \(lessonId) не найден в локальном списке уроков")
+                }
+            }
+        }
+    }
+    
+    func refreshAllPurchaseStatuses(phone: String) {
+        print("🔄 Обновляем статусы всех покупок для телефона: \(phone)")
+        print("📊 Текущее количество уроков: \(videoLessons.count)")
+        
+        databaseRef.child("videoLessonPurchases").child(phone).observeSingleEvent(of: .value) { [weak self] snapshot in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                var purchaseStatuses: [String: Bool] = [:]
+                var purchaseDates: [String: Date] = [:]
+                
+                if let purchases = snapshot.value as? [String: [String: Any]] {
+                    print("📋 Найдено покупок в Firebase: \(purchases.count)")
+                    
+                    for (purchaseId, purchaseData) in purchases {
+                        if let videoLessonId = purchaseData["videoLessonId"] as? String {
+                            purchaseStatuses[videoLessonId] = true
+                            print("📦 Покупка \(purchaseId) для урока: \(videoLessonId)")
+                            
+                            if let timestamp = purchaseData["purchase_date"] as? TimeInterval {
+                                purchaseDates[videoLessonId] = Date(timeIntervalSince1970: timestamp)
+                            }
+                        }
+                    }
+                } else {
+                    print("❌ Покупки не найдены в Firebase для телефона: \(phone)")
+                }
+                
+                print("🎯 Обновляем локальное состояние уроков...")
+                var updatedCount = 0
+                var hasChanges = false
+                
+                // Обновляем локальное состояние всех уроков
+                for (index, lesson) in self.videoLessons.enumerated() {
+                    print("🔍 Проверяем урок \(lesson.id): \(lesson.title)")
+                    print("   Текущий статус: isPurchased = \(lesson.isPurchased)")
+                    
+                    if let isPurchased = purchaseStatuses[lesson.id] {
+                        print("   ✅ Найдена покупка в Firebase, обновляем статус")
+                        
+                        // Проверяем, изменился ли статус
+                        if self.videoLessons[index].isPurchased != isPurchased {
+                            hasChanges = true
+                            print("   🔄 Статус изменился с \(self.videoLessons[index].isPurchased) на \(isPurchased)")
+                        }
+                        
+                        self.videoLessons[index].isPurchased = isPurchased
+                        if isPurchased {
+                            self.videoLessons[index].purchaseDate = purchaseDates[lesson.id]
+                        }
+                        updatedCount += 1
+                        print("   ✅ Обновлен: isPurchased = \(self.videoLessons[index].isPurchased)")
+                    } else {
+                        print("   ❌ Покупка не найдена в Firebase")
+                        // Если покупки нет, но урок помечен как купленный, сбрасываем статус
+                        if self.videoLessons[index].isPurchased {
+                            hasChanges = true
+                            print("   🔄 Сбрасываем статус покупки")
+                            self.videoLessons[index].isPurchased = false
+                            self.videoLessons[index].purchaseDate = nil
+                        }
+                    }
+                }
+                
+                print("✅ Обновлены статусы покупок для \(updatedCount) из \(self.videoLessons.count) уроков")
+                print("🔄 Изменения в данных: \(hasChanges ? "ДА" : "НЕТ")")
+                
+                // Принудительно обновляем UI только если были изменения
+                if hasChanges {
+                    print("🚀 Принудительно обновляем UI")
+                    self.objectWillChange.send()
+                    
+                    // Дополнительное логирование для проверки
+                    print("🔄 Проверяем финальное состояние уроков:")
+                    for lesson in self.videoLessons {
+                        if lesson.isPurchased {
+                            print("   ✅ \(lesson.id): \(lesson.title) - КУПЛЕН")
+                        }
+                    }
+                } else {
+                    print("ℹ️ Изменений не было, UI не обновляем")
+                }
+            }
+        }
+    }
+    
+    func forceRefreshLessonsWithPurchaseStatus(phone: String) {
+        print("🚀 Принудительное обновление уроков с статусами покупок")
+        
+        // Сначала получаем все покупки
+        databaseRef.child("videoLessonPurchases").child(phone).observeSingleEvent(of: .value) { [weak self] purchaseSnapshot in
+            guard let self = self else { return }
+            
+            // Создаем словарь покупок
+            var userPurchases: [String: Date] = [:]
+            if let purchases = purchaseSnapshot.value as? [String: [String: Any]] {
+                for (_, purchaseData) in purchases {
+                    if let videoLessonId = purchaseData["videoLessonId"] as? String,
+                       let timestamp = purchaseData["purchase_date"] as? TimeInterval {
+                        userPurchases[videoLessonId] = Date(timeIntervalSince1970: timestamp)
+                    }
+                }
+            }
+            
+            print("📋 Найдено покупок: \(userPurchases.count)")
+            
+            // Теперь загружаем уроки и устанавливаем статусы покупок
+            self.databaseRef.child("videoLessons").observeSingleEvent(of: .value) { [weak self] lessonSnapshot in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    var lessons: [VideoLesson] = []
+                    
+                    if let lessonsDict = lessonSnapshot.value as? [String: [String: Any]] {
+                        for (lessonId, lessonData) in lessonsDict {
+                            if var lesson = VideoLesson(from: lessonData, id: lessonId) {
+                                // Устанавливаем статус покупки
+                                lesson.isPurchased = userPurchases[lessonId] != nil
+                                if lesson.isPurchased {
+                                    lesson.purchaseDate = userPurchases[lessonId]
+                                    print("✅ Урок \(lessonId): \(lesson.title) - КУПЛЕН")
+                                }
+                                lessons.append(lesson)
+                            }
+                        }
+                    }
+                    
+                    // Обновляем список уроков
+                    self.videoLessons = lessons.filter { $0.isActive }
+                    
+                    print("🔄 Список уроков обновлен: \(self.videoLessons.count) уроков")
+                    print("📊 Купленных уроков: \(self.videoLessons.filter { $0.isPurchased }.count)")
+                    
+                    // Принудительно обновляем UI
+                    self.objectWillChange.send()
+                }
+            }
+        }
+    }
+    
     func formatDuration(_ seconds: Int?) -> String {
         guard let seconds = seconds else { return "Неизвестно" }
         let minutes = seconds / 60
@@ -706,5 +904,88 @@ class VideoLessonViewModel: ObservableObject {
                 }
             }
         )
+    }
+    
+    // MARK: - Инициализация
+    
+    init() {
+        setupNotificationObservers()
+    }
+    
+    private func setupNotificationObservers() {
+        // Обработчик для обновления статуса покупки
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("RefreshPurchaseStatus"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let userPhone = notification.userInfo?["userPhone"] as? String,
+               let paymentId = notification.userInfo?["paymentId"] as? String {
+                print("🔄 Получено уведомление об обновлении статуса покупки: \(paymentId)")
+                self?.refreshAllPurchaseStatuses(phone: userPhone)
+            }
+        }
+    }
+    
+    func debugLessonPurchaseStatus(lessonId: String, phone: String) {
+        print("🔍 Отладка статуса покупки для урока: \(lessonId)")
+        print("📱 Телефон пользователя: \(phone)")
+        
+        // Проверяем локальное состояние
+        if let lesson = videoLessons.first(where: { $0.id == lessonId }) {
+            print("📊 Локальное состояние:")
+            print("   ID: \(lesson.id)")
+            print("   Название: \(lesson.title)")
+            print("   isPurchased: \(lesson.isPurchased)")
+            print("   purchaseDate: \(lesson.purchaseDate?.description ?? "nil")")
+        } else {
+            print("❌ Урок не найден в локальном списке")
+        }
+        
+        // Проверяем Firebase
+        databaseRef.child("videoLessonPurchases").child(phone).queryOrdered(byChild: "videoLessonId").queryEqual(toValue: lessonId).observeSingleEvent(of: .value) { snapshot in
+            print("🔥 Firebase состояние:")
+            if let purchases = snapshot.value as? [String: [String: Any]], !purchases.isEmpty {
+                print("   ✅ Покупка найдена в Firebase")
+                for (purchaseId, purchaseData) in purchases {
+                    print("   Покупка ID: \(purchaseId)")
+                    print("   Урок ID: \(purchaseData["videoLessonId"] ?? "nil")")
+                    print("   Статус: \(purchaseData["status"] ?? "nil")")
+                    print("   Дата: \(purchaseData["purchase_date"] ?? "nil")")
+                }
+            } else {
+                print("   ❌ Покупка не найдена в Firebase")
+            }
+        }
+    }
+    
+    func testAllLessonsStatus() {
+        print("🧪 ТЕСТ: Проверяем состояние всех уроков")
+        print("📱 Пользователь: \(UserDefaults.standard.string(forKey: "userPhone") ?? "неизвестно")")
+        print("📊 Всего уроков: \(videoLessons.count)")
+        
+        for (index, lesson) in videoLessons.enumerated() {
+            print("   \(index + 1). \(lesson.id): \(lesson.title)")
+            print("      isPurchased: \(lesson.isPurchased)")
+            print("      purchaseDate: \(lesson.purchaseDate?.description ?? "nil")")
+            print("      isActive: \(lesson.isActive)")
+        }
+        
+        // Проверяем Firebase
+        let userPhone = UserDefaults.standard.string(forKey: "userPhone") ?? ""
+        if !userPhone.isEmpty {
+            databaseRef.child("videoLessonPurchases").child(userPhone).observeSingleEvent(of: .value) { snapshot in
+                print("🔥 Firebase покупки для \(userPhone):")
+                if let purchases = snapshot.value as? [String: [String: Any]] {
+                    for (purchaseId, purchaseData) in purchases {
+                        let lessonId = purchaseData["videoLessonId"] as? String ?? "неизвестно"
+                        let status = purchaseData["status"] as? String ?? "неизвестно"
+                        print("   Покупка \(purchaseId): урок \(lessonId), статус \(status)")
+                    }
+                } else {
+                    print("   Покупок не найдено")
+                }
+            }
+        }
     }
 }

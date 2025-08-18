@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import YooKassaPayments
+import FirebaseDatabase // Added for Firebase integration
 
 class YooKassaRealPaymentService: ObservableObject {
 	static let shared = YooKassaRealPaymentService()
@@ -33,7 +34,7 @@ class YooKassaRealPaymentService: ObservableObject {
 	private var pendingAmount: Decimal = 0
 	private var pendingDescription: String = ""
 	private var statusCheckAttempts: Int = 0
-	private let maxStatusCheckAttempts: Int = 20
+	private let maxStatusCheckAttempts: Int = 10  // Уменьшили с 20 до 10
 	
 	// Защита от множественных уведомлений
 	private var processedPaymentIds: Set<String> = []
@@ -376,38 +377,28 @@ extension YooKassaRealPaymentService: TokenizationModuleOutput {
 					} else if lowerStatus == "pending" {
 						// Для всех типов платежей проверяем наличие URL подтверждения
 						if let urlStr = response.confirmationUrl, !urlStr.isEmpty {
-							if paymentMethodType == .bankCard {
-								print("🔄 Bank card: подтверждение внутри SDK")
-								if let module = self.presentedModule {
-									module.startConfirmationProcess(confirmationUrl: urlStr, paymentMethodType: paymentMethodType)
-								} else {
-									print("❌ Ошибка: модуль токенизации недоступен для подтверждения")
-									NotificationCenter.default.post(name: .ykPaymentError, object: nil, userInfo: ["error": YooPaymentError.tokenizationError])
+							// Все методы платежей (включая банковские карты) - открываем подтверждение вне SDK
+							print("🔄 \(paymentMethodType.rawValue): открываем подтверждение вне SDK")
+							if let url = URL(string: urlStr) {
+								UIApplication.shared.open(url) { success in
+									if success {
+										print("✅ Успешно открыт URL для подтверждения")
+										// Закрываем модуль токенизации, так как пользователь уходит во внешний браузер
+										if let module = self.presentedModule {
+											module.dismiss(animated: true)
+											self.presentedModule = nil
+										}
+										DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+											self.startPaymentStatusCheck(paymentId: response.paymentId ?? "")
+										}
+									} else {
+										print("❌ Не удалось открыть URL для подтверждения")
+										NotificationCenter.default.post(name: .ykPaymentError, object: nil, userInfo: ["error": YooPaymentError.tokenizationError])
+									}
 								}
 							} else {
-								// Все остальные методы (SBP, SberPay, Tinkoff Bank и др.) - открываем подтверждение вне SDK
-								print("🔄 \(paymentMethodType.rawValue): открываем подтверждение вне SDK")
-								if let url = URL(string: urlStr) {
-									UIApplication.shared.open(url) { success in
-										if success {
-											print("✅ Успешно открыт URL для подтверждения")
-											// Закрываем модуль токенизации, так как пользователь уходит во внешний браузер
-											if let module = self.presentedModule {
-												module.dismiss(animated: true)
-												self.presentedModule = nil
-											}
-											DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-												self.startPaymentStatusCheck(paymentId: response.paymentId ?? "")
-											}
-										} else {
-											print("❌ Не удалось открыть URL для подтверждения")
-											NotificationCenter.default.post(name: .ykPaymentError, object: nil, userInfo: ["error": YooPaymentError.tokenizationError])
-										}
-									}
-								} else {
-									print("❌ Неверный URL для подтверждения: \(urlStr)")
-									NotificationCenter.default.post(name: .ykPaymentError, object: nil, userInfo: ["error": YooPaymentError.tokenizationError])
-								}
+								print("❌ Неверный URL для подтверждения: \(urlStr)")
+								NotificationCenter.default.post(name: .ykPaymentError, object: nil, userInfo: ["error": YooPaymentError.tokenizationError])
 							}
 						} else {
 							print("⏳ Платеж в обработке без подтверждения, начинаем проверку статуса")
@@ -548,7 +539,22 @@ extension YooKassaRealPaymentService: TokenizationModuleOutput {
 					switch lowerStatus {
 					case "succeeded":
 						print("🎉 Платеж успешно подтвержден")
+						// Очищаем lastPaymentId после успешного завершения
+						self.lastPaymentId = nil
 						self.sendSuccessNotification(paymentId: paymentId)
+						
+						// Обновляем статус покупки в ViewModel
+						DispatchQueue.main.async {
+							if let userPhone = UserDefaults.standard.string(forKey: "userPhone"),
+							   !userPhone.isEmpty {
+								// Находим ViewModel и обновляем статус
+								NotificationCenter.default.post(
+									name: Notification.Name("RefreshPurchaseStatus"),
+									object: nil,
+									userInfo: ["paymentId": paymentId, "userPhone": userPhone]
+								)
+							}
+						}
 					case "pending":
 						print("⏳ Платеж в обработке, ожидаем подтверждения")
 						self.statusCheckAttempts += 1
@@ -629,11 +635,41 @@ extension YooKassaRealPaymentService {
 	private func startPaymentStatusCheck(paymentId: String) {
 		print("🔄 Начинаем проверку статуса платежа: \(paymentId)")
 		
-		// Сбрасываем счетчик попыток
-		statusCheckAttempts = 0
+		// Сначала проверяем, не создана ли уже покупка в Firebase (webhook мог уже обработать)
+		checkIfPurchaseExistsInFirebase(paymentId: paymentId) { [weak self] exists in
+			guard let self = self else { return }
+			
+			if exists {
+				print("✅ Покупка уже существует в Firebase (обработана webhook), отправляем уведомление об успехе")
+				self.lastPaymentId = nil
+				self.sendSuccessNotification(paymentId: paymentId)
+				return
+			}
+			
+			// Если покупки нет, начинаем проверку статуса
+			print("🔄 Покупка не найдена в Firebase, начинаем проверку статуса")
+			self.statusCheckAttempts = 0
+			self.checkPaymentStatusRecursively(paymentId: paymentId)
+		}
+	}
+	
+	private func checkIfPurchaseExistsInFirebase(paymentId: String, completion: @escaping (Bool) -> Void) {
+		// Получаем номер телефона пользователя
+		let userPhone = UserDefaults.standard.string(forKey: "userPhone") ?? ""
 		
-		// Запускаем первую проверку
-		checkPaymentStatusRecursively(paymentId: paymentId)
+		guard !userPhone.isEmpty else {
+			print("❌ Не удалось получить номер телефона пользователя")
+			completion(false)
+			return
+		}
+		
+		// Проверяем, существует ли покупка с таким transactionId
+		let databaseRef = Database.database().reference()
+		databaseRef.child("videoLessonPurchases").child(userPhone).queryOrdered(byChild: "transactionId").queryEqual(toValue: paymentId).observeSingleEvent(of: .value) { snapshot in
+			let exists = snapshot.exists()
+			print("🔍 Проверка покупки в Firebase: \(exists ? "найдена" : "не найдена")")
+			completion(exists)
+		}
 	}
 	
 	private func checkPaymentStatusRecursively(paymentId: String) {
@@ -652,6 +688,19 @@ extension YooKassaRealPaymentService {
 						// Очищаем lastPaymentId после успешного завершения
 						self.lastPaymentId = nil
 						self.sendSuccessNotification(paymentId: paymentId)
+						
+						// Обновляем статус покупки в ViewModel
+						DispatchQueue.main.async {
+							if let userPhone = UserDefaults.standard.string(forKey: "userPhone"),
+							   !userPhone.isEmpty {
+								// Находим ViewModel и обновляем статус
+								NotificationCenter.default.post(
+									name: Notification.Name("RefreshPurchaseStatus"),
+									object: nil,
+									userInfo: ["paymentId": paymentId, "userPhone": userPhone]
+								)
+							}
+						}
 					case "pending":
 						self.statusCheckAttempts += 1
 						
@@ -664,8 +713,8 @@ extension YooKassaRealPaymentService {
 						}
 						
 						print("⏳ Платеж в обработке, попытка \(self.statusCheckAttempts)/\(self.maxStatusCheckAttempts)")
-						// Повторяем проверку через 5 секунд
-						DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+						// Повторяем проверку через 10 секунд
+						DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
 							self.checkPaymentStatusRecursively(paymentId: paymentId)
 						}
 					case "canceled":

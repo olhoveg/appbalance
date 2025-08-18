@@ -17,38 +17,26 @@ struct VideoLessonCardView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Превью видео
+        VStack(spacing: 0) {
+            // Видео превью
             ZStack {
-                if let thumbnailUrl = lesson.thumbnailUrl, !thumbnailUrl.isEmpty {
-                    AsyncImage(url: URL(string: thumbnailUrl)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color(.systemGray5))
-                            .overlay(
-                                Image(systemName: "video")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(.secondary)
-                            )
-                    }
-                    .frame(height: 120)
-                    .clipped()
-                } else {
+                AsyncImage(url: URL(string: lesson.thumbnailUrl ?? "")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
                     Rectangle()
-                        .fill(Color(.systemGray5))
-                        .frame(height: 120)
-                        .overlay(
-                            Image(systemName: "video")
-                                .font(.system(size: 30))
-                                .foregroundColor(.secondary)
-                        )
+                        .fill(Color.gray.opacity(0.3))
                 }
+                .frame(height: 120)
+                .clipped()
                 
                 // Кнопка воспроизведения
                 Button(action: {
+                    print("🎬 Нажата кнопка воспроизведения для урока: \(lesson.title)")
+                    print("   ID: \(lesson.id)")
+                    print("   isPurchased: \(lesson.isPurchased)")
+                    
                     if lesson.isPurchased {
                         showingVideoPlayer = true
                     } else {
@@ -87,6 +75,18 @@ struct VideoLessonCardView: View {
                                 .foregroundColor(.green)
                                 .font(.caption)
                             Spacer()
+                            
+                            // Кнопка принудительного обновления (только для админов)
+                            if isAdmin {
+                                Button(action: {
+                                    viewModel.forceUpdateLessonPurchaseStatus(lessonId: lesson.id, phone: userPhone)
+                                }) {
+                                    Image(systemName: "arrow.clockwise.circle")
+                                        .foregroundColor(.blue)
+                                        .font(.caption)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
                         }
                         Spacer()
                     }
@@ -213,10 +213,14 @@ struct VideoLessonCardView: View {
                         print("   ID: \(lesson.id)")
                         print("   Куплен: \(lesson.isPurchased)")
                         print("   Обрабатывается: \(viewModel.isProcessingPayment(for: lesson.id))")
+                        print("   Пользователь: \(userPhone)")
+                        print("   Кнопка показывает: \(lesson.isPurchased ? "Смотреть" : "Купить")")
                         
                         if lesson.isPurchased {
+                            print("🎬 Открываем видео для купленного урока")
                             showingVideoPlayer = true
                         } else {
+                            print("🛒 Начинаем покупку урока")
                             onPurchase(lesson)
                         }
                     }) {
@@ -254,6 +258,12 @@ struct VideoLessonCardView: View {
             if isAdmin {
                 Button(lesson.isActive ? "Деактивировать" : "Активировать") {
                     viewModel.toggleVideoLessonActive(lesson.id) { _ in }
+                }
+                Button("Отладка покупки") {
+                    viewModel.debugLessonPurchaseStatus(lessonId: lesson.id, phone: userPhone)
+                }
+                Button("Принудительное обновление") {
+                    viewModel.forceUpdateLessonPurchaseStatus(lessonId: lesson.id, phone: userPhone)
                 }
                 Button("Удалить", role: .destructive) {
                     viewModel.deleteVideoLesson(lesson.id) { _ in }
