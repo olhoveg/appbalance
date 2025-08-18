@@ -67,8 +67,8 @@ struct VideoLessonCardView: View {
                     .padding(8)
                 }
                 
-                // Индикатор покупки
-                if lesson.isPurchased {
+                // Индикатор покупки (только для админов)
+                if lesson.isPurchased && isAdmin {
                     VStack {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
@@ -77,24 +77,22 @@ struct VideoLessonCardView: View {
                             Spacer()
                             
                             // Кнопка принудительного обновления (только для админов)
-                            if isAdmin {
-                                Button(action: {
-                                    viewModel.forceUpdateLessonPurchaseStatus(lessonId: lesson.id, phone: userPhone)
-                                }) {
-                                    Image(systemName: "arrow.clockwise.circle")
-                                        .foregroundColor(.blue)
-                                        .font(.caption)
-                                }
-                                .buttonStyle(PlainButtonStyle())
+                            Button(action: {
+                                viewModel.forceUpdateLessonPurchaseStatus(lessonId: lesson.id, phone: userPhone)
+                            }) {
+                                Image(systemName: "arrow.clockwise.circle")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
                         Spacer()
                     }
                     .padding(8)
                 }
                 
-                // Индикатор скидки
-                if lesson.hasActiveDiscount {
+                // Индикатор скидки (только для некупленных уроков)
+                if lesson.hasActiveDiscount && !lesson.isPurchased {
                     VStack {
                         HStack {
                             Spacer()
@@ -167,85 +165,111 @@ struct VideoLessonCardView: View {
                 }
                 
                 // Цена и кнопка
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if lesson.hasActiveDiscount {
-                            // Показываем скидку
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    Text(viewModel.formatPrice(lesson.currentPrice))
-                                        .font(.headline)
-                                        .foregroundColor(.red)
-                                        .fontWeight(.bold)
-                                    
-                                    Text("-\(lesson.discountPercentage ?? 0)%")
-                                        .font(.caption2)
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 2)
-                                        .background(Color.red)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(4)
-                                }
-                                
-                                Text(viewModel.formatPrice(lesson.originalPrice))
-                                    .font(.caption)
-                                    .strikethrough()
-                                    .foregroundColor(.secondary)
-                                
-                                // Таймер обратного отсчета
-                                if let discount = lesson.discount {
-                                    DiscountTimerView(endDate: discount.endDate)
-                                }
-                            }
-                        } else {
-                            // Обычная цена
-                            Text(viewModel.formatPrice(lesson.currentPrice))
-                                .font(.headline)
-                                .foregroundColor(.accentColor)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        print("🔘 Нажата кнопка для урока: \(lesson.title)")
-                        print("   ID: \(lesson.id)")
-                        print("   Куплен: \(lesson.isPurchased)")
-                        print("   Обрабатывается: \(viewModel.isProcessingPayment(for: lesson.id))")
-                        print("   Пользователь: \(userPhone)")
-                        print("   Кнопка показывает: \(lesson.isPurchased ? "Смотреть" : "Купить")")
+                if lesson.isPurchased {
+                    // Для купленных уроков - кнопка по центру
+                    HStack {
+                        Spacer()
                         
-                        if lesson.isPurchased {
+                        Button(action: {
+                            print("🔘 Нажата кнопка для урока: \(lesson.title)")
+                            print("   ID: \(lesson.id)")
+                            print("   Куплен: \(lesson.isPurchased)")
+                            print("   Пользователь: \(userPhone)")
                             print("🎬 Открываем видео для купленного урока")
                             showingVideoPlayer = true
-                        } else {
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "play")
+                                    .font(.caption)
+                                Text("Смотреть")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .contentShape(Rectangle())
+                        
+                        Spacer()
+                    }
+                } else {
+                    // Для некупленных уроков - цена слева, кнопка справа
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if lesson.hasActiveDiscount {
+                                // Показываем скидку
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text(viewModel.formatPrice(lesson.currentPrice))
+                                            .font(.headline)
+                                            .foregroundColor(.red)
+                                            .fontWeight(.bold)
+                                        
+                                        Text("-\(lesson.discountPercentage ?? 0)%")
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 2)
+                                            .background(Color.red)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(4)
+                                    }
+                                    
+                                    Text(viewModel.formatPrice(lesson.originalPrice))
+                                        .font(.caption)
+                                        .strikethrough()
+                                        .foregroundColor(.secondary)
+                                    
+                                    // Таймер обратного отсчета
+                                    if let discount = lesson.discount {
+                                        DiscountTimerView(endDate: discount.endDate)
+                                    }
+                                }
+                            } else {
+                                // Обычная цена
+                                Text(viewModel.formatPrice(lesson.currentPrice))
+                                    .font(.headline)
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            print("🔘 Нажата кнопка для урока: \(lesson.title)")
+                            print("   ID: \(lesson.id)")
+                            print("   Куплен: \(lesson.isPurchased)")
+                            print("   Обрабатывается: \(viewModel.isProcessingPayment(for: lesson.id))")
+                            print("   Пользователь: \(userPhone)")
                             print("🛒 Начинаем покупку урока")
                             onPurchase(lesson)
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            if viewModel.isProcessingPayment(for: lesson.id) {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: lesson.isPurchased ? "play" : "cart")
+                        }) {
+                            HStack(spacing: 4) {
+                                if viewModel.isProcessingPayment(for: lesson.id) {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Image(systemName: "cart")
+                                        .font(.caption)
+                                }
+                                
+                                Text("Купить")
                                     .font(.caption)
+                                    .fontWeight(.semibold)
                             }
-                            
-                            Text(lesson.isPurchased ? "Смотреть" : "Купить")
-                                .font(.caption)
-                                .fontWeight(.semibold)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.accentColor)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(lesson.isPurchased ? Color.green : Color.accentColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
+                        .disabled(viewModel.isProcessingPayment(for: lesson.id))
+                        .contentShape(Rectangle())
                     }
-                    .disabled(viewModel.isProcessingPayment(for: lesson.id))
-                    .contentShape(Rectangle()) // Улучшаем hit testing
                 }
             }
             .padding(.horizontal, 4)

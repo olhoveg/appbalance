@@ -64,39 +64,41 @@ struct VideoLessonDetailView: View {
                             .fontWeight(.bold)
                             .foregroundColor(.primary)
                         
-                        // Цена и скидка
-                        VStack(alignment: .leading, spacing: 8) {
-                            if lesson.hasActiveDiscount {
-                                HStack(spacing: 8) {
+                        // Цена и скидка (только для некупленных уроков)
+                        if !lesson.isPurchased {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if lesson.hasActiveDiscount {
+                                    HStack(spacing: 8) {
+                                        Text(viewModel.formatPrice(lesson.currentPrice))
+                                            .font(.title3)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.red)
+                                        
+                                        Text("-\(lesson.discountPercentage ?? 0)%")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.red)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(8)
+                                    }
+                                    
+                                    Text(viewModel.formatPrice(lesson.originalPrice))
+                                        .font(.subheadline)
+                                        .strikethrough()
+                                        .foregroundColor(.secondary)
+                                    
+                                    // Таймер обратного отсчета
+                                    if let discount = lesson.discount {
+                                        DiscountTimerView(endDate: discount.endDate)
+                                    }
+                                } else {
                                     Text(viewModel.formatPrice(lesson.currentPrice))
                                         .font(.title3)
                                         .fontWeight(.bold)
-                                        .foregroundColor(.red)
-                                    
-                                    Text("-\(lesson.discountPercentage ?? 0)%")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.red)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(8)
+                                        .foregroundColor(.accentColor)
                                 }
-                                
-                                Text(viewModel.formatPrice(lesson.originalPrice))
-                                    .font(.subheadline)
-                                    .strikethrough()
-                                    .foregroundColor(.secondary)
-                                
-                                // Таймер обратного отсчета
-                                if let discount = lesson.discount {
-                                    DiscountTimerView(endDate: discount.endDate)
-                                }
-                            } else {
-                                Text(viewModel.formatPrice(lesson.currentPrice))
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.accentColor)
                             }
                         }
                         
