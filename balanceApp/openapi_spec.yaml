@@ -1,42 +1,132 @@
 openapi: 3.0.0
 info:
-  title: yk-api
+  title: YooKassa Payment API
+  description: API для обработки платежей через YooKassa в приложении BalanceApp
   version: 1.0.0
 servers:
 - url: https://d5dgl1ikvie8dgvombue.fary004x.apigw.yandexcloud.net
+  description: Production server
+
 paths:
   /payments/create:
     post:
+      summary: Создание платежа
+      description: Создает новый платеж через YooKassa для покупки видео урока
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: d4eddmpv77r6uei62hdg
         tag: "$latest"
         payload_format_version: "1.0"
+        
   /payments/status:
     get:
+      summary: Проверка статуса платежа
+      description: Проверяет текущий статус платежа по его ID
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: d4eddmpv77r6uei62hdg
         tag: "$latest"
         payload_format_version: "1.0"
+        
   /payments/pending:
     get:
+      summary: Получение отложенных покупок
+      description: Получает список отложенных покупок для конкретного пользователя
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: d4eddmpv77r6uei62hdg
         tag: "$latest"
         payload_format_version: "1.0"
+        
   /payments/pending/remove:
     delete:
+      summary: Удаление отложенной покупки
+      description: Удаляет отложенную покупку после успешной обработки
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: d4eddmpv77r6uei62hdg
         tag: "$latest"
         payload_format_version: "1.0"
+        
   /webhooks/yookassa:
     post:
+      summary: Webhook от YooKassa
+      description: Обрабатывает уведомления от YooKassa о статусе платежей
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: d4eddmpv77r6uei62hdg
         tag: "$latest"
         payload_format_version: "1.0"
+
+components:
+  schemas:
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID платежа в YooKassa
+        status:
+          type: string
+          description: Статус платежа
+          enum: [pending, succeeded, canceled, waiting_for_capture]
+        amount:
+          type: object
+          properties:
+            value:
+              type: string
+              description: Сумма платежа
+            currency:
+              type: string
+              description: Валюта
+        description:
+          type: string
+          description: Описание платежа
+        created_at:
+          type: string
+          format: date-time
+          description: Дата создания платежа
+    
+    PendingPurchase:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          description: ID платежа
+        amount:
+          type: string
+          description: Сумма платежа
+        currency:
+          type: string
+          description: Валюта
+        description:
+          type: string
+          description: Описание платежа
+        status:
+          type: string
+          description: Статус платежа
+        createdAt:
+          type: string
+          format: date-time
+          description: Дата создания
+        userPhone:
+          type: string
+          description: Номер телефона пользователя
+        videoLessonId:
+          type: string
+          description: ID видео урока
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: API ключ для аутентификации (если требуется)
+
+tags:
+  - name: Payments
+    description: Операции с платежами
+  - name: Pending Purchases
+    description: Управление отложенными покупками
+  - name: Webhooks
+    description: Webhook обработчики

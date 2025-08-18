@@ -45,6 +45,7 @@ class YooKassaPaymentService: ObservableObject {
 extension Notification.Name {
     static let ykPaymentSuccess = Notification.Name("ykPaymentSuccess")
     static let ykPaymentError = Notification.Name("ykPaymentError")
+    static let ykPaymentCanceled = Notification.Name("ykPaymentCanceled")
 }
 
 // MARK: - Ошибки

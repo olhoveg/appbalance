@@ -88,22 +88,25 @@ struct VideoLessonsView: View {
                 } else {
                     ScrollView {
                         LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 16),
-                            GridItem(.flexible(), spacing: 16)
-                        ], spacing: 16) {
+                            GridItem(.flexible(), spacing: 20),
+                            GridItem(.flexible(), spacing: 20)
+                        ], spacing: 20) {
                             ForEach(filteredVideoLessons) { lesson in
                                 VideoLessonCardView(
                                     lesson: lesson,
                                     viewModel: viewModel,
                                     userPhone: userPhone,
                                     onPurchase: { selectedLesson in
+                                        print("📱 Выбран урок для покупки: \(selectedLesson.title)")
                                         selectedVideoLesson = selectedLesson
                                         showingPurchaseAlert = true
                                     }
                                 )
+                                .id(lesson.id) // Уникальный ID для каждого элемента
                             }
                         }
-                        .padding()
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                     }
                 }
             }
@@ -126,18 +129,12 @@ struct VideoLessonsView: View {
             if !userPhone.isEmpty {
                 // Загружаем данные из Firebase
                 viewModel.fetchVideoLessons(phone: userPhone)
-                
-                // Проверяем отложенные покупки
-                viewModel.checkPendingPurchases(phone: userPhone)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Обновляем данные при возвращении в приложение
             if !userPhone.isEmpty {
                 viewModel.refreshVideoLessons(phone: userPhone)
-                
-                // Проверяем отложенные покупки при возвращении в приложение
-                viewModel.checkPendingPurchases(phone: userPhone)
             }
         }
         .refreshable {
@@ -154,7 +151,7 @@ struct VideoLessonsView: View {
             }
         } message: {
             if let lesson = selectedVideoLesson {
-                Text("Вы уверены, что хотите купить видео урок \"\(lesson.title)\" за \(viewModel.formatPrice(lesson.price))?")
+                Text("Вы уверены, что хотите купить видео урок \"\(lesson.title)\" за \(viewModel.formatPrice(lesson.currentPrice))?")
             }
         }
         .alert("Ошибка", isPresented: .constant(viewModel.errorMessage != nil)) {
@@ -165,6 +162,20 @@ struct VideoLessonsView: View {
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
             }
+        }
+        .alert("Успешная покупка!", isPresented: $viewModel.showSuccessAlert) {
+            Button("OK") {
+                viewModel.showSuccessAlert = false
+            }
+        } message: {
+            Text(viewModel.successMessage)
+        }
+        .alert("Ошибка платежа", isPresented: $viewModel.showErrorAlert) {
+            Button("OK") {
+                viewModel.showErrorAlert = false
+            }
+        } message: {
+            Text(viewModel.errorAlertMessage)
         }
         .sheet(isPresented: $showingAdminPanel) {
             VideoLessonListAdminView(viewModel: viewModel)
@@ -177,8 +188,9 @@ struct VideoLessonsView: View {
                 AppMetrica.reportEvent(name: "Пользователь купил видео урок", parameters: [
                     "video_id": lesson.id,
                     "video_title": lesson.title,
-                    "price": lesson.price
+                    "price": lesson.currentPrice
                 ])
+                // Алерт об успешной покупке показывается автоматически в ViewModel
             }
         }
     }

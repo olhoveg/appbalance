@@ -209,6 +209,11 @@ struct VideoLessonCardView: View {
                     Spacer()
                     
                     Button(action: {
+                        print("🔘 Нажата кнопка для урока: \(lesson.title)")
+                        print("   ID: \(lesson.id)")
+                        print("   Куплен: \(lesson.isPurchased)")
+                        print("   Обрабатывается: \(viewModel.isProcessingPayment(for: lesson.id))")
+                        
                         if lesson.isPurchased {
                             showingVideoPlayer = true
                         } else {
@@ -216,7 +221,7 @@ struct VideoLessonCardView: View {
                         }
                     }) {
                         HStack(spacing: 4) {
-                            if viewModel.isProcessingPayment {
+                            if viewModel.isProcessingPayment(for: lesson.id) {
                                 ProgressView()
                                     .scaleEffect(0.8)
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -235,7 +240,8 @@ struct VideoLessonCardView: View {
                         .foregroundColor(.white)
                         .cornerRadius(8)
                     }
-                    .disabled(viewModel.isProcessingPayment)
+                    .disabled(viewModel.isProcessingPayment(for: lesson.id))
+                    .contentShape(Rectangle()) // Улучшаем hit testing
                 }
             }
             .padding(.horizontal, 4)
@@ -243,6 +249,7 @@ struct VideoLessonCardView: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .contentShape(Rectangle()) // Улучшаем hit testing для всей карточки
         .contextMenu {
             if isAdmin {
                 Button(lesson.isActive ? "Деактивировать" : "Активировать") {

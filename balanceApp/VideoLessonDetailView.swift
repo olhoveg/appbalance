@@ -138,7 +138,7 @@ struct VideoLessonDetailView: View {
                                 dismiss()
                             }) {
                                 HStack {
-                                    if viewModel.isProcessingPayment {
+                                    if viewModel.isProcessingPayment(for: lesson.id) {
                                         ProgressView()
                                             .scaleEffect(0.8)
                                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -146,7 +146,7 @@ struct VideoLessonDetailView: View {
                                         Image(systemName: "cart")
                                     }
                                     
-                                    Text(viewModel.isProcessingPayment ? "Обработка..." : "Купить за \(viewModel.formatPrice(lesson.currentPrice))")
+                                    Text(viewModel.isProcessingPayment(for: lesson.id) ? "Обработка..." : "Купить за \(viewModel.formatPrice(lesson.currentPrice))")
                                         .fontWeight(.semibold)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -155,7 +155,7 @@ struct VideoLessonDetailView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(12)
                             }
-                            .disabled(viewModel.isProcessingPayment)
+                            .disabled(viewModel.isProcessingPayment(for: lesson.id))
                         } else {
                             Button(action: {
                                 showingVideoPlayer = true

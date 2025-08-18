@@ -9,7 +9,13 @@ class VideoLessonViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var adminPhones: [String] = []
-    @Published var isProcessingPayment = false
+    @Published var processingPayments: Set<String> = [] // Индивидуальное состояние загрузки для каждого урока
+    
+    // Состояния для алертов
+    @Published var showSuccessAlert = false
+    @Published var showErrorAlert = false
+    @Published var successMessage = ""
+    @Published var errorAlertMessage = ""
     
     let databaseRef = Database.database().reference()
     
@@ -20,15 +26,41 @@ class VideoLessonViewModel: ObservableObject {
         return false
     }
     
+    // Вспомогательный метод для проверки состояния загрузки конкретного урока
+    func isProcessingPayment(for lessonId: String) -> Bool {
+        return processingPayments.contains(lessonId)
+    }
+    
+    // Вспомогательный метод для установки состояния загрузки
+    func setProcessingPayment(_ isProcessing: Bool, for lessonId: String) {
+        DispatchQueue.main.async {
+            if isProcessing {
+                self.processingPayments.insert(lessonId)
+            } else {
+                self.processingPayments.remove(lessonId)
+            }
+        }
+    }
+    
+    // Метод для очистки всех состояний загрузки
+    func clearAllProcessingPayments() {
+        DispatchQueue.main.async {
+            self.processingPayments.removeAll()
+        }
+    }
+    
     func fetchVideoLessons(phone: String) {
         isLoading = true
         errorMessage = nil
+        
+        // Очищаем все состояния загрузки при загрузке новых данных
+        clearAllProcessingPayments()
         
         // Загружаем список админов
         loadAdminPhones()
         
         // Сначала загружаем покупки пользователя
-        databaseRef.child("videoLessonPurchases").queryOrdered(byChild: "userId").queryEqual(toValue: phone).observeSingleEvent(of: .value) { [weak self] purchaseSnapshot in
+        databaseRef.child("videoLessonPurchases").child(phone).observeSingleEvent(of: .value) { [weak self] purchaseSnapshot in
             guard let self = self else { return }
             
             // Создаем словарь покупок для быстрого поиска
@@ -84,7 +116,7 @@ class VideoLessonViewModel: ObservableObject {
         var isPurchased = false
         let semaphore = DispatchSemaphore(value: 0)
         
-        databaseRef.child("videoLessonPurchases").queryOrdered(byChild: "userId").queryEqual(toValue: userId).observeSingleEvent(of: .value) { snapshot in
+        databaseRef.child("videoLessonPurchases").child(userId).observeSingleEvent(of: .value) { snapshot in
             if let purchases = snapshot.value as? [String: [String: Any]] {
                 for (_, purchaseData) in purchases {
                     if let videoLessonId = purchaseData["videoLessonId"] as? String,
@@ -106,7 +138,7 @@ class VideoLessonViewModel: ObservableObject {
         var purchaseDate: Date?
         let semaphore = DispatchSemaphore(value: 0)
         
-        databaseRef.child("videoLessonPurchases").queryOrdered(byChild: "userId").queryEqual(toValue: userId).observeSingleEvent(of: .value) { snapshot in
+        databaseRef.child("videoLessonPurchases").child(userId).observeSingleEvent(of: .value) { snapshot in
             if let purchases = snapshot.value as? [String: [String: Any]] {
                 for (_, purchaseData) in purchases {
                     if let videoLessonId = purchaseData["videoLessonId"] as? String,
@@ -276,12 +308,12 @@ class VideoLessonViewModel: ObservableObject {
             return
         }
         
-        isProcessingPayment = true
+        setProcessingPayment(true, for: videoId)
         
         // Создаем платеж через ЮKassa
         YooKassaRealPaymentService.shared.createPayment(for: lesson, userPhone: phone) { [weak self] result in
             DispatchQueue.main.async {
-                self?.isProcessingPayment = false
+                self?.setProcessingPayment(false, for: videoId)
                 
                 switch result {
                 case .success(let token):
@@ -290,6 +322,10 @@ class VideoLessonViewModel: ObservableObject {
                     
                 case .failure(let error):
                     self?.errorMessage = "Ошибка платежа: \(error.localizedDescription)"
+                    // Очищаем все наблюдатели при ошибке
+                    NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentSuccess, object: nil)
+                    NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentError, object: nil)
+                    NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentCanceled, object: nil)
                     completion(false)
                 }
             }
@@ -297,44 +333,108 @@ class VideoLessonViewModel: ObservableObject {
         
         // Подписываемся на уведомления о результате платежа
         setupPaymentNotifications(videoId: videoId, phone: phone, lesson: lesson, completion: completion)
+        
+        // Добавляем таймаут для автоматического сброса состояния загрузки
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) { [weak self] in
+            // Если состояние загрузки все еще активно через 60 секунд, сбрасываем его
+            if self?.isProcessingPayment(for: videoId) == true {
+                print("⏰ Таймаут платежа для урока \(videoId), сбрасываем состояние загрузки")
+                self?.setProcessingPayment(false, for: videoId)
+                // Очищаем все наблюдатели
+                NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentSuccess, object: nil)
+                NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentError, object: nil)
+                NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentCanceled, object: nil)
+                completion(false)
+            }
+        }
     }
     
     private func savePurchase(lesson: VideoLesson, phone: String, paymentToken: String, completion: @escaping (Bool) -> Void) {
-        // Создаем запись о покупке
-        let purchase = VideoLessonPurchase(
-            userId: phone,
-            videoLessonId: lesson.id,
-            price: lesson.currentPrice,
-            paymentMethod: "YooKassa",
-            transactionId: paymentToken
-        )
+        print("💾 Сохраняем покупку: \(lesson.id) с токеном: \(paymentToken)")
         
-        // Сохраняем в Firebase
-        databaseRef.child("videoLessonPurchases").child(purchase.id).setValue(purchase.toDictionary()) { [weak self] error, _ in
-            DispatchQueue.main.async {
-                if error == nil {
+        // Сначала проверяем, не существует ли уже такая покупка по transactionId
+        databaseRef.child("videoLessonPurchases").child(phone).queryOrdered(byChild: "transactionId").queryEqual(toValue: paymentToken).observeSingleEvent(of: .value) { [weak self] snapshot in
+            if let purchases = snapshot.value as? [String: [String: Any]], !purchases.isEmpty {
+                print("⚠️ Покупка с токеном \(paymentToken) уже существует, проверяем детали")
+                
+                // Проверяем, есть ли уже покупка именно для этого урока
+                let existingPurchaseForLesson = purchases.values.first { purchaseData in
+                    if let videoLessonId = purchaseData["videoLessonId"] as? String {
+                        return videoLessonId == lesson.id
+                    }
+                    return false
+                }
+                
+                if existingPurchaseForLesson != nil {
+                    print("✅ Покупка для урока \(lesson.id) уже существует, обновляем локальный статус")
                     // Обновляем локальный статус
                     if let index = self?.videoLessons.firstIndex(where: { $0.id == lesson.id }) {
                         self?.videoLessons[index].isPurchased = true
-                        self?.videoLessons[index].purchaseDate = purchase.purchaseDate
                     }
-                    
-                    // Отправляем аналитику
-                    AppMetrica.reportEvent(name: "Пользователь купил видео урок", parameters: [
-                        "video_id": lesson.id,
-                        "video_title": lesson.title,
-                        "price": lesson.currentPrice,
-                        "original_price": lesson.originalPrice,
-                        "has_discount": lesson.hasActiveDiscount,
-                        "discount_percentage": lesson.discountPercentage ?? 0,
-                        "payment_method": "YooKassa",
-                        "payment_token": paymentToken
-                    ])
-                    
+                    self?.setProcessingPayment(false, for: lesson.id)
                     completion(true)
+                    return
                 } else {
-                    self?.errorMessage = "Ошибка сохранения покупки: \(error?.localizedDescription ?? "Неизвестная ошибка")"
+                    print("⚠️ Найдена покупка с тем же токеном, но для другого урока. Это может быть ошибка.")
+                    // Показываем ошибку пользователю
+                    self?.errorAlertMessage = "Обнаружена ошибка: этот платеж уже был использован для другого урока"
+                    self?.showErrorAlert = true
+                    self?.setProcessingPayment(false, for: lesson.id)
                     completion(false)
+                    return
+                }
+            }
+            
+            // Создаем запись о покупке
+            let purchase = VideoLessonPurchase(
+                userId: phone,
+                videoLessonId: lesson.id,
+                price: lesson.currentPrice,
+                paymentMethod: "YooKassa",
+                transactionId: paymentToken
+            )
+            
+            print("💾 Создаем новую покупку с ID: \(purchase.id) для телефона: \(phone)")
+            
+            // Сохраняем в Firebase под номером телефона
+            self?.databaseRef.child("videoLessonPurchases").child(phone).child(purchase.id).setValue(purchase.toDictionary()) { [weak self] error, _ in
+                DispatchQueue.main.async {
+                    if error == nil {
+                        print("✅ Покупка успешно сохранена: \(purchase.id)")
+                        // Обновляем локальный статус
+                        if let index = self?.videoLessons.firstIndex(where: { $0.id == lesson.id }) {
+                            self?.videoLessons[index].isPurchased = true
+                            self?.videoLessons[index].purchaseDate = purchase.purchaseDate
+                        }
+                        
+                        // Показываем алерт об успешной покупке
+                        self?.successMessage = "🎉 Видео урок '\(lesson.title)' успешно куплен!"
+                        self?.showSuccessAlert = true
+                        
+                        // Отправляем аналитику
+                        AppMetrica.reportEvent(name: "Пользователь купил видео урок", parameters: [
+                            "video_id": lesson.id,
+                            "video_title": lesson.title,
+                            "price": lesson.currentPrice,
+                            "original_price": lesson.originalPrice,
+                            "has_discount": lesson.hasActiveDiscount,
+                            "discount_percentage": lesson.discountPercentage ?? 0,
+                            "payment_method": "YooKassa",
+                            "payment_token": paymentToken
+                        ])
+                        
+                        // Останавливаем индикатор загрузки
+                        self?.setProcessingPayment(false, for: lesson.id)
+                        
+                        completion(true)
+                    } else {
+                        print("❌ Ошибка сохранения покупки: \(error?.localizedDescription ?? "неизвестная ошибка")")
+                        self?.errorAlertMessage = "Ошибка сохранения покупки: \(error?.localizedDescription ?? "Неизвестная ошибка")"
+                        self?.showErrorAlert = true
+                        // Останавливаем индикатор загрузки при ошибке
+                        self?.setProcessingPayment(false, for: lesson.id)
+                        completion(false)
+                    }
                 }
             }
         }
@@ -345,6 +445,22 @@ class VideoLessonViewModel: ObservableObject {
         print("   Video ID: \(videoId)")
         print("   Phone: \(phone)")
         print("   Lesson: \(lesson.title)")
+        
+        // Флаг для предотвращения множественных вызовов
+        var isCompleted = false
+        
+        // Функция для завершения платежа
+        let finishPayment: (Bool) -> Void = { [weak self] success in
+            guard let self = self, !isCompleted else { return }
+            isCompleted = true
+            
+            // Очищаем все наблюдатели
+            NotificationCenter.default.removeObserver(self, name: .ykPaymentSuccess, object: nil)
+            NotificationCenter.default.removeObserver(self, name: .ykPaymentError, object: nil)
+            NotificationCenter.default.removeObserver(self, name: .ykPaymentCanceled, object: nil)
+            
+            completion(success)
+        }
         
         // Подписываемся на успешный платеж
         NotificationCenter.default.addObserver(
@@ -357,12 +473,26 @@ class VideoLessonViewModel: ObservableObject {
             
             if let token = notification.userInfo?["token"] as? String {
                 print("✅ Токен получен: \(token)")
-                self?.savePurchase(lesson: lesson, phone: phone, paymentToken: token, completion: completion)
+                self?.savePurchase(lesson: lesson, phone: phone, paymentToken: token, completion: finishPayment)
             } else {
                 print("❌ Токен не найден в уведомлении")
-                completion(false)
+                self?.setProcessingPayment(false, for: videoId)
+                finishPayment(false)
             }
-            NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentSuccess, object: nil)
+        }
+        
+        // Подписываемся на отмену платежа
+        NotificationCenter.default.addObserver(
+            forName: .ykPaymentCanceled,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            print("🚫 Получено уведомление об отмене платежа")
+            print("   Video ID: \(videoId)")
+            
+            // Просто сбрасываем состояние загрузки без показа ошибки
+            self?.setProcessingPayment(false, for: videoId)
+            finishPayment(false)
         }
         
         // Подписываемся на ошибку платежа
@@ -376,14 +506,17 @@ class VideoLessonViewModel: ObservableObject {
             
             if let error = notification.userInfo?["error"] as? Error {
                 print("❌ Ошибка: \(error.localizedDescription)")
-                self?.errorMessage = "Ошибка платежа: \(error.localizedDescription)"
-                completion(false)
+                self?.errorAlertMessage = "Ошибка платежа: \(error.localizedDescription)"
+                self?.showErrorAlert = true
+                self?.setProcessingPayment(false, for: videoId)
+                finishPayment(false)
             } else {
-                print("❌ Ошибка не найдена в уведомлении")
-                self?.errorMessage = "Неизвестная ошибка платежа"
-                completion(false)
+                print("❌ Ошибка не найден в уведомлении")
+                self?.errorAlertMessage = "Неизвестная ошибка платежа"
+                self?.showErrorAlert = true
+                self?.setProcessingPayment(false, for: videoId)
+                finishPayment(false)
             }
-            NotificationCenter.default.removeObserver(self as Any, name: .ykPaymentError, object: nil)
         }
     }
     
@@ -495,6 +628,8 @@ class VideoLessonViewModel: ObservableObject {
     }
     
     func refreshVideoLessons(phone: String) {
+        // Очищаем все состояния загрузки при обновлении данных
+        clearAllProcessingPayments()
         // Обновляем данные, включая покупки
         fetchVideoLessons(phone: phone)
     }
@@ -502,7 +637,7 @@ class VideoLessonViewModel: ObservableObject {
     // MARK: - Метод для обновления статуса покупки в реальном времени
     func updatePurchaseStatus(for lessonId: String, userId: String) {
         // Проверяем, купил ли пользователь этот урок
-        databaseRef.child("videoLessonPurchases").queryOrdered(byChild: "userId").queryEqual(toValue: userId).observeSingleEvent(of: .value) { [weak self] snapshot in
+        databaseRef.child("videoLessonPurchases").child(userId).observeSingleEvent(of: .value) { [weak self] snapshot in
             if let purchases = snapshot.value as? [String: [String: Any]] {
                 var isPurchased = false
                 var purchaseDate: Date?
@@ -571,151 +706,5 @@ class VideoLessonViewModel: ObservableObject {
                 }
             }
         )
-    }
-    
-    // MARK: - Отложенные покупки
-    
-    func checkPendingPurchases(phone: String) {
-        print("🔍 Проверяем отложенные покупки для: \(phone)")
-        
-        guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "PaymentsBackendURL") as? String,
-              let url = URL(string: baseURL + "/payments/pending?user_phone=\(phone)") else {
-            print("❌ Ошибка: не удалось создать URL для проверки отложенных покупок")
-            return
-        }
-        
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, err in
-            if let err = err {
-                print("❌ Ошибка сети при проверке отложенных покупок: \(err)")
-                return
-            }
-            
-            guard let data = data else {
-                print("❌ Ошибка: пустой ответ при проверке отложенных покупок")
-                return
-            }
-            
-            do {
-                print("📄 Полученные данные: \(String(data: data, encoding: .utf8) ?? "неизвестно")")
-                let pendingResponse = try JSONDecoder().decode(PendingPurchasesResponse.self, from: data)
-                print("📋 Найдено отложенных покупок: \(pendingResponse.pendingPurchases.count)")
-                
-                DispatchQueue.main.async {
-                    self?.processPendingPurchases(pendingResponse.pendingPurchases, phone: phone)
-                }
-            } catch {
-                print("❌ Ошибка декодирования отложенных покупок: \(error)")
-                print("📄 Сырые данные: \(String(data: data, encoding: .utf8) ?? "неизвестно")")
-            }
-        }.resume()
-    }
-    
-    private func processPendingPurchases(_ purchases: [PendingPurchase], phone: String) {
-        for purchase in purchases {
-            print("🔄 Обрабатываем отложенную покупку: \(purchase.paymentId)")
-            
-            // Проверяем, что у нас есть необходимые данные
-            guard let videoLessonId = purchase.videoLessonId else {
-                print("❌ Ошибка: отсутствует videoLessonId для покупки \(purchase.paymentId)")
-                continue
-            }
-            
-            // Проверяем, что это не тестовая запись
-            if purchase.paymentId.hasPrefix("test") {
-                print("⏭️ Пропускаем тестовую запись: \(purchase.paymentId)")
-                continue
-            }
-            
-            // Создаем запись о покупке
-            let videoPurchase = VideoLessonPurchase(
-                userId: phone,
-                videoLessonId: videoLessonId,
-                price: Int(Double(purchase.amount) ?? 0),
-                paymentMethod: "YooKassa",
-                transactionId: purchase.paymentId
-            )
-            
-            // Сохраняем в Firebase
-            databaseRef.child("videoLessonPurchases").child(videoPurchase.id).setValue(videoPurchase.toDictionary()) { [weak self] error, _ in
-                if error == nil {
-                    print("✅ Отложенная покупка сохранена: \(purchase.paymentId)")
-                    
-                    // Обновляем локальный статус уроков
-                    if let index = self?.videoLessons.firstIndex(where: { $0.id == purchase.videoLessonId }) {
-                        self?.videoLessons[index].isPurchased = true
-                        self?.videoLessons[index].purchaseDate = videoPurchase.purchaseDate
-                    }
-                    
-                    // Отправляем аналитику
-                    AppMetrica.reportEvent(name: "Отложенная покупка обработана", parameters: [
-                        "payment_id": purchase.paymentId,
-                        "video_lesson_id": purchase.videoLessonId,
-                        "amount": purchase.amount
-                    ])
-                    
-                    // Удаляем отложенную покупку после успешной обработки
-                    self?.removePendingPurchase(paymentId: purchase.paymentId)
-                } else {
-                    print("❌ Ошибка сохранения отложенной покупки: \(error?.localizedDescription ?? "неизвестная ошибка")")
-                }
-            }
-        }
-    }
-    
-    private struct PendingPurchasesResponse: Decodable {
-        let pendingPurchases: [PendingPurchase]
-        
-        enum CodingKeys: String, CodingKey {
-            case pendingPurchases = "pending_purchases"
-        }
-    }
-    
-    private struct PendingPurchase: Decodable {
-        let paymentId: String
-        let amount: String
-        let currency: String?
-        let description: String?
-        let status: String
-        let createdAt: String?
-        let userPhone: String?
-        let videoLessonId: String?
-    }
-    
-    // MARK: - Удаление отложенных покупок
-    
-    private func removePendingPurchase(paymentId: String) {
-        print("🗑️ Удаляем отложенную покупку: \(paymentId)")
-        
-        guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "PaymentsBackendURL") as? String,
-              let url = URL(string: baseURL + "/payments/pending/remove") else {
-            print("❌ Ошибка: не удалось создать URL для удаления отложенной покупки")
-            return
-        }
-        
-        var req = URLRequest(url: url)
-        req.httpMethod = "DELETE"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body = ["payment_id": paymentId]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: req) { data, response, err in
-            if let err = err {
-                print("❌ Ошибка сети при удалении отложенной покупки: \(err)")
-                return
-            }
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                if httpResponse.statusCode == 200 {
-                    print("✅ Отложенная покупка удалена: \(paymentId)")
-                } else {
-                    print("❌ Ошибка удаления отложенной покупки: \(httpResponse.statusCode)")
-                }
-            }
-        }.resume()
     }
 }
