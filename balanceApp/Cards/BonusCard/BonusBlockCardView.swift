@@ -415,6 +415,13 @@ struct LoyaltyProgramDetailView: View {
                 }
             }
         }
+        .onAppear {
+            print("🎯 LoyaltyProgramDetailView появился для программы: \(program.title)")
+            print("🎯 LoyaltyProgramDetailView - ID: \(program.id)")
+            print("🎯 LoyaltyProgramDetailView - Тип: \(program.type)")
+            print("🎯 LoyaltyProgramDetailView - Значение: \(program.value)")
+            print("🎯 LoyaltyProgramDetailView - LoyaltyType: \(program.loyaltyType.title)")
+        }
     }
     
     private func getApplicationDescription() -> String {

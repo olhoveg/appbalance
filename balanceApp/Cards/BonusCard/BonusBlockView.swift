@@ -8,7 +8,6 @@ struct BonusBlockView: View {
     @State private var activeIndex: Int = 0
     @State private var isLoading = true        // стартуем в режиме загрузки (скелетон)
     @AppStorage("userPhone") private var phoneNumber: String = ""
-    @State private var showingProgramDetail = false
     @State private var selectedProgram: LoyaltyProgram?
     
     var body: some View {
@@ -94,8 +93,13 @@ struct BonusBlockView: View {
                                             ForEach(programs) { program in
                                                 LoyaltyProgramCard(program: program)
                                                     .onTapGesture {
+                                                        print("🎯 Программа нажата: \(program.title)")
+                                                        print("🎯 ID программы: \(program.id)")
+                                                        print("🎯 Тип программы: \(program.type)")
+                                                        print("🎯 Значение: \(program.value)")
+                                                        print("🎯 LoyaltyType: \(program.loyaltyType.title)")
                                                         selectedProgram = program
-                                                        showingProgramDetail = true
+                                                        print("🎯 selectedProgram установлен: \(selectedProgram?.title ?? "nil")")
                                                     }
                                             }
                                         }
@@ -134,10 +138,14 @@ struct BonusBlockView: View {
         .refreshable {
             fetchBonusCards()
         }
-        .sheet(isPresented: $showingProgramDetail) {
-            if let program = selectedProgram {
-                LoyaltyProgramDetailView(program: program)
-            }
+        .sheet(item: $selectedProgram) { program in
+            LoyaltyProgramDetailView(program: program)
+                .onAppear {
+                    print("🎯 Sheet открывается для программы: \(program.title)")
+                    print("🎯 Sheet - ID программы: \(program.id)")
+                    print("🎯 Sheet - Тип программы: \(program.type)")
+                    print("🎯 Sheet - Значение: \(program.value)")
+                }
         }
     }
     
