@@ -183,22 +183,7 @@ struct BonusBlockCardView_Previews: PreviewProvider {
                 serviceItemType: "any_allowed",
                 goodItemType: "any_allowed"
             ),
-            transactions: [
-                BonusCardTransaction(
-                    type: "Начисление", 
-                    amount: 100, 
-                    date: Date(),
-                    description: "Начисление за покупку услуги",
-                    serviceName: "Массаж"
-                ),
-                BonusCardTransaction(
-                    type: "Списание", 
-                    amount: 50, 
-                    date: Date(),
-                    description: "Оплата услуги бонусами",
-                    serviceName: "Маникюр"
-                )
-            ],
+            transactions: [],
             programs: nil
         ))
         .previewLayout(.sizeThatFits)

@@ -1,9 +1,13 @@
 import SwiftUI
 
+private let API_KEY = "88fnh8jbmt44er5y28nj"
+
 struct AbonementDetailView: View {
     let abonement: Abonement
     @Environment(\.colorScheme) var colorScheme
-
+    @State private var transactions: [AbonementTransaction] = []
+    @State private var isLoading = true
+    
     private var userPhone: String {
         UserDefaults.standard.string(forKey: "userPhone") ?? ""
     }
@@ -22,8 +26,14 @@ struct AbonementDetailView: View {
             }
 
             Section(header: Text("История списаний")) {
-                Text("История списаний пуста.")
-                    .foregroundColor(.secondary)
+                if let transactions = abonement.transactions, !transactions.isEmpty {
+                    ForEach(transactions) { transaction in
+                        TransactionRow(transaction: transaction)
+                    }
+                } else {
+                    Text("История списаний пуста.")
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .listStyle(InsetGroupedListStyle())

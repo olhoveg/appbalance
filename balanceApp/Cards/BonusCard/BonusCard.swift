@@ -13,7 +13,7 @@ struct BonusCard: Identifiable, Codable {
     let maxDiscountPercent: Int?
     let maxDiscountAmount: Int?
     let type: BonusCardType
-    let transactions: [BonusCardTransaction]? // История операций (если есть)
+    var transactions: [AppTransaction]? // Обновлено для соответствия API
     let programs: [LoyaltyProgram]? // Программы лояльности
     
     enum CodingKeys: String, CodingKey {
@@ -44,37 +44,50 @@ struct BonusCardType: Codable {
     }
 }
 
-struct BonusCardTransaction: Identifiable, Codable {
-    var id: UUID = UUID()
-    let type: String // Например, "Начисление" или "Списание"
+struct AppTransaction: Codable, Identifiable {
+    let id: Int
     let amount: Double
+    let type: TransactionType
+    let isLoyaltyWithdraw: Bool
     let date: Date
-    let description: String? // Описание операции
-    let serviceName: String? // Название услуги, если применимо
+    let abonementId: Int?
 
-    enum CodingKeys: String, CodingKey {
-        case type, amount, date, description
-        case serviceName = "service_name"
-    }
-    
-    // Вычисляемые свойства для удобства
     var isCredit: Bool {
-        return type.lowercased().contains("начисление") || type.lowercased().contains("credit")
+        // We assume that if a transaction is not a withdrawal, it's a credit.
+        return !isLoyaltyWithdraw
     }
-    
-    var isDebit: Bool {
-        return type.lowercased().contains("списание") || type.lowercased().contains("debit")
-    }
-    
+
     var formattedAmount: String {
         let sign = isCredit ? "+" : "-"
-        return "\(sign)\(String(format: "%.2f", amount)) ₽"
+        return "\(sign)\(String(format: "%.2f", amount))"
     }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, amount, type
+        case isLoyaltyWithdraw = "is_loyalty_withdraw"
+        case date = "created_date"
+        case abonementId = "abonement_id"
+    }
+}
+
+struct TransactionType: Codable {
+    let id: Int
+    let title: String
 }
 
 struct BonusAPIResponse: Codable {
     let success: Bool
     let data: [BonusCard]
+}
+
+struct TransactionAPIResponse: Codable {
+    let success: Bool
+    let data: [AppTransaction]
+    let meta: TransactionMeta
+}
+
+struct TransactionMeta: Codable {
+    let count: Int
 }
 
 // Модели данных для программ лояльности

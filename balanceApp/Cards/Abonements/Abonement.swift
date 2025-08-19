@@ -26,6 +26,7 @@ struct Abonement: Identifiable, Codable {
     let type: AbonementType
     let createdDate: Date
     let expirationDate: Date?
+    var transactions: [AppTransaction]?
     
     let united_balance_services_count: Int?
     let balanceString: String?

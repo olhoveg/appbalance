@@ -259,11 +259,15 @@ struct BonusBlockView: View {
     }
     
     private func fetchTransactions(for card: BonusCard) {
-        print("🔄 Fetching transactions for card ID: \(card.id)")
+        let chainId = "415038"
+        let cardId = card.id
         
-        // Попробуем правильный API endpoint для транзакций
-        let urlString = "https://api.yclients.com/api/v1/loyalty/cards/\(card.id)/operations"
-        print("🌐 Transactions URL: \(urlString)")
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let createdBefore = dateFormatter.string(from: Date())
+        let createdAfter = dateFormatter.string(from: Calendar.current.date(byAdding: .year, value: -1, to: Date())!)
+        
+        let urlString = "https://api.yclients.com/api/v1/chain/\(chainId)/loyalty/transactions?loyalty_card_id=\(cardId)&created_after=\(createdAfter)&created_before=\(createdBefore)"
         
         guard let url = URL(string: urlString) else {
             print("❌ Invalid transactions URL")
@@ -291,26 +295,25 @@ struct BonusBlockView: View {
                 return
             }
             
-            print("📄 Transactions data length: \(data.count) bytes")
-            
             if let jsonString = String(data: data, encoding: .utf8) {
                 print("📄 Transactions JSON: \(jsonString)")
-                
-                // Пытаемся декодировать ответ
-                do {
-                    let decoder = JSONDecoder()
-                    if let jsonData = jsonString.data(using: .utf8) {
-                        let response = try decoder.decode(BonusAPIResponse.self, from: jsonData)
-                        print("✅ Transactions decoded successfully")
-                        print("✅ Transactions count: \(response.data.count)")
-                    }
-                } catch {
-                    print("❌ Transactions decode error: \(error)")
-                }
             }
-            
-            print("✅ Transactions request completed for card \(card.id)")
-            
+
+            do {
+                let decoder = JSONDecoder()
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+                decoder.dateDecodingStrategy = .formatted(dateFormatter)
+                
+                let response = try decoder.decode(TransactionAPIResponse.self, from: data)
+                DispatchQueue.main.async {
+                    if let index = self.bonusCards.firstIndex(where: { $0.id == card.id }) {
+                        self.bonusCards[index].transactions = response.data
+                    }
+                }
+            } catch {
+                print("❌ Transactions decode error: \(error)")
+            }
         }.resume()
     }
 }

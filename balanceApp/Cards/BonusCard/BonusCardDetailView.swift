@@ -170,7 +170,7 @@ struct BonusCardDetailView: View {
 }
 
 struct TransactionRow: View {
-    let transaction: BonusCardTransaction
+    let transaction: AppTransaction
     
     var body: some View {
         HStack(spacing: 12) {
@@ -180,21 +180,9 @@ struct TransactionRow: View {
                 .foregroundColor(transaction.isCredit ? .green : .red)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.type)
+                Text(transaction.type.title)
                     .font(.headline)
                     .foregroundColor(.primary)
-                
-                if let description = transaction.description {
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                if let serviceName = transaction.serviceName {
-                    Text(serviceName)
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
                 
                 Text(formatDate(transaction.date))
                     .font(.caption2)
@@ -244,29 +232,7 @@ struct TransactionRow: View {
             serviceItemType: "service",
             goodItemType: "good"
         ),
-        transactions: [
-            BonusCardTransaction(
-                type: "Начисление",
-                amount: 500.0,
-                date: Date(),
-                description: "Начисление за покупку услуги",
-                serviceName: "Массаж спины"
-            ),
-            BonusCardTransaction(
-                type: "Списание",
-                amount: 200.0,
-                date: Date().addingTimeInterval(-86400),
-                description: "Оплата услуги бонусами",
-                serviceName: "Маникюр"
-            ),
-            BonusCardTransaction(
-                type: "Начисление",
-                amount: 300.0,
-                date: Date().addingTimeInterval(-172800),
-                description: "Бонус за визит",
-                serviceName: nil
-            )
-        ],
+        transactions: [],
         programs: nil
     ))
 }
