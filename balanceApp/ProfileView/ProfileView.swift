@@ -29,6 +29,9 @@ struct ProfileView: View {
     @State private var isShowingImagePicker = false
     @State private var showFeedbackForm = false
     @State private var showFirebaseDataLoader = false
+    
+    // MARK: - Состояние темы
+    @AppStorage("isDarkMode") private var isDarkMode = false
 
     var body: some View {
         VStack {
@@ -120,6 +123,39 @@ struct ProfileView: View {
                             .cornerRadius(12)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal)
+
+                        // Переключатель темы
+                        VStack(spacing: 8) {
+                            HStack {
+                                Image(systemName: isDarkMode ? "moon.fill" : "sun.max.fill")
+                                    .foregroundColor(isDarkMode ? .yellow : .orange)
+                                    .font(.title2)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Тема приложения")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Text(isDarkMode ? "Темная тема" : "Светлая тема")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Toggle("", isOn: $isDarkMode)
+                                    .onChange(of: isDarkMode) { oldValue, newValue in
+                                        AppMetrica.reportEvent(name: "Пользователь изменил тему", parameters: [
+                                            "theme": newValue ? "dark" : "light"
+                                        ])
+                                        setAppTheme(isDark: newValue)
+                                    }
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(12)
+                        }
                         .padding(.horizontal)
 
                         // Кнопки действий
@@ -222,6 +258,9 @@ struct ProfileView: View {
                     
                     loadUserDataFromFirestore()
                     loadProfileImage()
+                    
+                    // Инициализируем тему
+                    initializeTheme()
                 }
 
             } else {
@@ -899,6 +938,26 @@ private extension Data {
     mutating func append(_ string: String) {
         if let data = string.data(using: .utf8) {
             append(data)
+        }
+    }
+}
+
+// MARK: - Расширения для управления темой
+extension ProfileView {
+    private func setAppTheme(isDark: Bool) {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            windowScene.windows.forEach { window in
+                window.overrideUserInterfaceStyle = isDark ? .dark : .light
+            }
+        }
+    }
+    
+    private func initializeTheme() {
+        // Инициализируем тему при загрузке
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            windowScene.windows.forEach { window in
+                window.overrideUserInterfaceStyle = isDarkMode ? .dark : .light
+            }
         }
     }
 }

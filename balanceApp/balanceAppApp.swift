@@ -252,6 +252,9 @@ struct balanceAppApp: App {
             .onAppear {
                 // Associate device once views load
                 OneSignal.login(externalId: authViewModel.externalId, token: nil)
+                
+                // Инициализируем тему приложения
+                initializeAppTheme()
             }
         }
         .modelContainer(sharedModelContainer)
@@ -262,6 +265,18 @@ extension AuthViewModel {
     /// External ID for OneSignal; replace the return value with your actual user identifier property
     var externalId: String {
         return "" // TODO: return your actual external ID here (e.g., phoneNumber or userId)
+    }
+}
+
+// MARK: - Расширение для управления темой приложения
+extension balanceAppApp {
+    private func initializeAppTheme() {
+        let isDarkMode = UserDefaults.standard.bool(forKey: "isDarkMode")
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            windowScene.windows.forEach { window in
+                window.overrideUserInterfaceStyle = isDarkMode ? .dark : .light
+            }
+        }
     }
 }
 

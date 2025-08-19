@@ -29,12 +29,16 @@ struct AbonementBlockView: View {
                                 } else if !viewModel.abonements.isEmpty {
                                     TabView(selection: $activeIndex) {
                                         ForEach(viewModel.abonements.indices, id: \.self) { index in
-                                            AbonementCardContainerView(
-                                                abonement: viewModel.abonements[index],
-                                                phoneNumber: phone,
-                                                isLoading: false
-                                            )
-                                            .padding(.horizontal)
+                                            let abonement = viewModel.abonements[index]
+                                            NavigationLink(destination: AbonementDetailView(abonement: abonement)) {
+                                                AbonementCardContainerView(
+                                                    abonement: abonement,
+                                                    phoneNumber: phone,
+                                                    isLoading: false
+                                                )
+                                                .padding(.horizontal)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
                                             .tag(index)
                                         }
                                     }

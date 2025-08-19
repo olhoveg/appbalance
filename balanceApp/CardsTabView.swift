@@ -38,12 +38,24 @@ struct CardsTabView: View {
             switch selectedTab {
             case 0:
                 SubscriptionsView() // Абонементы
+                    .onAppear {
+                        print("🎯 CardsTabView: Showing Subscriptions")
+                    }
             case 1:
                 CertificatesView() // Сертификаты
+                    .onAppear {
+                        print("🎯 CardsTabView: Showing Certificates")
+                    }
             case 2:
-                BonusBlockView() // Бонусная карта (нужно создать этот экран)
+                BonusBlockView() // Бонусная карта
+                    .onAppear {
+                        print("🎯 CardsTabView: Showing BonusBlockView")
+                    }
             default:
                 Text("Ошибка: неизвестная вкладка") // На случай ошибки
+                    .onAppear {
+                        print("❌ CardsTabView: Unknown tab \(selectedTab)")
+                    }
             }
         }
     }

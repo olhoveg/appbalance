@@ -99,6 +99,10 @@ struct MainView: View {
                 
                 if !userPhone.isEmpty {
                     OneSignalService.shared.setExternalUserId(userPhone)
+                    // Загружаем данные при первом открытии
+                    bonusCardVM.refreshBonusCards(phone: userPhone)
+                    abonementVM.fetchAbonements(phone: userPhone)
+                    certificateVM.fetchCertificates(phone: userPhone)
                 }
             }
         }

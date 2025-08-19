@@ -206,99 +206,46 @@ struct CustomVideoLessonsNavigationBar: View {
 
     var body: some View {
         HStack {
-            NavigationLink(destination: ProfileView()) {
-                Image(systemName: "person.crop.circle.fill")
-                    .resizable()
-                    .frame(width: 30, height: 30)
-                    .foregroundColor(colorScheme == .dark ? .white : .black)
-                    .padding(10)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+            Text("Видео уроки")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Spacer()
+            
+            // Кнопка обновления статуса покупок
+            Button(action: {
+                if !userPhone.isEmpty {
+                    viewModel.refreshAllPurchaseStatuses(phone: userPhone)
+                }
+            }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.caption)
+                    .foregroundColor(.accentColor)
             }
             .buttonStyle(PlainButtonStyle())
-            .simultaneousGesture(TapGesture().onEnded {
-                AppMetrica.reportEvent(name: "Пользователь нажал на иконку профиля в видео уроках")
-            })
-            .zIndex(1)
             
-            Spacer()
-            
-            HStack {
-                Text("Видео уроки")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Spacer()
-                
-                // Кнопка обновления статуса покупок
+            // Кнопка принудительного обновления уроков (только для админов)
+            if viewModel.adminPhones.contains(userPhone) {
                 Button(action: {
-                    if !userPhone.isEmpty {
-                        viewModel.refreshAllPurchaseStatuses(phone: userPhone)
-                    }
+                    viewModel.forceRefreshLessonsWithPurchaseStatus(phone: userPhone)
                 }) {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.caption)
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.orange)
                 }
                 .buttonStyle(PlainButtonStyle())
-                
-                // Кнопка принудительного обновления уроков (только для админов)
-                if viewModel.adminPhones.contains(userPhone) {
-                    Button(action: {
-                        viewModel.forceRefreshLessonsWithPurchaseStatus(phone: userPhone)
-                    }) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
-                // Кнопка тестирования (только для админов)
-                if viewModel.adminPhones.contains(userPhone) {
-                    Button(action: {
-                        viewModel.testAllLessonsStatus()
-                    }) {
-                        Image(systemName: "info.circle")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
             }
             
-            Spacer()
-            
-            HStack(spacing: 15) {
+            // Кнопка тестирования (только для админов)
+            if viewModel.adminPhones.contains(userPhone) {
                 Button(action: {
-                    if let url = URL(string: "https://wa.me/79615805108") {
-                        UIApplication.shared.open(url)
-                    }
+                    viewModel.testAllLessonsStatus()
                 }) {
-                    Image(systemName: "message.fill")
-                        .resizable()
-                        .frame(width: 24, height: 24)
-                        .foregroundColor(.green)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .simultaneousGesture(TapGesture().onEnded {
-                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку чата в видео уроках")
-                })
-                
-                Button(action: {
-                    if let url = URL(string: "tel://+79615805108") {
-                        UIApplication.shared.open(url)
-                    }
-                }) {
-                    Image(systemName: "phone.fill")
-                        .resizable()
-                        .frame(width: 24, height: 24)
+                    Image(systemName: "info.circle")
+                        .font(.caption)
                         .foregroundColor(.blue)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .simultaneousGesture(TapGesture().onEnded {
-                    AppMetrica.reportEvent(name: "Пользователь нажал на иконку телефона в видео уроках")
-                })
             }
         }
         .padding(.horizontal, 20)
