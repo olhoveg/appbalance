@@ -51,6 +51,7 @@ struct AppTransaction: Codable, Identifiable {
     let isLoyaltyWithdraw: Bool
     let date: Date
     let abonementId: Int?
+    let typeId: Int
 
     var isCredit: Bool {
         // We assume that if a transaction is not a withdrawal, it's a credit.
@@ -67,6 +68,7 @@ struct AppTransaction: Codable, Identifiable {
         case isLoyaltyWithdraw = "is_loyalty_withdraw"
         case date = "created_date"
         case abonementId = "abonement_id"
+        case typeId = "type_id"
     }
 }
 

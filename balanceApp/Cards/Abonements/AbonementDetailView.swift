@@ -25,19 +25,28 @@ struct AbonementDetailView: View {
                 }
             }
 
-            Section(header: Text("История списаний")) {
+            Section(header: Text("История использования")) {
                 if let transactions = abonement.transactions, !transactions.isEmpty {
-                    ForEach(transactions) { transaction in
-                        TransactionRow(transaction: transaction)
+                    let initialBalance = abonement.balance + transactions.count
+                    let _ = print("Initial balance: \(initialBalance)")
+                    ForEach(transactions.indices, id: \.self) { index in
+                        let balanceBefore = initialBalance - index
+                        let _ = print("Balance before: \(balanceBefore)")
+                        let balanceAfter = balanceBefore - 1
+                        let _ = print("Balance after: \(balanceAfter)")
+                        UsageHistoryRow(transaction: transactions[index], balanceBefore: balanceBefore, balanceAfter: balanceAfter)
                     }
                 } else {
-                    Text("История списаний пуста.")
+                    Text("История использования пуста.")
                         .foregroundColor(.secondary)
                 }
             }
         }
         .listStyle(InsetGroupedListStyle())
         .navigationTitle("Детали абонемента")
+        .onAppear {
+            print("Abonement details: \(abonement)")
+        }
     }
     
     private func formattedDate(_ date: Date) -> String {
@@ -45,6 +54,34 @@ struct AbonementDetailView: View {
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMMM yyyy"
         return formatter.string(from: date)
+    }
+}
+
+struct UsageHistoryRow: View {
+    let transaction: AppTransaction
+    let balanceBefore: Int
+    let balanceAfter: Int
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text("Использование сеанса")
+                    .font(.headline)
+                Text(transaction.date, style: .date)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            HStack {
+                Text("\(balanceBefore)")
+                    .font(.headline)
+                Image(systemName: "arrow.right")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Text("\(balanceAfter)")
+                    .font(.headline)
+            }
+        }
     }
 }
 

@@ -27,16 +27,25 @@ struct Abonement: Identifiable, Codable {
     let createdDate: Date
     let expirationDate: Date?
     var transactions: [AppTransaction]?
+    let initialBalance: Int?
     
     let united_balance_services_count: Int?
     let balanceString: String?
     let balanceContainer: BalanceContainer?
     let expirationText: String?
 
+    var balance: Int {
+        if let unitedBalance = united_balance_services_count {
+            return unitedBalance
+        }
+        return balanceContainer?.links.reduce(0) { $0 + $1.count } ?? 0
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, number, type, united_balance_services_count, balanceString, balanceContainer, expirationText
         case createdDate = "created_date"
         case expirationDate = "expiration_date"
+        case initialBalance = "initial_balance"
     }
 }
 

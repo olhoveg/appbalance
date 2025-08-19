@@ -55,6 +55,7 @@ class AbonementViewModel: ObservableObject {
                     decoder.dateDecodingStrategy = .iso8601
                     let resp = try decoder.decode(AbonementAPIResponse.self, from: data)
                     self.abonements = resp.data
+                    self.abonements.forEach { print("Abonement loaded: \($0)") }
                     self.fetchTransactionsForAllAbonements()
                 } catch {
                     print("Ошибка парсинга абонементов: \(error.localizedDescription)")
@@ -79,7 +80,7 @@ class AbonementViewModel: ObservableObject {
         let createdBefore = dateFormatter.string(from: Date())
         let createdAfter = dateFormatter.string(from: Calendar.current.date(byAdding: .year, value: -1, to: Date())!)
         
-        let urlString = "https://api.yclients.com/api/v1/chain/\(chainId)/loyalty/transactions?created_after=\(createdAfter)&created_before=\(createdBefore)"
+        let urlString = "https://api.yclients.com/api/v1/chain/\(chainId)/loyalty/transactions?created_after=\(createdAfter)&created_before=\(createdBefore)&types[]=9"
         
         guard let url = URL(string: urlString) else {
             print("❌ Invalid transactions URL")
