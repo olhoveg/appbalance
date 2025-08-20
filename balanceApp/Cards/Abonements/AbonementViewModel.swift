@@ -73,7 +73,6 @@ class AbonementViewModel: ObservableObject {
 
     private func fetchTransactions(for abonement: Abonement) {
         let chainId = "415038"
-        let abonementId = abonement.id
         
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -83,7 +82,6 @@ class AbonementViewModel: ObservableObject {
         let urlString = "https://api.yclients.com/api/v1/chain/\(chainId)/loyalty/transactions?created_after=\(createdAfter)&created_before=\(createdBefore)&types[]=9"
         
         guard let url = URL(string: urlString) else {
-            print("❌ Invalid transactions URL")
             return
         }
         
@@ -108,10 +106,80 @@ class AbonementViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     if let index = self.abonements.firstIndex(where: { $0.id == abonement.id }) {
                         self.abonements[index].transactions = response.data.filter { $0.abonementId == abonement.id }
+                        self.fetchVisitDetailsForTransactions(abonementIndex: index)
                     }
                 }
             } catch {
                 print("❌ Transactions decode error for abonement \(abonement.id): \(error)")
+            }
+        }.resume()
+    }
+
+    private func fetchVisitDetailsForTransactions(abonementIndex: Int) {
+        guard let transactions = abonements[abonementIndex].transactions else { return }
+        for (transactionIndex, transaction) in transactions.enumerated() {
+            fetchVisitDetails(for: transaction.visitId) { visitDetails in
+                DispatchQueue.main.async {
+                    self.abonements[abonementIndex].transactions?[transactionIndex].visitDetails = visitDetails
+                }
+            }
+        }
+    }
+    
+    private func fetchVisitDetails(for visitId: Int, completion: @escaping (VisitDetails?) -> Void) {
+        let urlString = "https://api.yclients.com/api/v1/visits/\(visitId)"
+        print("Fetching visit details for visit ID: \(visitId)")
+        guard let url = URL(string: urlString) else {
+            completion(nil)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/vnd.api.v2+json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer 88fnh8jbmt44er5y28nj, User 9d241fb00061c17a5e2e76a23b214b20", forHTTPHeaderField: "Authorization")
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            guard let data = data, error == nil else {
+                completion(nil)
+                return
+            }
+
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("Raw visit details JSON for visit \(visitId): \(jsonString)")
+            }
+
+            do {
+                let decoder = JSONDecoder()
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+                decoder.dateDecodingStrategy = .formatted(dateFormatter)
+
+                let visitResponse = try decoder.decode(AppVisitResponse.self, from: data)
+                
+                if let record = visitResponse.data?.records.first,
+                   let service = record.services.first {
+                    
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+                    let startTime = dateFormatter.date(from: record.datetime) ?? Date()
+                    let endTime = startTime.addingTimeInterval(TimeInterval(record.length))
+                    
+                    let visitDetails = VisitDetails(
+                        serviceTitle: service.title,
+                        specialistName: record.staff.name,
+                        startTime: startTime,
+                        endTime: endTime,
+                        serviceCost: service.cost
+                    )
+                    completion(visitDetails)
+                } else {
+                    completion(nil)
+                }
+            } catch {
+                print("❌ Visit decode error for visit \(visitId): \(error)")
+                completion(nil)
             }
         }.resume()
     }

@@ -7,6 +7,7 @@ struct AbonementDetailView: View {
     @Environment(\.colorScheme) var colorScheme
     @State private var transactions: [AbonementTransaction] = []
     @State private var isLoading = true
+    @State private var selectedTransaction: AppTransaction?
     
     private var userPhone: String {
         UserDefaults.standard.string(forKey: "userPhone") ?? ""
@@ -28,13 +29,12 @@ struct AbonementDetailView: View {
             Section(header: Text("История использования")) {
                 if let transactions = abonement.transactions, !transactions.isEmpty {
                     let initialBalance = abonement.balance + transactions.count
-                    let _ = print("Initial balance: \(initialBalance)")
                     ForEach(transactions.indices, id: \.self) { index in
                         let balanceBefore = initialBalance - index
-                        let _ = print("Balance before: \(balanceBefore)")
-                        let balanceAfter = balanceBefore - 1
-                        let _ = print("Balance after: \(balanceAfter)")
-                        UsageHistoryRow(transaction: transactions[index], balanceBefore: balanceBefore, balanceAfter: balanceAfter)
+                        UsageHistoryRow(transaction: transactions[index], balanceBefore: balanceBefore, balanceAfter: balanceBefore - 1)
+                            .onTapGesture {
+                                selectedTransaction = transactions[index]
+                            }
                     }
                 } else {
                     Text("История использования пуста.")
@@ -44,6 +44,28 @@ struct AbonementDetailView: View {
         }
         .listStyle(InsetGroupedListStyle())
         .navigationTitle("Детали абонемента")
+        .sheet(item: $selectedTransaction) { transaction in
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Детали сеанса")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 20)
+                
+                if let visitDetails = transaction.visitDetails {
+                    InfoRow(icon: "scissors", title: "Услуга", value: visitDetails.serviceTitle)
+                    InfoRow(icon: "person", title: "Специалист", value: visitDetails.specialistName)
+                    InfoRow(icon: "calendar", title: "Дата", value: formattedDate(visitDetails.startTime))
+                    InfoRow(icon: "clock", title: "Начало", value: formatTime(visitDetails.startTime))
+                    InfoRow(icon: "clock.fill", title: "Окончание", value: formatTime(visitDetails.endTime))
+                    InfoRow(icon: "rublesign.circle", title: "Стоимость", value: "\(visitDetails.serviceCost) ₽")
+                } else {
+                    Text("Нет данных")
+                }
+                
+                Spacer()
+            }
+            .padding()
+        }
         .onAppear {
             print("Abonement details: \(abonement)")
         }
@@ -53,6 +75,13 @@ struct AbonementDetailView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ru_RU")
         formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
     }
 }

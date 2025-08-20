@@ -33,6 +33,7 @@ struct Abonement: Identifiable, Codable {
     let balanceString: String?
     let balanceContainer: BalanceContainer?
     let expirationText: String?
+    let status: AbonementStatus
 
     var balance: Int {
         if let unitedBalance = united_balance_services_count {
@@ -41,8 +42,23 @@ struct Abonement: Identifiable, Codable {
         return balanceContainer?.links.reduce(0) { $0 + $1.count } ?? 0
     }
 
+    var isActive: Bool {
+        // A subscription is inactive if the balance is zero or less.
+        if balance <= 0 {
+            return false
+        }
+        
+        // A subscription is inactive if its expiration date is in the past.
+        if let expirationDate = expirationDate, expirationDate < Date() {
+            return false
+        }
+        
+        // Otherwise, it's active.
+        return true
+    }
+
     enum CodingKeys: String, CodingKey {
-        case id, number, type, united_balance_services_count, balanceString, balanceContainer, expirationText
+        case id, number, type, united_balance_services_count, balanceString, balanceContainer, expirationText, status
         case createdDate = "created_date"
         case expirationDate = "expiration_date"
         case initialBalance = "initial_balance"

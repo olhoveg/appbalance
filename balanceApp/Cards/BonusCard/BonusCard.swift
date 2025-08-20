@@ -52,6 +52,9 @@ struct AppTransaction: Codable, Identifiable {
     let date: Date
     let abonementId: Int?
     let typeId: Int
+    let visitId: Int
+    var serviceTitle: String?
+    var visitDetails: VisitDetails?
 
     var isCredit: Bool {
         // We assume that if a transaction is not a withdrawal, it's a credit.
@@ -69,6 +72,7 @@ struct AppTransaction: Codable, Identifiable {
         case date = "created_date"
         case abonementId = "abonement_id"
         case typeId = "type_id"
+        case visitId = "visit_id"
     }
 }
 

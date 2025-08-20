@@ -4,6 +4,15 @@ struct AbonementBlockView: View {
     @StateObject private var viewModel = AbonementViewModel()
     @State private var activeIndex: Int = 0      // для пагинатора
     @State private var isInitialLoadCompleted = false
+    @State private var showExpired = false
+    
+    private var filteredAbonements: [Abonement] {
+        if showExpired {
+            return viewModel.abonements.filter { !$0.isActive }
+        } else {
+            return viewModel.abonements.filter { $0.isActive }
+        }
+    }
 
     private func getUserPhoneNumber() -> String? {
         UserDefaults.standard.string(forKey: "userPhone")
@@ -26,10 +35,10 @@ struct AbonementBlockView: View {
                                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                                     .frame(height: 380)
 
-                                } else if !viewModel.abonements.isEmpty {
+                                } else if !filteredAbonements.isEmpty {
                                     TabView(selection: $activeIndex) {
-                                        ForEach(viewModel.abonements.indices, id: \.self) { index in
-                                            let abonement = viewModel.abonements[index]
+                                        ForEach(filteredAbonements.indices, id: \.self) { index in
+                                            let abonement = filteredAbonements[index]
                                             NavigationLink(destination: AbonementDetailView(abonement: abonement)) {
                                                 AbonementCardContainerView(
                                                     abonement: abonement,
@@ -45,7 +54,7 @@ struct AbonementBlockView: View {
                                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                                     .frame(height: 380)
 
-                                } else if !viewModel.isLoading && isInitialLoadCompleted && viewModel.abonements.isEmpty {
+                                } else if !viewModel.isLoading && isInitialLoadCompleted && filteredAbonements.isEmpty {
                                     Text("У вас нет активных абонементов")
                                         .font(.headline)
                                         .foregroundColor(.secondary)
@@ -65,9 +74,14 @@ struct AbonementBlockView: View {
                     }
                     if viewModel.isLoading && isInitialLoadCompleted {
                         PaginationView(dots: 3, activeIndex: activeIndex)
-                    } else if !viewModel.abonements.isEmpty {
-                        PaginationView(dots: viewModel.abonements.count, activeIndex: activeIndex)
+                    } else if !filteredAbonements.isEmpty {
+                        PaginationView(dots: filteredAbonements.count, activeIndex: activeIndex)
                     }
+
+                    Toggle(isOn: $showExpired) {
+                        Text("Показать истекшие")
+                    }
+                    .padding(.horizontal)
 
                     if isInitialLoadCompleted {
                         AbonementPurchaseListView()
