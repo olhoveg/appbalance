@@ -4,6 +4,56 @@ import Foundation
 struct AbonementDetailView: View {
     @State var abonement: Abonement
     @State private var isLoading: Bool = false
+    @State private var visitVMById: [Int: VisitVM] = [:]
+    @State private var selectedVisitId: Int? = nil
+    @State private var isVisitSheetPresented: Bool = false
+    @State private var recordIdByVisitId: [Int: Int] = [:]
+
+    // MARK: - Visit view model
+    struct VisitVM {
+        let serviceTitle: String
+        let specialistName: String
+        let startTime: Date
+        let endTime: Date
+        let serviceCost: Double?
+    }
+
+    // MARK: - Minimal visit API decoders
+    private struct VisitAPIResponse: Decodable {
+        let data: VisitData?
+    }
+    private struct VisitData: Decodable {
+        let records: [VisitRecord]
+    }
+    private struct VisitRecord: Decodable {
+        let datetime: String
+        let length: Int
+        let staff: Staff
+        let services: [VisitService]
+    }
+    private struct Staff: Decodable { let name: String }
+    private struct VisitService: Decodable { let title: String; let cost: Double? }
+
+    // MARK: - Record (Запись) API decoders
+    private struct RecordAPIResponse: Decodable { let success: Bool; let data: RecordOne? }
+    private struct RecordOne: Decodable {
+        let id: Int
+        let company_id: Int
+        let datetime: String // e.g. 2019-01-01T12:00:00+09:00
+        let length: Int
+        let staff: Staff
+        let services: [VisitService]
+        let visit_id: String?
+    }
+
+    // MARK: - Lightweight decoder to extract item_record_id from transactions
+    private struct TxLiteEnvelope: Decodable { let success: Bool; let data: [TxLite] }
+    private struct TxLite: Decodable {
+        let visit_id: Int
+        let item_record_id: Int?
+        let abonement_id: Int?
+        let type_id: Int
+    }
 
     var body: some View {
         List {
@@ -21,12 +71,18 @@ struct AbonementDetailView: View {
                                 Text("Использование абонемента")
                                     .font(.headline)
                                 HStack(spacing: 8) {
+                                    let vm = visitVMById[t.visitId]
+                                    Text(vm?.startTime != nil ? formattedDate(vm!.startTime) : "—")
                                     Text("визит #\(t.visitId)")
                                 }
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             }
                             Spacer()
+                        }
+                        .onTapGesture {
+                            self.selectedVisitId = t.visitId
+                            self.isVisitSheetPresented = true
                         }
                     }
                 } else {
@@ -38,11 +94,148 @@ struct AbonementDetailView: View {
         .onAppear {
             fetchTransactions()
         }
+        .sheet(isPresented: $isVisitSheetPresented) {
+            if let vid = selectedVisitId, let vm = visitVMById[vid] {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Детали визита").font(.title2).bold()
+                    HStack { Text("Дата:"); Spacer(); Text(formattedDate(vm.startTime)) }
+                    HStack { Text("Начало:"); Spacer(); Text(formatTime(vm.startTime)) }
+                    HStack { Text("Окончание:"); Spacer(); Text(formatTime(vm.endTime)) }
+                    HStack { Text("Специалист:"); Spacer(); Text(vm.specialistName) }
+                    HStack { Text("Услуга:"); Spacer(); Text(vm.serviceTitle.isEmpty ? "—" : vm.serviceTitle) }
+                    HStack { Text("Стоимость:"); Spacer(); Text(vm.serviceCost != nil ? "\(Int(vm.serviceCost!)) ₽" : "—") }
+                    Spacer()
+                }
+                .padding()
+            } else {
+                Text("Нет данных визита")
+                    .padding()
+            }
+        }
     }
 
-    // Stub; replace with your real implementation if it exists elsewhere in your project
     private func fetchVisitDetailsForTransactions() {
-        // no-op for now
+        guard let tx = abonement.transactions, !tx.isEmpty else { return }
+
+        let iso = DateFormatter()
+        iso.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+
+        let companyId = 433675 // TODO: подставь свой фактический company_id
+
+        for t in tx {
+            let visitId = t.visitId
+            if visitVMById[visitId] != nil { continue }
+            if let recordId = recordIdByVisitId[visitId] {
+                // Предпочитаем получать запись по /record
+                fetchRecord(companyId: companyId, recordId: recordId, visitId: visitId)
+            } else {
+                // Fallback на /visits/{visitId}
+                self.fetchVisitByIdFallback(visitId: visitId)
+            }
+        }
+    }
+
+    private func fetchRecord(companyId: Int, recordId: Int, visitId: Int) {
+        let urlString = "https://api.yclients.com/api/v1/record/\(companyId)/\(recordId)"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
+        let authHeader = "Bearer 88fnh8jbmt44er5y28nj, User 9d241fb00061c17a5e2e76a23b214b20"
+        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+
+        let iso = DateFormatter()
+        iso.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            if let error = error {
+                print("❌ Record fetch error for recordId=\(recordId): \(error.localizedDescription)")
+                self.fetchVisitByIdFallback(visitId: visitId)
+                return
+            }
+            guard let data = data else { self.fetchVisitByIdFallback(visitId: visitId); return }
+
+            do {
+                let decoder = JSONDecoder()
+                let payload = try decoder.decode(RecordAPIResponse.self, from: data)
+                guard let rec = payload.data else {
+                    print("ℹ️ No record data for recordId=\(recordId), fallback to /visits")
+                    self.fetchVisitByIdFallback(visitId: visitId)
+                    return
+                }
+                let start = iso.date(from: rec.datetime) ?? Date()
+                let end = start.addingTimeInterval(TimeInterval(rec.length))
+                let service = rec.services.first
+                let vm = VisitVM(
+                    serviceTitle: service?.title ?? "",
+                    specialistName: rec.staff.name,
+                    startTime: start,
+                    endTime: end,
+                    serviceCost: service?.cost
+                )
+                DispatchQueue.main.async {
+                    self.visitVMById[visitId] = vm
+                }
+            } catch {
+                print("❌ Record decode error for recordId=\(recordId): \(error)")
+                if let json = String(data: data, encoding: .utf8) {
+                    print("Raw record JSON (recordId=\(recordId)):\n\(json)")
+                }
+                self.fetchVisitByIdFallback(visitId: visitId)
+            }
+        }.resume()
+    }
+
+    private func fetchVisitByIdFallback(visitId: Int) {
+        let urlString = "https://api.yclients.com/api/v1/visits/\(visitId)"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/vnd.yclients.v2+json", forHTTPHeaderField: "Accept")
+        let authHeader = "Bearer 88fnh8jbmt44er5y28nj, User 9d241fb00061c17a5e2e76a23b214b20"
+        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+
+        let iso = DateFormatter()
+        iso.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            if let error = error {
+                print("❌ Visit fallback fetch error for id=\(visitId): \(error.localizedDescription)")
+                return
+            }
+            guard let data = data else { return }
+
+            do {
+                let decoder = JSONDecoder()
+                let payload = try decoder.decode(VisitAPIResponse.self, from: data)
+                guard let record = payload.data?.records.first else {
+                    print("ℹ️ No records in fallback for visit id=\(visitId)")
+                    return
+                }
+                let start = iso.date(from: record.datetime) ?? Date()
+                let end = start.addingTimeInterval(TimeInterval(record.length))
+                let service = record.services.first
+                let vm = VisitVM(
+                    serviceTitle: service?.title ?? "",
+                    specialistName: record.staff.name,
+                    startTime: start,
+                    endTime: end,
+                    serviceCost: service?.cost
+                )
+                DispatchQueue.main.async {
+                    self.visitVMById[visitId] = vm
+                }
+            } catch {
+                print("❌ Visit fallback decode error for id=\(visitId): \(error)")
+                if let json = String(data: data, encoding: .utf8) {
+                    print("Raw visit fallback JSON (id=\(visitId)):\n\(json)")
+                }
+            }
+        }.resume()
     }
 
     private func fetchTransactions() {
@@ -109,6 +302,7 @@ struct AbonementDetailView: View {
                 print("📄 Raw transactions JSON for abonement \(self.abonement.number):\n\(jsonString)")
             }
 
+            // Дополнительно оставляем только операции использования абонемента (typeId == 9)
             do {
                 let decoder = JSONDecoder()
                 let dfISO = DateFormatter()
@@ -137,6 +331,21 @@ struct AbonementDetailView: View {
                 let filtered9 = filtered.filter { $0.typeId == 9 }
                 print("🎯 After typeId==9 filter: \(filtered9.count)")
 
+                // 🧭 Построим карту visitId -> recordId (item_record_id) на основе исходного JSON
+                do {
+                    let lite = try JSONDecoder().decode(TxLiteEnvelope.self, from: data)
+                    var map: [Int: Int] = [:]
+                    for tx in lite.data where tx.type_id == 9 && tx.abonement_id == self.abonement.id {
+                        if let rid = tx.item_record_id { map[tx.visit_id] = rid }
+                    }
+                    print("🗺️ Built recordIdByVisitId map entries: \(map.count)")
+                    DispatchQueue.main.async {
+                        self.recordIdByVisitId = map
+                    }
+                } catch {
+                    print("⚠️ Failed to build recordIdByVisitId map: \(error)")
+                }
+
                 DispatchQueue.main.async {
                     self.abonement.transactions = filtered9
                     self.fetchVisitDetailsForTransactions()
@@ -148,5 +357,18 @@ struct AbonementDetailView: View {
                 }
             }
         }.resume()
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ru_RU")
+        f.dateFormat = "d MMMM yyyy"
+        return f.string(from: date)
+    }
+    private func formatTime(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ru_RU")
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
     }
 }
