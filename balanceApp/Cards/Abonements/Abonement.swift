@@ -20,8 +20,8 @@ struct BalanceContainer: Codable {
     let links: [BalanceLink]
 }
 
-struct Abonement: Identifiable, Codable {
-    var id: Int
+struct Abonement: Codable, Identifiable {
+    let id: Int
     let number: String
     let type: AbonementType
     let createdDate: Date
