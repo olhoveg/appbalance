@@ -5,11 +5,14 @@ struct AbonementDetailView: View {
     @State var abonement: Abonement
     @State private var isLoading: Bool = false
     @State private var visitVMById: [Int: VisitVM] = [:]
-    @State private var selectedVisitId: Int? = nil
-    @State private var isVisitSheetPresented: Bool = false
+    @State private var selectedVisit: SelectedVisit? = nil
+    @State private var loadingVisitIds: Set<Int> = []
     @State private var recordIdByVisitId: [Int: Int] = [:]
+    @State private var companyIdByVisitId: [Int: Int] = [:]
 
     // MARK: - Visit view model
+    // MARK: - Selection wrapper for .sheet(item:)
+    struct SelectedVisit: Identifiable { let id: Int }
     struct VisitVM {
         let serviceTitle: String
         let specialistName: String
@@ -18,21 +21,53 @@ struct AbonementDetailView: View {
         let serviceCost: Double?
     }
 
-    // MARK: - Minimal visit API decoders
-    private struct VisitAPIResponse: Decodable {
+    // MARK: - Updated Visit API decoders based on actual response
+    private struct VisitResponse: Decodable { 
+        let success: Bool
         let data: VisitData?
     }
+    
     private struct VisitData: Decodable {
+        let attendance: Int
+        let datetime: String
+        let comment: Int
         let records: [VisitRecord]
     }
+    
     private struct VisitRecord: Decodable {
-        let datetime: String
-        let length: Int
-        let staff: Staff
+        let id: Int
+        let company_id: Int
+        let staff_id: Int
         let services: [VisitService]
+        let staff: Staff
+        let client: Client
+        let date: String
+        let datetime: String
+        let seance_length: Int
+        let length: Int
+        let visit_id: Int
+        let payment_status: Int
     }
-    private struct Staff: Decodable { let name: String }
-    private struct VisitService: Decodable { let title: String; let cost: Double? }
+    
+    private struct Staff: Decodable { 
+        let id: Int
+        let name: String
+        let specialization: String
+    }
+    
+    private struct Client: Decodable {
+        let id: Int
+        let name: String
+        let phone: String
+    }
+    
+    private struct VisitService: Decodable { 
+        let id: Int
+        let title: String
+        let cost: Double
+        let cost_to_pay: Double
+        let amount: Int
+    }
 
     // MARK: - Record (Запись) API decoders
     private struct RecordAPIResponse: Decodable { let success: Bool; let data: RecordOne? }
@@ -54,6 +89,9 @@ struct AbonementDetailView: View {
         let abonement_id: Int?
         let type_id: Int
     }
+    
+    // MARK: - Transaction API decoders
+    private struct TransactionAPIResponse: Decodable { let success: Bool; let data: [AppTransaction] }
 
     var body: some View {
         List {
@@ -81,8 +119,7 @@ struct AbonementDetailView: View {
                             Spacer()
                         }
                         .onTapGesture {
-                            self.selectedVisitId = t.visitId
-                            self.isVisitSheetPresented = true
+                            self.selectedVisit = SelectedVisit(id: t.visitId)
                         }
                     }
                 } else {
@@ -94,44 +131,48 @@ struct AbonementDetailView: View {
         .onAppear {
             fetchTransactions()
         }
-        .sheet(isPresented: $isVisitSheetPresented) {
-            if let vid = selectedVisitId, let vm = visitVMById[vid] {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Детали визита").font(.title2).bold()
+        .sheet(item: $selectedVisit) { sel in
+            let vid = sel.id
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Детали визита").font(.title2).bold()
+
+                if let vm = visitVMById[vid] {
                     HStack { Text("Дата:"); Spacer(); Text(formattedDate(vm.startTime)) }
                     HStack { Text("Начало:"); Spacer(); Text(formatTime(vm.startTime)) }
                     HStack { Text("Окончание:"); Spacer(); Text(formatTime(vm.endTime)) }
                     HStack { Text("Специалист:"); Spacer(); Text(vm.specialistName) }
                     HStack { Text("Услуга:"); Spacer(); Text(vm.serviceTitle.isEmpty ? "—" : vm.serviceTitle) }
                     HStack { Text("Стоимость:"); Spacer(); Text(vm.serviceCost != nil ? "\(Int(vm.serviceCost!)) ₽" : "—") }
-                    Spacer()
+                } else if loadingVisitIds.contains(vid) {
+                    HStack { ProgressView(); Text("Загружаем визит…") }
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Ошибка загрузки визита")
+                        .foregroundColor(.red)
                 }
-                .padding()
-            } else {
-                Text("Нет данных визита")
-                    .padding()
+                Spacer()
             }
+            .padding()
+            .onAppear { ensureVisitLoaded(vid) }
+            .onChange(of: visitVMById[vid] != nil) { _ in /* trigger rebuild */ }
         }
+    }
+    
+    private func ensureVisitLoaded(_ visitId: Int) {
+        if visitVMById[visitId] != nil { return }
+        if loadingVisitIds.contains(visitId) { return }
+        loadingVisitIds.insert(visitId)
+        fetchVisitByIdFallback(visitId: visitId)
     }
 
     private func fetchVisitDetailsForTransactions() {
         guard let tx = abonement.transactions, !tx.isEmpty else { return }
 
-        let iso = DateFormatter()
-        iso.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-
-        let companyId = 433675 // TODO: подставь свой фактический company_id
-
         for t in tx {
             let visitId = t.visitId
             if visitVMById[visitId] != nil { continue }
-            if let recordId = recordIdByVisitId[visitId] {
-                // Предпочитаем получать запись по /record
-                fetchRecord(companyId: companyId, recordId: recordId, visitId: visitId)
-            } else {
-                // Fallback на /visits/{visitId}
-                self.fetchVisitByIdFallback(visitId: visitId)
-            }
+            // Получаем данные визита напрямую
+            self.fetchVisitByIdFallback(visitId: visitId)
         }
     }
 
@@ -190,7 +231,10 @@ struct AbonementDetailView: View {
 
     private func fetchVisitByIdFallback(visitId: Int) {
         let urlString = "https://api.yclients.com/api/v1/visits/\(visitId)"
-        guard let url = URL(string: urlString) else { return }
+        guard let url = URL(string: urlString) else { 
+            DispatchQueue.main.async { self.loadingVisitIds.remove(visitId) }
+            return 
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -199,26 +243,52 @@ struct AbonementDetailView: View {
         let authHeader = "Bearer 88fnh8jbmt44er5y28nj, User 9d241fb00061c17a5e2e76a23b214b20"
         request.setValue(authHeader, forHTTPHeaderField: "Authorization")
 
+        print("⏳ Fetching visit id=\(visitId)")
+
         let iso = DateFormatter()
         iso.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
 
-        URLSession.shared.dataTask(with: request) { data, _, error in
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer {
+                DispatchQueue.main.async { self.loadingVisitIds.remove(visitId) }
+            }
+            
             if let error = error {
-                print("❌ Visit fallback fetch error for id=\(visitId): \(error.localizedDescription)")
+                print("❌ Visit fetch error for id=\(visitId): \(error.localizedDescription)")
                 return
             }
-            guard let data = data else { return }
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📥 HTTP Status for visit \(visitId): \(httpResponse.statusCode)")
+                if httpResponse.statusCode != 200 {
+                    print("❌ HTTP error for visit \(visitId): \(httpResponse.statusCode)")
+                    return
+                }
+            }
+            
+            guard let data = data else { 
+                print("❌ No data received for visit \(visitId)")
+                return 
+            }
 
             do {
                 let decoder = JSONDecoder()
-                let payload = try decoder.decode(VisitAPIResponse.self, from: data)
-                guard let record = payload.data?.records.first else {
-                    print("ℹ️ No records in fallback for visit id=\(visitId)")
+                let payload = try decoder.decode(VisitResponse.self, from: data)
+                
+                guard let visitData = payload.data, !visitData.records.isEmpty else {
+                    print("ℹ️ No visit data or empty records for id=\(visitId)")
+                    if let json = String(data: data, encoding: .utf8) { 
+                        print("Raw visit JSON (id=\(visitId)):\n\(json)") 
+                    }
                     return
                 }
+                
+                // Берем первую запись из records
+                let record = visitData.records[0]
                 let start = iso.date(from: record.datetime) ?? Date()
                 let end = start.addingTimeInterval(TimeInterval(record.length))
                 let service = record.services.first
+                
                 let vm = VisitVM(
                     serviceTitle: service?.title ?? "",
                     specialistName: record.staff.name,
@@ -226,13 +296,18 @@ struct AbonementDetailView: View {
                     endTime: end,
                     serviceCost: service?.cost
                 )
+                
                 DispatchQueue.main.async {
+                    self.companyIdByVisitId[visitId] = record.company_id
                     self.visitVMById[visitId] = vm
                 }
+                
+                print("✅ Successfully loaded visit \(visitId): \(vm.serviceTitle) at \(vm.startTime)")
+                
             } catch {
-                print("❌ Visit fallback decode error for id=\(visitId): \(error)")
+                print("❌ Visit decode error for id=\(visitId): \(error)")
                 if let json = String(data: data, encoding: .utf8) {
-                    print("Raw visit fallback JSON (id=\(visitId)):\n\(json)")
+                    print("Raw visit JSON (id=\(visitId)):\n\(json)")
                 }
             }
         }.resume()
