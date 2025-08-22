@@ -4,14 +4,9 @@ struct AbonementBlockView: View {
     @StateObject private var viewModel = AbonementViewModel()
     @State private var activeIndex: Int = 0      // для пагинатора
     @State private var isInitialLoadCompleted = false
-    @State private var showExpired = false
     
     private var filteredAbonements: [Abonement] {
-        if showExpired {
-            return viewModel.abonements.filter { !$0.isActive }
-        } else {
-            return viewModel.abonements.filter { $0.isActive }
-        }
+        viewModel.abonements.filter { $0.isActive }
     }
 
     private func getUserPhoneNumber() -> String? {
@@ -77,11 +72,6 @@ struct AbonementBlockView: View {
                     } else if !filteredAbonements.isEmpty {
                         PaginationView(dots: filteredAbonements.count, activeIndex: activeIndex)
                     }
-
-                    Toggle(isOn: $showExpired) {
-                        Text("Показать истекшие")
-                    }
-                    .padding(.horizontal)
 
                     if isInitialLoadCompleted {
                         AbonementPurchaseListView()
