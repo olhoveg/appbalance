@@ -96,8 +96,82 @@ struct AbonementDetailView: View {
     var body: some View {
         List {
             Section(header: Text("Абонемент")) {
-                Text("№ \(abonement.number)")
-                Text("ID: \(abonement.id)")
+                VStack(alignment: .leading, spacing: 12) {
+                    // Основная информация
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("№ \(abonement.number)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            StatusBadge(isActive: abonement.isActive)
+                        }
+                        
+                        HStack {
+                            Text("ID: \(abonement.id)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Тип и статус
+                    VStack(alignment: .leading, spacing: 6) {
+                        AbonementInfoRow(label: "Тип", value: abonement.type.title)
+                        AbonementInfoRow(label: "Статус", value: abonement.status.title)
+                        if let extendedTitle = abonement.status.extended_title {
+                            AbonementInfoRow(label: "Описание", value: extendedTitle)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Баланс
+                    VStack(alignment: .leading, spacing: 6) {
+                        AbonementInfoRow(label: "Текущий баланс", value: "\(abonement.balance) посещений")
+                        if let initialBalance = abonement.initialBalance {
+                            AbonementInfoRow(label: "Начальный баланс", value: "\(initialBalance) посещений")
+                        }
+                        if let balanceString = abonement.balanceString {
+                            AbonementInfoRow(label: "Баланс (строка)", value: balanceString)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Даты
+                    VStack(alignment: .leading, spacing: 6) {
+                        AbonementInfoRow(label: "Дата создания", value: formattedDate(abonement.createdDate))
+                        if let expirationDate = abonement.expirationDate {
+                            AbonementInfoRow(label: "Дата окончания", value: formattedDate(expirationDate))
+                        } else {
+                            AbonementInfoRow(label: "Дата окончания", value: "Бессрочный")
+                        }
+                        if let expirationText = abonement.expirationText {
+                            AbonementInfoRow(label: "Срок действия", value: expirationText)
+                        }
+                    }
+                    
+                    // Детальная информация о балансе
+                    if let balanceContainer = abonement.balanceContainer, !balanceContainer.links.isEmpty {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Детализация баланса")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                            
+                            ForEach(balanceContainer.links.indices, id: \.self) { index in
+                                let link = balanceContainer.links[index]
+                                AbonementInfoRow(label: "Услуга \(index + 1)", value: "\(link.count) посещений")
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
             }
             Section(header: Text("История")) {
                 let tx = (abonement.transactions ?? [])
@@ -150,26 +224,92 @@ struct AbonementDetailView: View {
         }
         .sheet(item: $selectedVisit) { sel in
             let vid = sel.id
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Детали визита").font(.title2).bold()
+            NavigationView {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Заголовок
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Детали визита")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            
+                            Text("Визит #\(vid)")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.bottom, 10)
 
-                if let vm = visitVMById[vid] {
-                    HStack { Text("Дата:"); Spacer(); Text(formattedDate(vm.startTime)) }
-                    HStack { Text("Начало:"); Spacer(); Text(formatTime(vm.startTime)) }
-                    HStack { Text("Окончание:"); Spacer(); Text(formatTime(vm.endTime)) }
-                    HStack { Text("Специалист:"); Spacer(); Text(vm.specialistName) }
-                    HStack { Text("Услуга:"); Spacer(); Text(vm.serviceTitle.isEmpty ? "—" : vm.serviceTitle) }
-                    HStack { Text("Стоимость:"); Spacer(); Text(vm.serviceCost != nil ? "\(Int(vm.serviceCost!)) ₽" : "—") }
-                } else if loadingVisitIds.contains(vid) {
-                    HStack { ProgressView(); Text("Загружаем визит…") }
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("Ошибка загрузки визита")
-                        .foregroundColor(.red)
+                        if let vm = visitVMById[vid] {
+                            // Основная информация
+                            VStack(spacing: 16) {
+                                // Дата и время
+                                DetailCard(title: "Дата и время", icon: "calendar") {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        DetailRow(label: "Дата", value: formattedDate(vm.startTime))
+                                        DetailRow(label: "Начало", value: formatTime(vm.startTime))
+                                        DetailRow(label: "Окончание", value: formatTime(vm.endTime))
+                                        DetailRow(label: "Длительность", value: formatDuration(vm.startTime, vm.endTime))
+                                    }
+                                }
+                                
+                                // Услуга и специалист
+                                DetailCard(title: "Услуга", icon: "star.fill") {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        DetailRow(label: "Название", value: vm.serviceTitle.isEmpty ? "—" : vm.serviceTitle)
+                                        DetailRow(label: "Специалист", value: vm.specialistName)
+                                        if let cost = vm.serviceCost {
+                                            DetailRow(label: "Стоимость", value: "\(Int(cost)) ₽")
+                                        }
+                                    }
+                                }
+                                
+                                // Дополнительная информация
+                                DetailCard(title: "Информация", icon: "info.circle") {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        DetailRow(label: "ID визита", value: "\(vid)")
+                                        DetailRow(label: "Статус", value: "Завершен")
+                                    }
+                                }
+                            }
+                        } else if loadingVisitIds.contains(vid) {
+                            // Загрузка
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .scaleEffect(1.2)
+                                Text("Загружаем детали визита...")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 50)
+                        } else {
+                            // Ошибка
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.red)
+                                Text("Ошибка загрузки")
+                                    .font(.headline)
+                                    .foregroundColor(.red)
+                                Text("Не удалось загрузить детали визита")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 50)
+                        }
+                        
+                        Spacer(minLength: 20)
+                    }
+                    .padding()
                 }
-                Spacer()
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarItems(trailing: Button("Закрыть") {
+                    selectedVisit = nil
+                })
             }
-            .padding()
             .onAppear { ensureVisitLoaded(vid) }
             .onChange(of: visitVMById[vid] != nil) { _ in /* trigger rebuild */ }
         }
@@ -462,5 +602,106 @@ struct AbonementDetailView: View {
         f.locale = Locale(identifier: "ru_RU")
         f.dateFormat = "HH:mm"
         return f.string(from: date)
+    }
+    
+    private func formatDuration(_ start: Date, _ end: Date) -> String {
+        let duration = end.timeIntervalSince(start)
+        let hours = Int(duration) / 3600
+        let minutes = Int(duration) % 3600 / 60
+        
+        if hours > 0 {
+            return "\(hours) ч \(minutes) мин"
+        } else {
+            return "\(minutes) мин"
+        }
+    }
+}
+
+// MARK: - Helper Views
+struct DetailCard<Content: View>: View {
+    let title: String
+    let icon: String
+    let content: Content
+    
+    init(title: String, icon: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(.blue)
+                    .font(.headline)
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            
+            content
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
+struct DetailRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .frame(width: 100, alignment: .leading)
+            
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+            
+            Spacer()
+        }
+    }
+}
+
+struct AbonementInfoRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .frame(width: 120, alignment: .leading)
+            
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+            
+            Spacer()
+        }
+    }
+}
+
+struct StatusBadge: View {
+    let isActive: Bool
+    
+    var body: some View {
+        Text(isActive ? "Активен" : "Неактивен")
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundColor(isActive ? .white : .white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isActive ? Color.green : Color.red)
+            .cornerRadius(8)
     }
 }
