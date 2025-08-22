@@ -108,10 +108,27 @@ struct AbonementDetailView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Использование абонемента")
                                     .font(.headline)
-                                HStack(spacing: 8) {
-                                    let vm = visitVMById[t.visitId]
-                                    Text(vm?.startTime != nil ? formattedDate(vm!.startTime) : "—")
-                                    Text("визит #\(t.visitId)")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 8) {
+                                        Text("Списано:")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(formattedDate(t.date))
+                                            .font(.subheadline)
+                                            .foregroundColor(.primary)
+                                    }
+                                    HStack(spacing: 8) {
+                                        let vm = visitVMById[t.visitId]
+                                        Text("Визит:")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(vm?.startTime != nil ? formattedDate(vm!.startTime) : "—")
+                                            .font(.subheadline)
+                                            .foregroundColor(.primary)
+                                        Text("#\(t.visitId)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
