@@ -171,7 +171,7 @@ class AbonementViewModel: ObservableObject {
                         specialistName: record.staff.name,
                         startTime: startTime,
                         endTime: endTime,
-                        serviceCost: service.cost
+                        serviceCost: Double(service.cost)
                     )
                     completion(visitDetails)
                 } else {
