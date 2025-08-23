@@ -19,6 +19,7 @@ struct AppVisitService: Codable {
     let id: Int
     let title: String
     let cost: Int
+    let amount: Int
 }
 
 struct AppVisitStaff: Codable {

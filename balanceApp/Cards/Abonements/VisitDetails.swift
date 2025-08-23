@@ -6,4 +6,5 @@ struct VisitDetails: Codable {
     let startTime: Date?
     let endTime: Date?
     let serviceCost: Double?
+    let sessionsCount: Int?
 }

@@ -171,8 +171,10 @@ class AbonementViewModel: ObservableObject {
                         specialistName: record.staff.name,
                         startTime: startTime,
                         endTime: endTime,
-                        serviceCost: Double(service.cost)
+                        serviceCost: Double(service.cost),
+                        sessionsCount: service.amount
                     )
+                    print("✅ Created VisitDetails for visit \(visitId): serviceTitle=\(service.title), sessionsCount=\(service.amount)")
                     completion(visitDetails)
                 } else {
                     completion(nil)

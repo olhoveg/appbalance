@@ -9,17 +9,11 @@ struct AbonementDetailView: View {
     @State private var loadingVisitIds: Set<Int> = []
     @State private var recordIdByVisitId: [Int: Int] = [:]
     @State private var companyIdByVisitId: [Int: Int] = [:]
+    @State private var refreshTrigger = 0
 
     // MARK: - Visit view model
     // MARK: - Selection wrapper for .sheet(item:)
     struct SelectedVisit: Identifiable { let id: Int }
-    struct VisitVM {
-        let serviceTitle: String
-        let specialistName: String
-        let startTime: Date
-        let endTime: Date
-        let serviceCost: Double?
-    }
 
     // MARK: - Updated Visit API decoders based on actual response
     private struct VisitResponse: Decodable { 
@@ -174,14 +168,27 @@ struct AbonementDetailView: View {
                 .padding(.vertical, 8)
             }
             Section(header: Text("История")) {
-                let tx = (abonement.transactions ?? [])
-                if !tx.isEmpty {
-                    ForEach(tx.indices, id: \.self) { i in
-                        let t = tx[i]
+                if let tx = abonement.transactions, !tx.isEmpty {
+                    ForEach(Array(tx.enumerated()), id: \.element.id) { i, t in
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Использование абонемента")
-                                    .font(.headline)
+                                HStack {
+                                    Text("Использование абонемента")
+                                        .font(.headline)
+                                    Spacer()
+                                    BalanceChangeView(
+                                        initialBalance: abonement.balance + tx.reduce(0) { sum, transaction in 
+                                            let visitVM = visitVMById[transaction.visitId]
+                                            return sum + (visitVM?.sessionsCount ?? 1)
+                                        }, // Восстанавливаем начальный баланс с реальными сеансами
+                                        transactions: tx,
+                                        transactionIndex: i,
+                                        visitVM: visitVMById[t.visitId],
+                                        visitVMById: visitVMById,
+                                        refreshTrigger: refreshTrigger
+                                    )
+                                    .id("\(t.visitId)-\(refreshTrigger)")
+                                }
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack(spacing: 8) {
                                         Text("Списано:")
@@ -371,10 +378,12 @@ struct AbonementDetailView: View {
                     specialistName: rec.staff.name,
                     startTime: start,
                     endTime: end,
-                    serviceCost: service?.cost
+                    serviceCost: service?.cost,
+                    sessionsCount: service?.amount
                 )
                 DispatchQueue.main.async {
                     self.visitVMById[visitId] = vm
+                    self.refreshTrigger += 1
                 }
             } catch {
                 print("❌ Record decode error for recordId=\(recordId): \(error)")
@@ -451,12 +460,14 @@ struct AbonementDetailView: View {
                     specialistName: record.staff.name,
                     startTime: start,
                     endTime: end,
-                    serviceCost: service?.cost
+                    serviceCost: service?.cost,
+                    sessionsCount: service?.amount
                 )
                 
                 DispatchQueue.main.async {
                     self.companyIdByVisitId[visitId] = record.company_id
                     self.visitVMById[visitId] = vm
+                    self.refreshTrigger += 1
                 }
                 
                 print("✅ Successfully loaded visit \(visitId): \(vm.serviceTitle) at \(vm.startTime)")
@@ -549,11 +560,7 @@ struct AbonementDetailView: View {
                 let typeHistogram = Dictionary(grouping: all, by: { $0.typeId }).mapValues { $0.count }
                 print("📊 typeId histogram: \(typeHistogram)")
 
-                // Диагностика: первые 10 значений abonementId
-                let sample = all.prefix(10)
-                for (idx, tx) in sample.enumerated() {
-                    print("🔹 tx[#\(idx)] id=\(tx.id) typeId=\(tx.typeId) visitId=\(String(describing: tx.visitId)) abonementId=\(String(describing: tx.abonementId))")
-                }
+
 
                 // Фильтруем по текущему абонементу
                 let filtered = all.filter { $0.abonementId == self.abonement.id }
@@ -705,3 +712,65 @@ struct StatusBadge: View {
             .cornerRadius(8)
     }
 }
+
+struct BalanceChangeView: View {
+    let initialBalance: Int
+    let transactions: [AppTransaction]
+    let transactionIndex: Int
+    let visitVM: VisitVM?
+    let visitVMById: [Int: VisitVM]
+    let refreshTrigger: Int
+    
+    private var sessionsUsed: Int {
+        // Если есть детали визита, берем количество сеансов из них
+        if let visit = visitVM, let sessionsCount = visit.sessionsCount {
+            return sessionsCount
+        }
+        // По умолчанию считаем 1 сеанс на транзакцию
+        return 1
+    }
+    
+                private var balanceBefore: Int {
+                // Рассчитываем баланс до этой транзакции
+                // Начинаем с начального баланса и вычитаем все списания до этой транзакции
+                var balance = initialBalance
+                // Вычитаем сеансы из всех транзакций до текущей
+                for i in 0..<transactionIndex {
+                    // Используем реальное количество сеансов из visitVMById
+                    let transaction = transactions[i]
+                    let visitVM = visitVMById[transaction.visitId]
+                    balance -= (visitVM?.sessionsCount ?? 1)
+                }
+                return balance
+            }
+    
+    private var balanceAfter: Int {
+        // Баланс после этой транзакции - списываем реальное количество сеансов
+        return balanceBefore - sessionsUsed
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("\(balanceBefore)")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+            
+            Text("→")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Text("\(balanceAfter)")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color(.systemGray6))
+        .cornerRadius(6)
+
+    }
+}
+
+
