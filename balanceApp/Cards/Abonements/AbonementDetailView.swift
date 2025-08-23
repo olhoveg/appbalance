@@ -170,24 +170,12 @@ struct AbonementDetailView: View {
             Section(header: Text("История")) {
                 if let tx = abonement.transactions, !tx.isEmpty {
                     ForEach(Array(tx.enumerated()), id: \.element.id) { i, t in
-                        HStack {
+                        HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Text("Использование абонемента")
                                         .font(.headline)
                                     Spacer()
-                                    BalanceChangeView(
-                                        initialBalance: abonement.balance + tx.reduce(0) { sum, transaction in 
-                                            let visitVM = visitVMById[transaction.visitId]
-                                            return sum + (visitVM?.sessionsCount ?? 1)
-                                        }, // Восстанавливаем начальный баланс с реальными сеансами
-                                        transactions: tx,
-                                        transactionIndex: i,
-                                        visitVM: visitVMById[t.visitId],
-                                        visitVMById: visitVMById,
-                                        refreshTrigger: refreshTrigger
-                                    )
-                                    .id("\(t.visitId)-\(refreshTrigger)")
                                 }
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack(spacing: 8) {
@@ -215,6 +203,18 @@ struct AbonementDetailView: View {
                                 .foregroundColor(.secondary)
                             }
                             Spacer()
+                            BalanceChangeView(
+                                initialBalance: abonement.balance + tx.reduce(0) { sum, transaction in 
+                                    let visitVM = visitVMById[transaction.visitId]
+                                    return sum + (visitVM?.sessionsCount ?? 1)
+                                }, // Восстанавливаем начальный баланс с реальными сеансами
+                                transactions: tx,
+                                transactionIndex: i,
+                                visitVM: visitVMById[t.visitId],
+                                visitVMById: visitVMById,
+                                refreshTrigger: refreshTrigger
+                            )
+                            .id("\(t.visitId)-\(refreshTrigger)")
                         }
                         .onTapGesture {
                             self.selectedVisit = SelectedVisit(id: t.visitId)
@@ -750,25 +750,26 @@ struct BalanceChangeView: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Text("\(balanceBefore)")
-                .font(.caption)
+                .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
             
             Text("→")
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
             
             Text("\(balanceAfter)")
-                .font(.caption)
+                .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .background(Color(.systemGray6))
-        .cornerRadius(6)
+        .cornerRadius(8)
+        .frame(maxHeight: .infinity, alignment: .center)
 
     }
 }
