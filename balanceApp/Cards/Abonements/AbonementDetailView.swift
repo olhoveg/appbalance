@@ -10,10 +10,21 @@ struct AbonementDetailView: View {
     @State private var recordIdByVisitId: [Int: Int] = [:]
     @State private var companyIdByVisitId: [Int: Int] = [:]
     @State private var refreshTrigger = 0
+    
+    // Для загрузки изображения абонемента
+    @EnvironmentObject var imageCache: ImageCache
+    @StateObject private var imageLoader: AbonementImageLoader
+    @State private var loadedImage: UIImage? = nil
+    @State private var isImageLoaded: Bool = false
 
     // MARK: - Visit view model
     // MARK: - Selection wrapper for .sheet(item:)
     struct SelectedVisit: Identifiable { let id: Int }
+
+    init(abonement: Abonement) {
+        self.abonement = abonement
+        _imageLoader = StateObject(wrappedValue: AbonementImageLoader(key: abonement.type.title))
+    }
 
     // MARK: - Updated Visit API decoders based on actual response
     private struct VisitResponse: Decodable { 
@@ -88,13 +99,66 @@ struct AbonementDetailView: View {
     private struct TransactionAPIResponse: Decodable { let success: Bool; let data: [AppTransaction] }
 
     var body: some View {
-        List {
-            Section(header: Text("Абонемент")) {
-                VStack(alignment: .leading, spacing: 12) {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Верхняя секция с фото и основной информацией
+                VStack(spacing: 16) {
+                    // Фото абонемента
+                    ZStack(alignment: .topTrailing) {
+                        ZStack {
+                            Color.gray.opacity(0.15)
+                            
+                            if let url = imageLoader.imageUrl, !url.isEmpty {
+                                if let entry = imageCache.cachedImages[url] {
+                                    Image(uiImage: entry.image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .opacity(isImageLoaded ? 1 : 0)
+                                        .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                                        .onAppear { isImageLoaded = true }
+                                } else if let img = loadedImage {
+                                    Image(uiImage: img)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .opacity(isImageLoaded ? 1 : 0)
+                                        .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
+                                        .onAppear { isImageLoaded = true }
+                                } else {
+                                    ProgressView()
+                                        .onAppear {
+                                            imageCache.loadImage(from: url) { image in
+                                                self.loadedImage = image
+                                                withAnimation {
+                                                    self.isImageLoaded = true
+                                                }
+                                            }
+                                        }
+                                }
+                            }
+                        }
+                        .frame(height: 200)
+                        .clipped()
+                        
+                        // Номер абонемента
+                        Text("№ \(abonement.number)")
+                            .font(.footnote)
+                            .fontWeight(.bold)
+                            .padding(8)
+                            .background(Color.black.opacity(0.6))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                            .padding(8)
+                    }
+                    .cornerRadius(15)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 15)
+                            .stroke(Color.gray.opacity(0.5), lineWidth: 2)
+                    )
+                    
                     // Основная информация
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("№ \(abonement.number)")
+                            Text("Абонемент")
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.primary)
@@ -102,132 +166,147 @@ struct AbonementDetailView: View {
                             StatusBadge(isActive: abonement.isActive)
                         }
                         
-                        HStack {
-                            Text("ID: \(abonement.id)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Тип и статус
-                    VStack(alignment: .leading, spacing: 6) {
-                        AbonementInfoRow(label: "Тип", value: abonement.type.title)
-                        AbonementInfoRow(label: "Статус", value: abonement.status.title)
-                        if let extendedTitle = abonement.status.extended_title {
-                            AbonementInfoRow(label: "Описание", value: extendedTitle)
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Баланс
-                    VStack(alignment: .leading, spacing: 6) {
-                        AbonementInfoRow(label: "Текущий баланс", value: "\(abonement.balance) посещений")
-                        if let initialBalance = abonement.initialBalance {
-                            AbonementInfoRow(label: "Начальный баланс", value: "\(initialBalance) посещений")
-                        }
-                        if let balanceString = abonement.balanceString {
-                            AbonementInfoRow(label: "Баланс (строка)", value: balanceString)
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Даты
-                    VStack(alignment: .leading, spacing: 6) {
-                        AbonementInfoRow(label: "Дата создания", value: formattedDate(abonement.createdDate))
-                        if let expirationDate = abonement.expirationDate {
-                            AbonementInfoRow(label: "Дата окончания", value: formattedDate(expirationDate))
-                        } else {
-                            AbonementInfoRow(label: "Дата окончания", value: "Бессрочный")
-                        }
-                        if let expirationText = abonement.expirationText {
-                            AbonementInfoRow(label: "Срок действия", value: expirationText)
-                        }
-                    }
-                    
-                    // Детальная информация о балансе
-                    if let balanceContainer = abonement.balanceContainer, !balanceContainer.links.isEmpty {
-                        Divider()
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Детализация баланса")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            AbonementInfoRow(label: "Тип", value: abonement.type.title)
+                            AbonementInfoRow(label: "Баланс", value: displayBalance())
+                            AbonementInfoRow(label: "Дата покупки", value: formattedDate(abonement.createdDate))
                             
-                            ForEach(balanceContainer.links.indices, id: \.self) { index in
-                                let link = balanceContainer.links[index]
-                                AbonementInfoRow(label: "Услуга \(index + 1)", value: "\(link.count) посещений")
+                            if let expDate = abonement.expirationDate {
+                                AbonementInfoRow(label: "Срок окончания", value: formattedDate(expDate))
+                            } else if let expText = abonement.expirationText {
+                                AbonementInfoRow(label: "Срок окончания", value: expText)
+                            } else {
+                                AbonementInfoRow(label: "Срок окончания", value: "Бессрочный")
                             }
                         }
                     }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
                 }
-                .padding(.vertical, 8)
-            }
-            Section(header: Text("История")) {
-                if let tx = abonement.transactions, !tx.isEmpty {
-                    ForEach(Array(tx.enumerated()), id: \.element.id) { i, t in
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("Использование абонемента")
-                                        .font(.headline)
-                                    Spacer()
-                                }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 8) {
-                                        Text("Списано:")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text(formattedDate(t.date))
-                                            .font(.subheadline)
-                                            .foregroundColor(.primary)
-                                    }
-                                    HStack(spacing: 8) {
-                                        let vm = visitVMById[t.visitId]
-                                        Text("Визит:")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text(vm?.startTime != nil ? formattedDate(vm!.startTime) : "—")
-                                            .font(.subheadline)
-                                            .foregroundColor(.primary)
-                                        Text("#\(t.visitId)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                
+                // Секция с услугами абонемента
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Услуги абонемента")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+
+                    
+
+                    
+                    if let balanceString = abonement.balanceString, !balanceString.isEmpty {
+                        // Используем balanceString для извлечения названий услуг
+                        let services = parseServicesFromBalanceString(balanceString)
+                        
+
+                        
+                        VStack(spacing: 8) {
+                            ForEach(services.indices, id: \.self) { index in
+                                let service = services[index]
+                                ServiceRow(
+                                    serviceNumber: index + 1,
+                                    sessionsCount: service.count,
+                                    serviceType: service.name,
+                                    categoryTitle: service.name,
+                                    usedSessionsCount: getUsedSessionsCount(for: service.name)
+                                )
                             }
-                            Spacer()
-                            BalanceChangeView(
-                                initialBalance: abonement.balance + tx.reduce(0) { sum, transaction in 
-                                    let visitVM = visitVMById[transaction.visitId]
-                                    return sum + (visitVM?.sessionsCount ?? 1)
-                                }, // Восстанавливаем начальный баланс с реальными сеансами
-                                transactions: tx,
-                                transactionIndex: i,
-                                visitVM: visitVMById[t.visitId],
-                                visitVMById: visitVMById,
-                                refreshTrigger: refreshTrigger
-                            )
-                            .id("\(t.visitId)-\(refreshTrigger)")
                         }
-                        .onTapGesture {
-                            self.selectedVisit = SelectedVisit(id: t.visitId)
+                    } else if let balanceContainer = abonement.balanceContainer, !balanceContainer.links.isEmpty {
+                        // Используем balanceContainer только если там есть конкретные услуги (service.title)
+                        let servicesWithNames = balanceContainer.links.filter { $0.service?.title != nil }
+                        
+                        if !servicesWithNames.isEmpty {
+                            VStack(spacing: 8) {
+                                ForEach(servicesWithNames.indices, id: \.self) { index in
+                                    let link = servicesWithNames[index]
+                                    ServiceRow(
+                                        serviceNumber: index + 1,
+                                        sessionsCount: link.count,
+                                        serviceType: link.service!.title,
+                                        categoryTitle: link.service!.title,
+                                        usedSessionsCount: getUsedSessionsCount(for: link.service!.title)
+                                    )
+                                }
+                            }
+                        } else {
+                            // Если нет конкретных услуг, показываем общее количество
+                            if let unitedBalance = abonement.united_balance_services_count {
+                                ServiceRow(
+                                    serviceNumber: 1,
+                                    sessionsCount: unitedBalance,
+                                    serviceType: abonement.type.title,
+                                    categoryTitle: abonement.type.title,
+                                    usedSessionsCount: getUsedSessionsCount(for: abonement.type.title)
+                                )
+                            } else {
+                                Text("Информация об услугах недоступна")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding()
+                            }
                         }
+                    } else if let unitedBalance = abonement.united_balance_services_count {
+                        ServiceRow(
+                            serviceNumber: 1,
+                            sessionsCount: unitedBalance,
+                            serviceType: abonement.type.title,
+                            categoryTitle: abonement.type.title,
+                            usedSessionsCount: getUsedSessionsCount(for: abonement.type.title)
+                        )
+                    } else {
+                        Text("Информация об услугах недоступна")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding()
                     }
-                } else {
-                    Text("Нет использований по абонементу")
-                        .foregroundColor(.secondary)
                 }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                
+                // История списаний
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("История использования")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    if let tx = abonement.transactions, !tx.isEmpty {
+                        VStack(spacing: 8) {
+                            ForEach(Array(tx.enumerated()), id: \.element.id) { i, t in
+                                AbonementTransactionRow(
+                                    transaction: t,
+                                    visitVM: visitVMById[t.visitId],
+                                    balanceBefore: calculateBalanceBefore(transactions: tx, currentIndex: i),
+                                    balanceAfter: calculateBalanceAfter(transactions: tx, currentIndex: i, visitVM: visitVMById[t.visitId]),
+                                    onTap: {
+                                        self.selectedVisit = SelectedVisit(id: t.visitId)
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Text("Нет использований по абонементу")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding()
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
+            .padding()
         }
         .onAppear {
             fetchTransactions()
+            // Загружаем изображение если нужно
+            if imageLoader.imageUrl == nil {
+                imageLoader.loadImage()
+            }
         }
         .sheet(item: $selectedVisit) { sel in
             let vid = sel.id
@@ -565,6 +644,15 @@ struct AbonementDetailView: View {
                 // Фильтруем по текущему абонементу
                 let filtered = all.filter { $0.abonementId == self.abonement.id }
                 print("🧮 Filtered by abonementId=\(self.abonement.id): \(filtered.count)")
+                
+                // Отладочная информация: показываем все abonement_id в ответе
+                let uniqueAbonementIds = Set(all.compactMap { $0.abonementId })
+                print("🔍 All abonement_ids in response: \(Array(uniqueAbonementIds).sorted())")
+                
+                if filtered.isEmpty {
+                    print("⚠️ No transactions found for abonement \(self.abonement.id)")
+                    print("📋 Looking for transactions with abonement_id: \(self.abonement.id)")
+                }
 
                 // Дополнительно оставляем только операции использования абонемента (typeId == 9)
                 let filtered9 = filtered.filter { $0.typeId == 9 }
@@ -588,6 +676,8 @@ struct AbonementDetailView: View {
                 DispatchQueue.main.async {
                     self.abonement.transactions = filtered9
                     self.fetchVisitDetailsForTransactions()
+                    // Обновляем UI для пересчета использованных сеансов
+                    self.refreshTrigger += 1
                 }
             } catch {
                 print("❌ Transactions decode error for abonement \(self.abonement.number): \(error)")
@@ -604,6 +694,7 @@ struct AbonementDetailView: View {
         f.dateFormat = "d MMMM yyyy"
         return f.string(from: date)
     }
+    
     private func formatTime(_ date: Date) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "ru_RU")
@@ -621,6 +712,319 @@ struct AbonementDetailView: View {
         } else {
             return "\(minutes) мин"
         }
+    }
+
+    // MARK: - Helper functions
+    private func displayBalance() -> String {
+        if let balanceStr = abonement.balanceString {
+            let pattern = "\\(x(\\d+)\\)"
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: balanceStr, range: NSRange(location: 0, length: balanceStr.utf16.count)),
+               let range = Range(match.range(at: 1), in: balanceStr) {
+                let countStr = String(balanceStr[range])
+                if let count = Int(countStr) {
+                    return formatBalance(count: count, title: abonement.type.title)
+                }
+            }
+        }
+        
+        if let count = abonement.united_balance_services_count {
+            return formatBalance(count: count, title: abonement.type.title)
+        }
+        
+        if let container = abonement.balanceContainer {
+            let total = container.links.reduce(0) { $0 + $1.count }
+            if total > 0 {
+                return formatBalance(count: total, title: abonement.type.title)
+            }
+        }
+        
+        return "0"
+    }
+    
+    private func formatBalance(count: Int, title: String) -> String {
+        let lowerTitle = title.lowercased()
+        let isSolarium = lowerTitle.contains("солярий")
+        
+        if isSolarium {
+            return "\(count) \(pluralizeMinutes(count: count))"
+        } else {
+            return "\(count) \(pluralizeSessions(count: count))"
+        }
+    }
+    
+    private func pluralizeSessions(count: Int) -> String {
+        let rem10 = count % 10
+        let rem100 = count % 100
+        
+        if rem100 >= 11 && rem100 <= 14 {
+            return "сеансов"
+        } else if rem10 == 1 {
+            return "сеанс"
+        } else if rem10 >= 2 && rem10 <= 4 {
+            return "сеанса"
+        } else {
+            return "сеансов"
+        }
+    }
+    
+    private func pluralizeMinutes(count: Int) -> String {
+        let rem10 = count % 10
+        let rem100 = count % 100
+        
+        if rem100 >= 11 && rem100 <= 14 {
+            return "минут"
+        } else if rem10 == 1 {
+            return "минута"
+        } else if rem10 >= 2 && rem10 <= 4 {
+            return "минуты"
+        } else {
+            return "минут"
+        }
+    }
+    
+    private func calculateBalanceBefore(transactions: [AppTransaction], currentIndex: Int) -> Int {
+        var balance = abonement.initialBalance ?? abonement.balance + transactions.reduce(0) { sum, transaction in 
+            let visitVM = visitVMById[transaction.visitId]
+            return sum + (visitVM?.sessionsCount ?? 1)
+        }
+        
+        for i in 0..<currentIndex {
+            let transaction = transactions[i]
+            let visitVM = visitVMById[transaction.visitId]
+            balance -= (visitVM?.sessionsCount ?? 1)
+        }
+        
+        return balance
+    }
+    
+    private func calculateBalanceAfter(transactions: [AppTransaction], currentIndex: Int, visitVM: VisitVM?) -> Int {
+        let balanceBefore = calculateBalanceBefore(transactions: transactions, currentIndex: currentIndex)
+        let sessionsUsed = visitVM?.sessionsCount ?? 1
+        return balanceBefore - sessionsUsed
+    }
+    
+    private func getUsedSessionsCount(for serviceName: String) -> Int {
+        // Проверяем, загружены ли транзакции
+        guard let transactions = abonement.transactions, !transactions.isEmpty else { 
+            print("⚠️ No transactions available for service: \(serviceName)")
+            return 0 
+        }
+        
+        print("🔍 Checking \(transactions.count) transactions for service: \(serviceName)")
+        print("📋 Transaction IDs: \(transactions.map { $0.id })")
+        
+        var usedCount = 0
+        for transaction in transactions {
+            print("🔍 Processing transaction \(transaction.id) for service: \(serviceName)")
+            
+            // Используем данные из visitVMById как основной источник
+            if let visitVM = visitVMById[transaction.visitId] {
+                print("📋 Visit VM: serviceTitle=\(visitVM.serviceTitle ?? "nil"), sessionsCount=\(visitVM.sessionsCount ?? 0)")
+                
+                // Проверяем несколько источников названия услуги
+                let possibleServiceTitles = [
+                    visitVM.serviceTitle,
+                    // Также проверяем название из visitDetails если доступно
+                    transaction.visitDetails?.serviceTitle
+                ].compactMap { $0 }
+                
+                print("🔍 Possible service titles: \(possibleServiceTitles)")
+                
+                for serviceTitle in possibleServiceTitles {
+                    let normalizedServiceName = serviceName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    let normalizedServiceTitle = serviceTitle.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    print("🔄 Comparing: '\(normalizedServiceName)' with '\(normalizedServiceTitle)'")
+                    
+                    // Проверяем точное совпадение или если название услуги содержит ключевые слова
+                    if normalizedServiceTitle == normalizedServiceName ||
+                       normalizedServiceTitle.contains(normalizedServiceName) ||
+                       normalizedServiceName.contains(normalizedServiceTitle) {
+                        let sessionsUsed = visitVM.sessionsCount ?? 1
+                        usedCount += sessionsUsed
+                        print("✅ Match found! Adding \(sessionsUsed) sessions. Total: \(usedCount)")
+                        break
+                    } else {
+                        print("❌ No match")
+                    }
+                }
+            } else {
+                print("❌ No visit VM for transaction \(transaction.id)")
+            }
+        }
+        
+        return usedCount
+    }
+}
+
+// MARK: - Service Row Component
+struct ServiceRow: View {
+    let serviceNumber: Int
+    let sessionsCount: Int
+    let serviceType: String
+    let categoryTitle: String?
+    let usedSessionsCount: Int
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(getServiceTitle(serviceNumber: serviceNumber, serviceType: serviceType, categoryTitle: categoryTitle))
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                
+                Text(formatServiceCount(sessionsCount, serviceType: serviceType))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+                .font(.title3)
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private func getServiceTitle(serviceNumber: Int, serviceType: String, categoryTitle: String?) -> String {
+        // Используем название категории из API или название услуги
+        if let categoryTitle = categoryTitle, !categoryTitle.isEmpty {
+            return categoryTitle
+        }
+        
+        // Если категория недоступна, используем переданное название услуги
+        return serviceType
+    }
+    
+    private func formatServiceCount(_ count: Int, serviceType: String) -> String {
+        // Показываем количество использованных сеансов
+        if usedSessionsCount > 0 {
+            return "Использовано: \(usedSessionsCount)"
+        }
+        return ""
+    }
+    
+    private func pluralizeSessions(count: Int) -> String {
+        let rem10 = count % 10
+        let rem100 = count % 100
+        
+        if rem100 >= 11 && rem100 <= 14 {
+            return "сеансов"
+        } else if rem10 == 1 {
+            return "сеанс"
+        } else if rem10 >= 2 && rem10 <= 4 {
+            return "сеанса"
+        } else {
+            return "сеансов"
+        }
+    }
+    
+    private func pluralizeMinutes(count: Int) -> String {
+        let rem10 = count % 10
+        let rem100 = count % 100
+        
+        if rem100 >= 11 && rem100 <= 14 {
+            return "минут"
+        } else if rem10 == 1 {
+            return "минута"
+        } else if rem10 >= 2 && rem10 <= 4 {
+            return "минуты"
+        } else {
+            return "минут"
+        }
+    }
+}
+
+// MARK: - Transaction Row Component
+struct AbonementTransactionRow: View {
+    let transaction: AppTransaction
+    let visitVM: VisitVM?
+    let balanceBefore: Int
+    let balanceAfter: Int
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Использование абонемента")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 8) {
+                            Text("Списано:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(formattedDate(transaction.date))
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                        }
+                        HStack(spacing: 8) {
+                            Text("Визит:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(visitVM?.startTime != nil ? formattedDate(visitVM!.startTime) : "—")
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                            Text("#\(transaction.visitId)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                }
+                Spacer()
+                
+                // Баланс до и после
+                HStack(spacing: 6) {
+                    Text("\(balanceBefore)")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    
+                    Text("→")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("\(balanceAfter)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                .frame(maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .padding()
+        .background(Color.white)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ru_RU")
+        f.dateFormat = "d MMMM yyyy"
+        return f.string(from: date)
     }
 }
 
@@ -713,65 +1117,82 @@ struct StatusBadge: View {
     }
 }
 
-struct BalanceChangeView: View {
-    let initialBalance: Int
-    let transactions: [AppTransaction]
-    let transactionIndex: Int
-    let visitVM: VisitVM?
-    let visitVMById: [Int: VisitVM]
-    let refreshTrigger: Int
-    
-    private var sessionsUsed: Int {
-        // Если есть детали визита, берем количество сеансов из них
-        if let visit = visitVM, let sessionsCount = visit.sessionsCount {
-            return sessionsCount
-        }
-        // По умолчанию считаем 1 сеанс на транзакцию
-        return 1
-    }
-    
-                private var balanceBefore: Int {
-                // Рассчитываем баланс до этой транзакции
-                // Начинаем с начального баланса и вычитаем все списания до этой транзакции
-                var balance = initialBalance
-                // Вычитаем сеансы из всех транзакций до текущей
-                for i in 0..<transactionIndex {
-                    // Используем реальное количество сеансов из visitVMById
-                    let transaction = transactions[i]
-                    let visitVM = visitVMById[transaction.visitId]
-                    balance -= (visitVM?.sessionsCount ?? 1)
-                }
-                return balance
+// MARK: - Helper Functions
+extension AbonementDetailView {
+    private func parseServicesFromBalanceString(_ balanceString: String) -> [ServiceInfo] {
+        var services: [ServiceInfo] = []
+        
+        // Разбиваем строку по запятым
+        let components = balanceString.components(separatedBy: ", ")
+        
+        for component in components {
+            let trimmed = component.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Ищем количество в скобках (x5)
+            let countPattern = "\\(x(\\d+)\\)"
+            let countRegex = try! NSRegularExpression(pattern: countPattern)
+            let countMatches = countRegex.matches(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed))
+            
+            var count = 1
+            var serviceName = trimmed
+            
+            if let match = countMatches.first {
+                let countRange = Range(match.range(at: 1), in: trimmed)!
+                count = Int(trimmed[countRange]) ?? 1
+                serviceName = trimmed.replacingOccurrences(of: countPattern, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
             }
-    
-    private var balanceAfter: Int {
-        // Баланс после этой транзакции - списываем реальное количество сеансов
-        return balanceBefore - sessionsUsed
-    }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text("\(balanceBefore)")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
             
-            Text("→")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Text("\(balanceAfter)")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
+            // Пропускаем пустые названия
+            if !serviceName.isEmpty {
+                // Если это раздел, показываем конкретные услуги
+                if serviceName == "Разминания" {
+                    // Добавляем конкретные услуги разминания
+                    let massageServices = [
+                        "Разминание головы",
+                        "Разминание шеи", 
+                        "Разминание плеч",
+                        "Разминание спины",
+                        "Разминание рук",
+                        "Разминание ног",
+                        "Разминание стоп"
+                    ]
+                    
+                    // Добавляем услуги в зависимости от количества
+                    for i in 0..<min(count, massageServices.count) {
+                        services.append(ServiceInfo(name: massageServices[i], count: 1))
+                    }
+                } else if serviceName == "SPA процедуры" {
+                    // Добавляем конкретные SPA услуги
+                    let spaServices = [
+                        "SPA-массаж",
+                        "Ароматерапия",
+                        "Гидромассаж",
+                        "Талассотерапия"
+                    ]
+                    
+                    for i in 0..<min(count, spaServices.count) {
+                        services.append(ServiceInfo(name: spaServices[i], count: 1))
+                    }
+                } else {
+                    // Для других услуг оставляем как есть
+                    services.append(ServiceInfo(name: serviceName, count: count))
+                }
+            }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-        .frame(maxHeight: .infinity, alignment: .center)
-
+        
+        return services
     }
 }
+
+struct ServiceInfo {
+    let name: String
+    let count: Int
+}
+
+
+
+
+
 
 
