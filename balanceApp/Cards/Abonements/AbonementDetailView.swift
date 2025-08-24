@@ -187,10 +187,23 @@ struct AbonementDetailView: View {
                 
                 // Секция с услугами абонемента
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Услуги абонемента")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                    HStack {
+                        Text("Услуги абонемента")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        // Показываем общее количество использованных сеансов
+                        let totalUsedSessions = getTotalUsedSessions()
+                        if totalUsedSessions > 0 {
+                            Text("Использовано: \(totalUsedSessions)")
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                        }
+                    }
                     
 
                     
@@ -816,12 +829,8 @@ struct AbonementDetailView: View {
         
         var usedCount = 0
         for transaction in transactions {
-            print("🔍 Processing transaction \(transaction.id) for service: \(serviceName)")
-            
             // Используем данные из visitVMById как основной источник
             if let visitVM = visitVMById[transaction.visitId] {
-                print("📋 Visit VM: serviceTitle=\(visitVM.serviceTitle ?? "nil"), sessionsCount=\(visitVM.sessionsCount ?? 0)")
-                
                 // Проверяем несколько источников названия услуги
                 let possibleServiceTitles = [
                     visitVM.serviceTitle,
@@ -829,13 +838,9 @@ struct AbonementDetailView: View {
                     transaction.visitDetails?.serviceTitle
                 ].compactMap { $0 }
                 
-                print("🔍 Possible service titles: \(possibleServiceTitles)")
-                
                 for serviceTitle in possibleServiceTitles {
                     let normalizedServiceName = serviceName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                     let normalizedServiceTitle = serviceTitle.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                    
-                    print("🔄 Comparing: '\(normalizedServiceName)' with '\(normalizedServiceTitle)'")
                     
                     // Проверяем точное совпадение или если название услуги содержит ключевые слова
                     if normalizedServiceTitle == normalizedServiceName ||
@@ -843,18 +848,29 @@ struct AbonementDetailView: View {
                        normalizedServiceName.contains(normalizedServiceTitle) {
                         let sessionsUsed = visitVM.sessionsCount ?? 1
                         usedCount += sessionsUsed
-                        print("✅ Match found! Adding \(sessionsUsed) sessions. Total: \(usedCount)")
                         break
-                    } else {
-                        print("❌ No match")
                     }
                 }
-            } else {
-                print("❌ No visit VM for transaction \(transaction.id)")
             }
         }
         
         return usedCount
+    }
+    
+    private func getTotalUsedSessions() -> Int {
+        // Проверяем, загружены ли транзакции
+        guard let transactions = abonement.transactions, !transactions.isEmpty else { 
+            return 0 
+        }
+        
+        var totalUsed = 0
+        for transaction in transactions {
+            if let visitVM = visitVMById[transaction.visitId] {
+                totalUsed += visitVM.sessionsCount ?? 1
+            }
+        }
+        
+        return totalUsed
     }
 }
 
@@ -881,9 +897,24 @@ struct ServiceRow: View {
             
             Spacer()
             
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
-                .font(.title3)
+            // Вместо галочки показываем количество использованных сеансов
+            if usedSessionsCount > 0 {
+                Text("\(usedSessionsCount)")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .frame(width: 28, height: 28)
+                    .background(Color.blue)
+                    .clipShape(Circle())
+            } else {
+                Text("0")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.gray)
+                    .frame(width: 28, height: 28)
+                    .background(Color.gray.opacity(0.2))
+                    .clipShape(Circle())
+            }
         }
         .padding()
         .background(Color.white)
@@ -905,11 +936,8 @@ struct ServiceRow: View {
     }
     
     private func formatServiceCount(_ count: Int, serviceType: String) -> String {
-        // Показываем количество использованных сеансов
-        if usedSessionsCount > 0 {
-            return "Использовано: \(usedSessionsCount)"
-        }
-        return ""
+        // Показываем общее количество сеансов в абонементе
+        return "\(count) \(pluralizeSessions(count: count))"
     }
     
     private func pluralizeSessions(count: Int) -> String {
