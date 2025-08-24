@@ -84,7 +84,7 @@ class AbonementViewModel: ObservableObject {
         guard let url = URL(string: urlString) else {
             return
         }
-        
+         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

@@ -10,6 +10,7 @@ struct AbonementDetailView: View {
     @State private var recordIdByVisitId: [Int: Int] = [:]
     @State private var companyIdByVisitId: [Int: Int] = [:]
     @State private var refreshTrigger = 0
+    @State private var selectedService: ServiceInfo? = nil
     
     // Для загрузки изображения абонемента
     @EnvironmentObject var imageCache: ImageCache
@@ -124,7 +125,7 @@ struct AbonementDetailView: View {
                                         .animation(.easeInOut(duration: 0.35), value: isImageLoaded)
                                         .onAppear { isImageLoaded = true }
                                 } else {
-                                    ProgressView()
+                                    ProgressView() 
                                         .onAppear {
                                             imageCache.loadImage(from: url) { image in
                                                 self.loadedImage = image
@@ -223,7 +224,10 @@ struct AbonementDetailView: View {
                                     sessionsCount: service.count,
                                     serviceType: service.name,
                                     categoryTitle: service.name,
-                                    usedSessionsCount: getUsedSessionsCount(for: service.name)
+                                    usedSessionsCount: getUsedSessionsCount(for: service.name),
+                                    onTap: {
+                                        selectedService = service
+                                    }
                                 )
                             }
                         }
@@ -240,7 +244,10 @@ struct AbonementDetailView: View {
                                         sessionsCount: link.count,
                                         serviceType: link.service!.title,
                                         categoryTitle: link.service!.title,
-                                        usedSessionsCount: getUsedSessionsCount(for: link.service!.title)
+                                        usedSessionsCount: getUsedSessionsCount(for: link.service!.title),
+                                        onTap: {
+                                            selectedService = ServiceInfo(name: link.service!.title, count: link.count)
+                                        }
                                     )
                                 }
                             }
@@ -252,7 +259,10 @@ struct AbonementDetailView: View {
                                     sessionsCount: unitedBalance,
                                     serviceType: abonement.type.title,
                                     categoryTitle: abonement.type.title,
-                                    usedSessionsCount: getUsedSessionsCount(for: abonement.type.title)
+                                    usedSessionsCount: getUsedSessionsCount(for: abonement.type.title),
+                                    onTap: {
+                                        selectedService = ServiceInfo(name: abonement.type.title, count: unitedBalance)
+                                    }
                                 )
                             } else {
                                 Text("Информация об услугах недоступна")
@@ -267,7 +277,10 @@ struct AbonementDetailView: View {
                             sessionsCount: unitedBalance,
                             serviceType: abonement.type.title,
                             categoryTitle: abonement.type.title,
-                            usedSessionsCount: getUsedSessionsCount(for: abonement.type.title)
+                            usedSessionsCount: getUsedSessionsCount(for: abonement.type.title),
+                            onTap: {
+                                selectedService = ServiceInfo(name: abonement.type.title, count: unitedBalance)
+                            }
                         )
                     } else {
                         Text("Информация об услугах недоступна")
@@ -411,6 +424,13 @@ struct AbonementDetailView: View {
             }
             .onAppear { ensureVisitLoaded(vid) }
             .onChange(of: visitVMById[vid] != nil) { _ in /* trigger rebuild */ }
+        }
+        .sheet(item: $selectedService) { service in
+            AbonementServiceDetailView(
+                serviceName: service.name,
+                sessionsCount: service.count,
+                usedSessionsCount: getUsedSessionsCount(for: service.name)
+            )
         }
     }
     
@@ -881,48 +901,52 @@ struct ServiceRow: View {
     let serviceType: String
     let categoryTitle: String?
     let usedSessionsCount: Int
+    let onTap: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(getServiceTitle(serviceNumber: serviceNumber, serviceType: serviceType, categoryTitle: categoryTitle))
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
+        Button(action: onTap) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(getServiceTitle(serviceNumber: serviceNumber, serviceType: serviceType, categoryTitle: categoryTitle))
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    Text(formatServiceCount(sessionsCount, serviceType: serviceType))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 
-                Text(formatServiceCount(sessionsCount, serviceType: serviceType))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Spacer()
+                
+                // Вместо галочки показываем количество использованных сеансов
+                if usedSessionsCount > 0 {
+                    Text("\(usedSessionsCount)")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 28, height: 28)
+                        .background(Color.blue)
+                        .clipShape(Circle())
+                } else {
+                    Text("0")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.gray)
+                        .frame(width: 28, height: 28)
+                        .background(Color.gray.opacity(0.2))
+                        .clipShape(Circle())
+                }
             }
-            
-            Spacer()
-            
-            // Вместо галочки показываем количество использованных сеансов
-            if usedSessionsCount > 0 {
-                Text("\(usedSessionsCount)")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(width: 28, height: 28)
-                    .background(Color.blue)
-                    .clipShape(Circle())
-            } else {
-                Text("0")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.gray)
-                    .frame(width: 28, height: 28)
-                    .background(Color.gray.opacity(0.2))
-                    .clipShape(Circle())
-            }
+            .padding()
+            .background(Color.white)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+            )
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-        )
+        .buttonStyle(PlainButtonStyle())
     }
     
     private func getServiceTitle(serviceNumber: Int, serviceType: String, categoryTitle: String?) -> String {
@@ -1213,9 +1237,340 @@ extension AbonementDetailView {
     }
 }
 
-struct ServiceInfo {
+struct ServiceInfo: Identifiable {
+    let id = UUID()
     let name: String
     let count: Int
+}
+
+// MARK: - Service Detail View
+struct AbonementServiceDetailView: View {
+    let serviceName: String
+    let sessionsCount: Int
+    let usedSessionsCount: Int
+    @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.colorScheme) var colorScheme
+    @State private var serviceImageUrl: String? = nil
+    @State private var loadedImage: UIImage? = nil
+    @State private var isLoadingImage = false
+    
+    private var cardWidth: CGFloat {
+        UIScreen.main.bounds.width - 32
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Изображение услуги
+                    ZStack {
+                        if let image = loadedImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: cardWidth, height: 250)
+                                .clipped()
+                        } else if isLoadingImage {
+                            ProgressView()
+                                .frame(width: cardWidth, height: 250)
+                        } else {
+                            Color.gray.opacity(0.2)
+                                .frame(width: cardWidth, height: 250)
+                        }
+                    }
+                    .frame(width: cardWidth, height: 250)
+                    .clipped()
+                    .cornerRadius(12)
+                    
+                    // Основная информация
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(serviceName)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Длительность: \(getServiceDuration(serviceName))")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("Количество сеансов: \(sessionsCount)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            if usedSessionsCount > 0 {
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text("Использовано")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    Text("\(usedSessionsCount)")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    
+                    // Подробное описание
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Описание услуги")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Text(getDetailedServiceDescription(serviceName))
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .lineSpacing(6)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    
+                    // Показания и противопоказания
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Показания и рекомендации")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            ServiceInfoRow(title: "Показания", value: getServiceIndications(serviceName))
+                            ServiceInfoRow(title: "Противопоказания", value: getServiceContraindications(serviceName))
+                            ServiceInfoRow(title: "Рекомендации", value: getServiceRecommendations(serviceName))
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    
+                    // Техники и особенности
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Техники и особенности")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Text(getServiceTechniques(serviceName))
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .lineSpacing(4)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .padding()
+            }
+            .navigationTitle("Детали услуги")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .navigationBarItems(
+                leading: Button(action: {
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    HStack {
+                        Image(systemName: "chevron.left")
+                        Text("Назад")
+                    }
+                }
+            )
+        }
+        .onAppear {
+            loadServiceImage()
+        }
+    }
+    
+    private func loadServiceImage() {
+        Task {
+            let imageUrl = await getServiceImageUrl(serviceName)
+            await MainActor.run {
+                serviceImageUrl = imageUrl
+                if let url = imageUrl {
+                    loadImage(from: url)
+                }
+            }
+        }
+    }
+    
+    private func loadImage(from urlString: String) {
+        isLoadingImage = true
+        // Здесь можно добавить кэширование изображений, как в ServicesView
+        guard let url = URL(string: urlString) else {
+            isLoadingImage = false
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            DispatchQueue.main.async {
+                isLoadingImage = false
+                if let data = data, let image = UIImage(data: data) {
+                    self.loadedImage = image
+                }
+            }
+        }.resume()
+    }
+    
+    private func getServiceImageUrl(_ serviceName: String) async -> String? {
+        // Здесь можно добавить логику получения URL изображения из Firebase, как в ServicesView
+        // Пока возвращаем nil для использования placeholder
+        return nil
+    }
+    
+    private func getDetailedServiceDescription(_ serviceName: String) -> String {
+        switch serviceName {
+        case "Разминание головы":
+            return "Профессиональный массаж головы - это комплексная процедура, направленная на глубокое расслабление мышц головы, лица и шеи. Наши специалисты используют специальные техники, которые помогают снять напряжение, улучшить кровообращение и лимфоток в области головы.\n\nМассаж включает работу с височными мышцами, лобной областью, затылочной частью и шейно-воротниковой зоной. Это помогает не только расслабиться, но и улучшить концентрацию внимания, снять головную боль и мигрень, а также нормализовать сон."
+        case "Разминание шеи":
+            return "Специализированный массаж шейно-воротниковой зоны - это целенаправленная работа с мышцами шеи, плеч и верхней части спины. Данная процедура особенно эффективна для людей, ведущих малоподвижный образ жизни или работающих за компьютером.\n\nМассаж включает глубокую проработку трапециевидных мышц, лестничных мышц и мышц-разгибателей шеи. Это помогает устранить мышечные зажимы, улучшить подвижность шейного отдела позвоночника, снять напряжение и предотвратить развитие остеохондроза."
+        case "Разминание плеч":
+            return "Массаж плечевого пояса направлен на расслабление и восстановление мышц плеч, верхней части спины и рук. Эта процедура особенно полезна после физических нагрузок, спортивных тренировок или длительной работы в статичном положении.\n\nСпециалист прорабатывает дельтовидные мышцы, трапециевидные мышцы и мышцы-вращатели плеча. Массаж помогает снять мышечное напряжение, улучшить кровообращение, восстановить подвижность суставов и предотвратить развитие болевого синдрома."
+        case "Разминание спины":
+            return "Комплексный массаж спины - это полноценная процедура, охватывающая всю поверхность спины от шеи до поясницы. Наши специалисты используют различные техники массажа, адаптированные под индивидуальные потребности клиента.\n\nМассаж включает работу с поверхностными и глубокими мышцами спины, межреберными мышцами и мышцами-разгибателями позвоночника. Это помогает снять боль и напряжение, улучшить осанку, укрепить мышечный корсет и восстановить подвижность позвоночника."
+        case "Разминание рук":
+            return "Массаж рук от плеч до кистей - это комплексная процедура, направленная на расслабление и восстановление мышц верхних конечностей. Массаж особенно эффективен после физических нагрузок, спортивных тренировок или длительной работы руками.\n\nПроцедура включает проработку мышц плеч, предплечий и кистей. Специалист использует различные техники для улучшения кровообращения, снятия мышечного напряжения, восстановления подвижности суставов и снятия усталости."
+        case "Разминание ног":
+            return "Массаж ног - это комплексная процедура, охватывающая мышцы бедер, голеней и стоп. Данный вид массажа особенно полезен после физических нагрузок, длительной ходьбы или стоячей работы.\n\nМассаж включает проработку квадрицепсов, икроножных мышц, мышц стопы и голени. Это помогает снять усталость, улучшить кровообращение, восстановить мышечный тонус и предотвратить развитие варикозной болезни."
+        case "Разминание стоп":
+            return "Специализированный массаж стоп - это процедура, направленная на расслабление и восстановление мышц стопы, улучшение кровообращения и лимфотока. Массаж стоп особенно эффективен для снятия усталости и напряжения.\n\nПроцедура включает работу с подошвенной поверхностью стопы, пальцами ног и голеностопным суставом. Специалист использует техники рефлексотерапии, воздействуя на активные точки стопы, что помогает улучшить работу внутренних органов и снять общее напряжение."
+        case "Классический массаж лица":
+            return "Профессиональный массаж лица - это процедура, направленная на улучшение кровообращения, лимфотока и тонуса кожи лица. Массаж помогает сохранить молодость и красоту кожи, а также снять напряжение с мимических мышц.\n\nПроцедура включает работу с лобными, височными, скуловыми мышцами и мышцами вокруг глаз и рта. Специалист использует специальные техники, которые помогают разгладить морщины, улучшить цвет лица, снять отечность и повысить эластичность кожи."
+        case "Детский оздоровительный (30 мин)":
+            return "Специально разработанный массаж для детей направлен на укрепление иммунитета, улучшение сна и общего самочувствия ребенка. Процедура адаптирована под возрастные особенности детского организма.\n\nМассаж включает мягкие, щадящие техники, направленные на расслабление мышц, улучшение кровообращения и лимфотока. Это помогает укрепить иммунную систему, нормализовать сон, улучшить аппетит и общее самочувствие ребенка."
+        case "Антицел бёдер":
+            return "Специализированный антицеллюлитный массаж области бедер направлен на борьбу с целлюлитом и улучшение состояния кожи. Процедура включает техники лимфодренажа и антицеллюлитного массажа.\n\nМассаж включает глубокую проработку подкожной жировой клетчатки, улучшение лимфотока и кровообращения. Это помогает уменьшить проявления целлюлита, улучшить тонус кожи, вывести лишнюю жидкость и токсины из организма."
+        case "Антицел живота":
+            return "Антицеллюлитный массаж области живота направлен на улучшение кровообращения, лимфотока и уменьшение жировых отложений в области живота. Процедура помогает подтянуть кожу и улучшить ее тонус.\n\nМассаж включает работу с мышцами живота, подкожной жировой клетчаткой и кожей. Специалист использует специальные техники, которые помогают активизировать обменные процессы, улучшить кровообращение и лимфоток, что способствует уменьшению жировых отложений."
+        case "Антицел рук":
+            return "Антицеллюлитный массаж рук направлен на улучшение тонуса кожи, кровообращения и уменьшение жировых отложений в области рук. Процедура помогает подтянуть кожу и улучшить ее состояние.\n\nМассаж включает проработку мышц плеч, предплечий и кистей, а также подкожной жировой клетчатки. Специалист использует техники, которые помогают активизировать обменные процессы, улучшить кровообращение и лимфоток, что способствует уменьшению жировых отложений и улучшению тонуса кожи."
+        default:
+            return "Профессиональная услуга, выполняемая опытными специалистами с использованием современных техник и качественных материалов. Наши мастера имеют многолетний опыт работы и регулярно повышают свою квалификацию.\n\nКаждая процедура адаптируется под индивидуальные потребности клиента, учитывая его состояние здоровья, возраст и пожелания. Мы используем только качественные материалы и современное оборудование для достижения максимального эффекта."
+        }
+    }
+    
+    private func getServiceDuration(_ serviceName: String) -> String {
+        switch serviceName {
+        case "Детский оздоровительный (30 мин)":
+            return "30 минут"
+        default:
+            return "45-60 минут"
+        }
+    }
+    
+    private func getServiceIndications(_ serviceName: String) -> String {
+        switch serviceName {
+        case "Разминание головы":
+            return "Головные боли, мигрень, стресс, бессонница, напряжение в области головы и шеи, усталость глаз, нарушение концентрации внимания."
+        case "Разминание шеи":
+            return "Боли в шее и плечах, остеохондроз шейного отдела, напряжение мышц, нарушение подвижности шеи, головные боли, связанные с напряжением мышц шеи."
+        case "Разминание плеч":
+            return "Боли в плечах, напряжение мышц плечевого пояса, последствия травм, спортивные нагрузки, длительная работа в статичном положении."
+        case "Разминание спины":
+            return "Боли в спине, остеохондроз, сколиоз, нарушение осанки, мышечное напряжение, последствия травм, сидячая работа."
+        case "Разминание рук":
+            return "Усталость рук, напряжение мышц, последствия физических нагрузок, спортивные травмы, длительная работа руками."
+        case "Разминание ног":
+            return "Усталость ног, отеки, варикозная болезнь, последствия физических нагрузок, длительная ходьба или стоячая работа."
+        case "Разминание стоп":
+            return "Усталость стоп, плоскостопие, отеки, нарушение кровообращения, стресс, общее напряжение."
+        case "Классический массаж лица":
+            return "Старение кожи, морщины, отечность, нарушение кровообращения, стресс, напряжение мимических мышц."
+        case "Детский оздоровительный (30 мин)":
+            return "Сниженный иммунитет, нарушение сна, плохой аппетит, гиперактивность, стресс, общее недомогание."
+        case "Антицел бёдер", "Антицел живота", "Антицел рук":
+            return "Целлюлит, дряблость кожи, нарушение кровообращения, лишний вес, отеки, нарушение лимфотока."
+        default:
+            return "Общее напряжение, стресс, усталость, нарушение кровообращения, мышечные боли."
+        }
+    }
+    
+    private func getServiceContraindications(_ serviceName: String) -> String {
+        switch serviceName {
+        case "Разминание головы", "Разминание шеи", "Разминание плеч", "Разминание спины":
+            return "Острые воспалительные процессы, высокая температура, онкологические заболевания, тромбоз, острые травмы, кожные заболевания в области массажа."
+        case "Разминание рук", "Разминание ног", "Разминание стоп":
+            return "Острые воспалительные процессы, тромбофлебит, варикоз в стадии обострения, острые травмы, кожные заболевания."
+        case "Классический массаж лица":
+            return "Острые воспалительные процессы на коже лица, акне в стадии обострения, герпес, аллергические реакции, повреждения кожи."
+        case "Детский оздоровительный (30 мин)":
+            return "Острые инфекционные заболевания, высокая температура, кожные заболевания, острые травмы, индивидуальная непереносимость."
+        case "Антицел бёдер", "Антицел живота", "Антицел рук":
+            return "Острые воспалительные процессы, тромбофлебит, варикоз в стадии обострения, кожные заболевания, беременность, менструация."
+        default:
+            return "Острые воспалительные процессы, высокая температура, онкологические заболевания, острые травмы, кожные заболевания."
+        }
+    }
+    
+    private func getServiceRecommendations(_ serviceName: String) -> String {
+        switch serviceName {
+        case "Разминание головы", "Разминание шеи", "Разминание плеч":
+            return "Рекомендуется курс из 10-15 процедур для достижения стойкого эффекта. Лучше проводить в вечернее время для расслабления."
+        case "Разминание спины":
+            return "Рекомендуется курс из 10-15 процедур. Сочетайте с лечебной физкультурой и правильной осанкой для максимального эффекта."
+        case "Разминание рук", "Разминание ног", "Разминание стоп":
+            return "Рекомендуется после физических нагрузок или длительной работы. Курс из 8-12 процедур для профилактики."
+        case "Классический массаж лица":
+            return "Рекомендуется курс из 10-15 процедур для достижения видимого эффекта. Сочетайте с правильным уходом за кожей."
+        case "Детский оздоровительный (30 мин)":
+            return "Рекомендуется курс из 10-15 процедур для укрепления иммунитета. Лучше проводить в первой половине дня."
+        case "Антицел бёдер", "Антицел живота", "Антицел рук":
+            return "Рекомендуется курс из 15-20 процедур для достижения максимального эффекта. Сочетайте с правильным питанием и физическими упражнениями."
+        default:
+            return "Рекомендуется консультация со специалистом для подбора оптимального курса и частоты процедур."
+        }
+    }
+    
+    private func getServiceTechniques(_ serviceName: String) -> String {
+        switch serviceName {
+        case "Разминание головы":
+            return "Используются техники поглаживания, растирания, разминания и вибрации. Специалист работает с височными, лобными и затылочными мышцами, применяя точечное воздействие на активные точки головы."
+        case "Разминание шеи":
+            return "Применяются техники классического массажа: поглаживание, растирание, разминание, вибрация. Особое внимание уделяется трапециевидным мышцам и мышцам-разгибателям шеи."
+        case "Разминание плеч":
+            return "Используются техники глубокого разминания, растирания и вибрации. Прорабатываются дельтовидные мышцы, трапециевидные мышцы и мышцы-вращатели плеча."
+        case "Разминание спины":
+            return "Применяются все основные техники классического массажа: поглаживание, растирание, разминание, вибрация, поколачивание. Работа ведется с поверхностными и глубокими мышцами спины."
+        case "Разминание рук":
+            return "Используются техники поглаживания, растирания, разминания и вибрации. Прорабатываются мышцы плеч, предплечий и кистей с учетом анатомических особенностей."
+        case "Разминание ног":
+            return "Применяются техники классического массажа с акцентом на квадрицепсы, икроножные мышцы и мышцы стопы. Используются приемы лимфодренажа для улучшения кровообращения."
+        case "Разминание стоп":
+            return "Используются техники рефлексотерапии, точечного массажа и классического массажа. Особое внимание уделяется активным точкам стопы и подошвенной поверхности."
+        case "Классический массаж лица":
+            return "Применяются мягкие техники поглаживания, растирания и разминания. Работа ведется по массажным линиям лица с учетом анатомии мимических мышц."
+        case "Детский оздоровительный (30 мин)":
+            return "Используются мягкие, щадящие техники поглаживания и легкого растирания. Массаж адаптирован под возрастные особенности детского организма."
+        case "Антицел бёдер", "Антицел живота", "Антицел рук":
+            return "Применяются специальные техники антицеллюлитного массажа: глубокое разминание, растирание, лимфодренаж. Работа ведется с подкожной жировой клетчаткой и кожей."
+        default:
+            return "Используются классические техники массажа, адаптированные под индивидуальные потребности клиента и особенности конкретной процедуры."
+        }
+    }
+}
+
+struct ServiceInfoRow: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.body)
+                .foregroundColor(.primary)
+        }
+    }
 }
 
 
