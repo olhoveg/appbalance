@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import FirebaseDatabase
 
 struct AbonementDetailView: View {
     @State var abonement: Abonement
@@ -1402,27 +1403,69 @@ struct AbonementServiceDetailView: View {
     }
     
     private func loadImage(from urlString: String) {
-        isLoadingImage = true
-        // Здесь можно добавить кэширование изображений, как в ServicesView
-        guard let url = URL(string: urlString) else {
-            isLoadingImage = false
+        guard !urlString.isEmpty else { return }
+        
+        // Проверяем кэш
+        if let cached = ServicesImageCache.shared.cachedImages[urlString]?.image {
+            self.loadedImage = cached
             return
         }
         
-        URLSession.shared.dataTask(with: url) { data, response, error in
+        isLoadingImage = true
+        ServicesImageCache.shared.loadImage(from: urlString) { image in
             DispatchQueue.main.async {
-                isLoadingImage = false
-                if let data = data, let image = UIImage(data: data) {
-                    self.loadedImage = image
-                }
+                self.loadedImage = image
+                self.isLoadingImage = false
             }
-        }.resume()
+        }
     }
     
     private func getServiceImageUrl(_ serviceName: String) async -> String? {
-        // Здесь можно добавить логику получения URL изображения из Firebase, как в ServicesView
-        // Пока возвращаем nil для использования placeholder
-        return nil
+        await withCheckedContinuation { continuation in
+            let dataRef = Database.database().reference(withPath: "services")
+            dataRef.observeSingleEvent(of: .value, with: { snapshot in
+                var imageUrl: String? = nil
+                
+                // Создаем маппинг названий услуг для более точного сопоставления
+                let serviceMapping: [String: [String]] = [
+                    "Разминание головы": ["Разминание головы", "Массаж головы", "Головной массаж"],
+                    "Разминание шеи": ["Разминание шеи", "Массаж шеи", "Шейный массаж"],
+                    "Разминание плеч": ["Разминание плеч", "Массаж плеч", "Плечевой массаж"],
+                    "Разминание спины": ["Разминание спины", "Массаж спины", "Спинной массаж"],
+                    "Разминание рук": ["Разминание рук", "Массаж рук", "Ручной массаж"],
+                    "Разминание ног": ["Разминание ног", "Массаж ног", "Ножной массаж"],
+                    "Разминание стоп": ["Разминание стоп", "Массаж стоп", "Стопный массаж"],
+                    "Классический массаж лица": ["Классический массаж лица", "Массаж лица", "Лицевой массаж"],
+                    "Детский оздоровительный (30 мин)": ["Детский оздоровительный", "Детский массаж", "Детский оздоровительный (30 мин)"],
+                    "Антицел бёдер": ["Антицеллюлитный массаж бедер", "Антицел бёдер", "Антицеллюлитный массаж"],
+                    "Антицел живота": ["Антицеллюлитный массаж живота", "Антицел живота", "Антицеллюлитный массаж"],
+                    "Антицел рук": ["Антицеллюлитный массаж рук", "Антицел рук", "Антицеллюлитный массаж"]
+                ]
+                
+                // Получаем возможные названия для данной услуги
+                let possibleNames = serviceMapping[serviceName] ?? [serviceName]
+                
+                for child in snapshot.children.allObjects as? [DataSnapshot] ?? [] {
+                    if let childData = child.value as? [String: Any],
+                       let childTitle = childData["title"] as? String,
+                       let img = childData["imageUrl"] as? String {
+                        
+                        // Проверяем точное совпадение или совпадение с возможными названиями
+                        if possibleNames.contains(childTitle) || childTitle.contains(serviceName) || serviceName.contains(childTitle) {
+                            imageUrl = img
+                            print("Found image for \(serviceName) with title: \(childTitle)")
+                            break
+                        }
+                    }
+                }
+                
+                print("Fetched imageUrl for \(serviceName): \(imageUrl ?? "nil")")
+                continuation.resume(returning: imageUrl)
+            }, withCancel: { error in
+                print("Error fetching image by service title: \(error)")
+                continuation.resume(returning: nil)
+            })
+        }
     }
     
     private func getDetailedServiceDescription(_ serviceName: String) -> String {
