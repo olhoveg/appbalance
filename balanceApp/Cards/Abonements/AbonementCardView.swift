@@ -57,7 +57,7 @@ struct AbonementCardView: View {
                         }
                     }
                 }
-                .frame(height: 200)
+                .frame(height: 240)
                 .clipped()
 
                 // Номер абонемента – поверх изображения

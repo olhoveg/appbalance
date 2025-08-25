@@ -100,11 +100,11 @@ struct BalanceBlockView: View {
                         .padding(.trailing, 8)
                     Text("Личный счет: \(viewModel.balance) ₽")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.black)
+                        .foregroundColor(.primary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Color.white)
+                .background(Color(.systemBackground))
                 .cornerRadius(20)
                 .padding(.top, 10)
                 .padding(.horizontal, 10)

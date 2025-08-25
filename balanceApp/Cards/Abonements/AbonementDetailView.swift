@@ -138,7 +138,7 @@ struct AbonementDetailView: View {
                                 }
                             }
                         }
-                        .frame(height: 200)
+                        .frame(height: 240)
                         .clipped()
                         
                         // Номер абонемента
@@ -940,11 +940,11 @@ struct ServiceRow: View {
                 }
             }
             .padding()
-            .background(Color.white)
+            .background(Color(.systemBackground))
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    .stroke(Color(.separator), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -1065,11 +1065,11 @@ struct AbonementTransactionRow: View {
         }
         .buttonStyle(PlainButtonStyle())
         .padding()
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                .stroke(Color(.separator), lineWidth: 1)
         )
     }
     

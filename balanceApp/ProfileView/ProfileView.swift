@@ -66,7 +66,7 @@ struct ProfileView: View {
                                     .aspectRatio(contentMode: .fill)
                                     .frame(width: 120, height: 120)
                                     .foregroundColor(.blue)
-                                    .background(Color.white)
+                                    .background(Color(.systemBackground))
                                     .clipShape(Circle())
                                     .overlay(Circle().stroke(Color.blue, lineWidth: 3))
                             }
