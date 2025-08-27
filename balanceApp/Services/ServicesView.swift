@@ -463,8 +463,7 @@ struct VerticalServicesView: View {
     @State private var searchDebounceWorkItem: DispatchWorkItem?
 
     var body: some View {
-        NavigationView {
-            List {
+        List {
                 // Сегментированный контроль сортировки
                 if isSearchPresented {
                     Picker("Сортировка", selection: $selectedSortOption) {
@@ -521,7 +520,6 @@ struct VerticalServicesView: View {
             .task {
                 await viewModel.fetchServices()
             }
-        }
     }
 
     private var filteredAndSortedServices: [VerticalServiceBlockModel] {

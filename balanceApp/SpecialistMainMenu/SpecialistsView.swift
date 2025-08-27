@@ -270,8 +270,7 @@ struct SpecialistsView: View {
     @State private var selectedExpert: Expert?
     
     var body: some View {
-        NavigationView {
-            ScrollView {
+        ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(viewModel.experts) { expert in
                         HStack(spacing: 16) {
@@ -314,7 +313,6 @@ struct SpecialistsView: View {
             .sheet(item: $selectedExpert) { expert in
                 SpecialistsDetailView(expert: expert, viewModel: viewModel)
             }
-        }
     }
     
     

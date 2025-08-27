@@ -35,6 +35,10 @@ class BalanceBlockViewModel: ObservableObject {
             return
         }
 
+        // Сбрасываем состояние перед загрузкой
+        balance = 0
+        balanceLoaded = false
+
         let companyId = "415038"
         let accessToken = "88fnh8jbmt44er5y28nj"
         let accessUserToken = "9d241fb00061c17a5e2e76a23b214b20"
@@ -59,6 +63,11 @@ class BalanceBlockViewModel: ObservableObject {
                 print("Ошибка при получении баланса: \(error.localizedDescription)")
             }
         }
+    }
+    
+    func resetBalance() {
+        balance = 0
+        balanceLoaded = false
     }
 
     private func fetchBalance(chainId: String, phone: String, accessToken: String, accessUserToken: String) async throws -> Int {

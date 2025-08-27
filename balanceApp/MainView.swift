@@ -20,79 +20,75 @@ struct MainView: View {
     @StateObject var storiesVM = StoriesViewModel()
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                CustomNavigationBar()
-                
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        // Stories остаются всегда
-                        StoriesView(viewModel: storiesVM)
-                        
-                        // Если пользователь не авторизован — показываем кнопку «Войти» и пропускаем блоки личного кабинета
-                        if userPhone.isEmpty {
-                            NavigationLink(destination: ProfileView()) {
-                                Text("Войти")
-                                    .font(.headline)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.accentColor)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(8)
-                            }
-                            .padding(.horizontal)
-                            .simultaneousGesture(TapGesture().onEnded {
-                                AppMetrica.reportEvent(name: "Пользователь нажал на кнопку 'Войти'")
-                            })
-                        } else {
-                            // Запись на солярий
-                            Button(action: {
-                                AppMetrica.reportEvent(name: "Пользователь нажал на кнопку 'Записаться'")
-                                selectedTab = .solarium
-                            }) {
-                                Text("Записаться")
-                                    .font(.headline)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(8)
-                            }
-                            .padding(.horizontal)
-                            
-                            // Личный блок
-                            RecordView(viewModel: recordViewModel)
-                            Divider()
-                            BalanceBlockView()
-                            Divider()
-                            LoyaltyBonusCardMainView(viewModel: bonusCardVM)
-                            Divider()
-                            LoyaltyAbonementMainView(viewModel: abonementVM)
-                            Divider()
-                            LoyaltyCertificateMainView(viewModel: certificateVM)
+        VStack(spacing: 0) {
+            CustomNavigationBar()
+            
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 20) {
+                    // Stories остаются всегда
+                    StoriesView(viewModel: storiesVM)
+                    
+                    // Если пользователь не авторизован — показываем кнопку «Войти» и пропускаем блоки личного кабинета
+                    if userPhone.isEmpty {
+                        NavigationLink(destination: ProfileView()) {
+                            Text("Войти")
+                                .font(.headline)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
                         }
+                        .padding(.horizontal)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            AppMetrica.reportEvent(name: "Пользователь нажал на кнопку 'Войти'")
+                        })
+                    } else {
+                        // Запись на солярий
+                        Button(action: {
+                            AppMetrica.reportEvent(name: "Пользователь нажал на кнопку 'Записаться'")
+                            selectedTab = .solarium
+                        }) {
+                            Text("Записаться")
+                                .font(.headline)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .padding(.horizontal)
                         
-                        // Рекомендации, услуги и статьи отображаются всегда
+                        // Личный блок
+                        RecordView(viewModel: recordViewModel)
                         Divider()
-                        RecommendationsBlockView()
+                        LoyaltyBonusCardMainView(viewModel: bonusCardVM)
+                        Divider()
+                        LoyaltyAbonementMainView(viewModel: abonementVM)
+                        Divider()
+                        LoyaltyCertificateMainView(viewModel: certificateVM)
                     }
-                    .padding(.vertical)
+                    
+                    // Рекомендации, услуги и статьи отображаются всегда
+                    Divider()
+                    RecommendationsBlockView()
                 }
-                .ignoresSafeArea(edges: .horizontal)
-                .refreshable {
-                    print("MainView: Refreshable вызван – обновляем данные всех блоков.")
-                    recordViewModel.refreshData()
-                    if !userPhone.isEmpty {
-                        bonusCardVM.refreshBonusCards(phone: userPhone)
-                        abonementVM.fetchAbonements(phone: userPhone)
-                        certificateVM.fetchCertificates(phone: userPhone)
-                        // Обновляем сторис
-                        storiesVM.fetchStories()
-                    }
+                .padding(.vertical)
+            }
+            .ignoresSafeArea(edges: .horizontal)
+            .refreshable {
+                print("MainView: Refreshable вызван – обновляем данные всех блоков.")
+                recordViewModel.refreshData()
+                if !userPhone.isEmpty {
+                    bonusCardVM.refreshBonusCards(phone: userPhone)
+                    abonementVM.fetchAbonements(phone: userPhone)
+                    certificateVM.fetchCertificates(phone: userPhone)
+                    // Обновляем сторис
+                    storiesVM.fetchStories()
                 }
             }
-            .navigationBarHidden(true)
         }
+        .navigationBarHidden(true)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 OneSignalService.shared.requestPermissionIfNeeded()
@@ -119,6 +115,8 @@ struct MainView: View {
 // MARK: - Кастомный NavigationBar
 struct CustomNavigationBar: View {
     @Environment(\.colorScheme) var colorScheme
+    @StateObject private var balanceViewModel = BalanceBlockViewModel()
+    @AppStorage("userPhone") var userPhone: String = ""
 
     var body: some View {
         HStack {
@@ -146,6 +144,23 @@ struct CustomNavigationBar: View {
             Spacer()
             
             HStack(spacing: 15) {
+                // Личный счет (только для авторизованных пользователей)
+                if !userPhone.isEmpty && balanceViewModel.balanceLoaded {
+                    HStack(spacing: 6) {
+                        Image(systemName: "creditcard.fill")
+                            .resizable()
+                            .frame(width: 16, height: 16)
+                            .foregroundColor(.accentColor)
+                        Text("\(balanceViewModel.balance) ₽")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                }
+                
                 Button(action: {
                     if let url = URL(string: "https://wa.me/79615805108") {
                         UIApplication.shared.open(url)
@@ -181,6 +196,18 @@ struct CustomNavigationBar: View {
         .padding(.vertical, 10)
         .background(colorScheme == .dark ? Color.black : Color.white)
         .shadow(color: colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .onAppear {
+            if !userPhone.isEmpty {
+                balanceViewModel.fetchData()
+            }
+        }
+        .onChange(of: userPhone) { newPhone in
+            if !newPhone.isEmpty {
+                balanceViewModel.fetchData()
+            } else {
+                balanceViewModel.resetBalance()
+            }
+        }
     }
 }
 
@@ -231,8 +258,6 @@ struct ArticleDetailView: View {
 
 struct MainView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationView {
-            MainView(selectedTab: .constant(.main))
-        }
+        MainView(selectedTab: .constant(.main))
     }
 }

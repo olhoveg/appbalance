@@ -459,31 +459,29 @@ struct SolariumView: View {
     @State private var alertMessage = ""
     
     var body: some View {
-        NavigationView {
-            Group {
-                if viewModel.selectedType == .none {
-                    startScreen
-                } else {
-                    bookingScreen
-                }
+        Group {
+            if viewModel.selectedType == .none {
+                startScreen
+            } else {
+                bookingScreen
             }
-            .navigationBarHidden(true)
-            .background(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white)
-            .alert(alertMessage, isPresented: $showAlert) {
-                Button("OK", role: .cancel) { }
+        }
+        .navigationBarHidden(true)
+        .background(colorScheme == .dark ? Color(UIColor.systemGray6) : Color.white)
+        .alert(alertMessage, isPresented: $showAlert) {
+            Button("OK", role: .cancel) { }
+        }
+        .confirmationDialog("Подтверждение записи", isPresented: $showConfirmationDialog, titleVisibility: .visible) {
+            Button("Да") {
+                handleBookingConfirmation()
             }
-            .confirmationDialog("Подтверждение записи", isPresented: $showConfirmationDialog, titleVisibility: .visible) {
-                Button("Да") {
-                    handleBookingConfirmation()
-                }
-                Button("Нет", role: .cancel) { }
-            } message: {
-                // Здесь добавляем сообщение с датой и временем записи
-                if let slot = pendingTimeSlot, let bookingDate = iso8601StringToDate(slot.dateTimeString) {
-                    Text("Запись на \(formattedDate(bookingDate)) в \(slot.displayTime)")
-                } else {
-                    Text("")
-                }
+            Button("Нет", role: .cancel) { }
+        } message: {
+            // Здесь добавляем сообщение с датой и временем записи
+            if let slot = pendingTimeSlot, let bookingDate = iso8601StringToDate(slot.dateTimeString) {
+                Text("Запись на \(formattedDate(bookingDate)) в \(slot.displayTime)")
+            } else {
+                Text("")
             }
         }
         .task { }

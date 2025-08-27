@@ -35,10 +35,9 @@ struct VideoLessonsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Кастомный NavigationBar
-                CustomVideoLessonsNavigationBar(userPhone: userPhone, viewModel: viewModel)
+        VStack(spacing: 0) {
+            // Кастомный NavigationBar
+            CustomVideoLessonsNavigationBar(userPhone: userPhone, viewModel: viewModel)
                 
                 VStack(spacing: 16) {
                     // Поиск
@@ -124,7 +123,6 @@ struct VideoLessonsView: View {
                 }
             }
             .navigationBarHidden(true)
-        }
         .onAppear {
             if !userPhone.isEmpty {
                 // Загружаем данные из Firebase
