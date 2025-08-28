@@ -137,30 +137,26 @@ struct CustomNavigationBar: View {
             
             Spacer()
             
-            Text("Главная")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(colorScheme == .dark ? .white : .black)
+            // Личный счет по центру (только для авторизованных пользователей)
+            if !userPhone.isEmpty && balanceViewModel.balanceLoaded {
+                HStack(spacing: 8) {
+                    Image(systemName: "creditcard.fill")
+                        .resizable()
+                        .frame(width: 18, height: 18)
+                        .foregroundColor(.accentColor)
+                    Text("\(balanceViewModel.balance) ₽")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(colorScheme == .dark ? .white : .black)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(.systemGray6))
+                .cornerRadius(10)
+            }
             
             Spacer()
             
             HStack(spacing: 15) {
-                // Личный счет (только для авторизованных пользователей)
-                if !userPhone.isEmpty && balanceViewModel.balanceLoaded {
-                    HStack(spacing: 6) {
-                        Image(systemName: "creditcard.fill")
-                            .resizable()
-                            .frame(width: 16, height: 16)
-                            .foregroundColor(.accentColor)
-                        Text("\(balanceViewModel.balance) ₽")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(colorScheme == .dark ? .white : .black)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                }
-                
                 Button(action: {
                     if let url = URL(string: "https://wa.me/79615805108") {
                         UIApplication.shared.open(url)
