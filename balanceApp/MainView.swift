@@ -140,10 +140,10 @@ struct CustomNavigationBar: View {
             // Личный счет по центру (только для авторизованных пользователей)
             if !userPhone.isEmpty && balanceViewModel.balanceLoaded {
                 HStack(spacing: 8) {
-                    Image(systemName: "creditcard.fill")
+                    Image(systemName: "rublesign.circle.fill")
                         .resizable()
                         .frame(width: 18, height: 18)
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.green)
                     Text("\(balanceViewModel.balance) ₽")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(colorScheme == .dark ? .white : .black)
