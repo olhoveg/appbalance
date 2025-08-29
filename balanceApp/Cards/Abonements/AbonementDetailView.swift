@@ -912,10 +912,6 @@ struct ServiceRow: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
-                    
-                    Text(formatServiceCount(sessionsCount, serviceType: serviceType))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
                 
                 Spacer()
